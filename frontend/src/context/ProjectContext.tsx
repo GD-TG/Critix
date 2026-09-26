@@ -3,12 +3,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { api } from "@/api";
 import { copy } from "@/shared";
-import type { Project, Result } from "@/types";
+import type { Analysis, Project, Result } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 
 interface ProjectContextValue {
@@ -16,6 +17,10 @@ interface ProjectContextValue {
   saved: Result | null;
   draft: Project | null;
   preview: Result | null;
+  view: Result | null;
+  rows: Map<string, Analysis["tasks"][number]>;
+  affected: Set<string>;
+  overloadedAssigneeIds: Set<string>;
   lastUpdated: Date;
   dirty: boolean;
   list: () => Promise<Array<{ id: string; name: string }>>;
@@ -102,8 +107,23 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     saved && draft && JSON.stringify(saved.project) !== JSON.stringify(draft),
   );
 
+  const view = preview || saved;
+  const rows = useMemo(
+    () => new Map((view?.analysis.tasks || []).map((r) => [r.id, r])),
+    [view],
+  );
+  const affected = useMemo(
+    () => new Set(preview?.changes?.changed_task_ids || []),
+    [preview],
+  );
+  const overloadedAssigneeIds = useMemo(
+    () => new Set(view?.analysis.overloads.map((o) => o.assignee_id) || []),
+    [view],
+  );
+
   const value: ProjectContextValue = {
-    projects, saved, draft, preview, lastUpdated, dirty,
+    projects, saved, draft, preview, view, rows, affected, overloadedAssigneeIds,
+    lastUpdated, dirty,
     list, accept, change, run, clearProject,
     setSaved, setDraft, setPreview,
   };
