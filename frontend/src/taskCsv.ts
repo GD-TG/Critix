@@ -36,7 +36,7 @@ export function parseCsvToTasks(csv: string, people: Person[], existingIds: stri
   if (!rows.length) throw new Error("CSV пуст");
   const heading = rows.shift()!.map(cell => cell.trim());
   if (heading.length < 8 || headers.slice(0, 8).some((h, i) => heading[i] !== h))
-    throw new Error("Нужны заголовки из экспорта Critix. Длительность указывается в минутах.");
+    throw new Error("Нужны заголовки из экспорта Актион. Длительность указывается в минутах.");
   const ids = new Set(existingIds);
   const priorities: Record<string, Task["priority"]> = {low: "low", medium: "medium", high: "high", urgent: "urgent", "Низкий": "low", "Средний": "medium", "Высокий": "high", "Срочный": "urgent"};
   const statuses: Record<string, Task["status"]> = {todo: "todo", in_progress: "in_progress", done: "done", blocked: "blocked", "Запланировано": "todo", "В работе": "in_progress", "Завершено": "done", "Заблокировано": "blocked"};

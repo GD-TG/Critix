@@ -207,7 +207,7 @@ export function ExecutiveReportModal({
               </div>
               <div style={{ textAlign: "right" }}>
                 <Text size="xs" fw={700} c="blue">
-                  CRITIX EXECUTIVE REPORT
+                  АКТИОН · ОТЧЁТ РУКОВОДИТЕЛЯ
                 </Text>
                 <Text size="xs" c="dimmed">
                   Метод критического пути (CPM)
@@ -220,7 +220,7 @@ export function ExecutiveReportModal({
           <SimpleGrid cols={{ base: 2, sm: 4 }} mb="md">
             <Card withBorder p="xs">
               <Text size="xs" c="dimmed">Прогресс проекта</Text>
-              <Text size="lg" fw={800} c="indigo">{progressPercent}%</Text>
+                <Text size="lg" fw={800} c="red">{progressPercent}%</Text>
               <Text size="10px" c="dimmed">{completedTasks.length} из {project.tasks.length} задач</Text>
             </Card>
 
@@ -249,9 +249,9 @@ export function ExecutiveReportModal({
 
           {/* AI Strategic Analysis */}
           {aiSummary && (
-            <Card withBorder p="sm" mb="md" style={{ background: "rgba(90, 117, 233, 0.04)" }}>
+            <Card withBorder p="sm" mb="md" style={{ background: "rgba(210, 10, 46, 0.04)" }}>
               <Group gap="xs" mb={4}>
-                <Sparkles size={16} color="#5a75e9" />
+                <Sparkles size={16} color="var(--brand)" />
                 <Text size="xs" fw={700} c="blue">
                   СТРАТЕГИЧЕСКИЙ АНАЛИЗ И РЕКОМЕНДАЦИИ AI
                 </Text>

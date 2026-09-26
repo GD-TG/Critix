@@ -13,6 +13,7 @@ import {
   FileInput,
   Group,
   MantineProvider,
+  type MantineColorsTuple,
   Menu,
   Modal,
   NumberInput,
@@ -92,6 +93,17 @@ import {
   type Skill,
   type Task,
 } from "./types";
+
+const actionLogo = new URL("./action-logo-transparent.png", import.meta.url).href;
+const actionRed: MantineColorsTuple = [
+  "#fff0f2", "#ffe0e4", "#ffc1cb", "#ff9baa", "#f46b83",
+  "#e9415e", "#d20a2e", "#b90a29", "#960821", "#79071c",
+];
+const actionTheme = {
+  fontFamily: "'IBM Plex Sans', sans-serif",
+  primaryColor: "red",
+  colors: { red: actionRed, blue: actionRed },
+};
 
 const statusLabels: Record<string, string> = {
   todo: "Запланировано",
@@ -183,7 +195,7 @@ function exportProjectToJson(project: Project) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${project.name.replace(/\s+/g, "_")}_critix_export.json`;
+  link.download = `${project.name.replace(/\s+/g, "_")}_aktion_export.json`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -539,7 +551,7 @@ export function App() {
           ? "#ee9564"
           : row.critical
             ? "#e57470"
-            : "#5a75e9",
+            : "var(--brand)",
         width: 230,
       },
     };
@@ -657,28 +669,39 @@ export function App() {
   // Login View
   if (!logged) {
     return (
-      <MantineProvider forceColorScheme={colorScheme}>
-        <Container size={420} my={80}>
-          <Card withBorder p="xl" radius="md">
-            <Stack gap="md">
-              <Group gap="xs">
-                <span className="brand-mark">c</span>
-                <Title order={2}>critix</Title>
-              </Group>
-              <Text c="dimmed" size="sm">
-                Вход в систему анализа рисков и управления критическим путем
-              </Text>
+      <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
+        <main className="login-screen">
+          <aside className="login-panel">
+            <div className="login-statement">
+              <span className="login-overline">РАБОЧЕЕ ПРОСТРАНСТВО</span>
+              <h1>Проект<br />в фокусе<span>.</span></h1>
+              <p>Сроки, связи и решения команды — в одном плане.</p>
+            </div>
+            <div className="login-panel-footer"><span>ПРОЕКТНОЕ УПРАВЛЕНИЕ</span><span>АКТИОН</span></div>
+          </aside>
+          <section className="login-main">
+            <div className="login-form">
+              <div className="login-lockup">
+                <img src={actionLogo} alt="Логотип Актион" />
+                <span>Актион</span>
+              </div>
+              <div className="login-form-heading">
+                <span>ВХОД В СИСТЕМУ</span>
+                <Title order={2}>С возвращением</Title>
+                <Text c="dimmed" size="sm">Введите пароль руководителя, чтобы продолжить.</Text>
+              </div>
 
               {error && <Alert color="red">{error}</Alert>}
 
               <PasswordInput
                 label="Пароль руководителя"
-                placeholder="Введи пароль из .env"
+                placeholder="Введите пароль"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
 
               <Button
+                className="login-submit"
                 fullWidth
                 loading={busy}
                 onClick={() =>
@@ -694,9 +717,11 @@ export function App() {
               >
                 Войти в рабочее пространство
               </Button>
-            </Stack>
-          </Card>
-        </Container>
+              <div className="login-secure-note"><span />Доступ только для участников команды</div>
+            </div>
+            <span className="login-copyright">© АКТИОН · ПЛАНИРОВАНИЕ ПРОЕКТОВ</span>
+          </section>
+        </main>
       </MantineProvider>
     );
   }
@@ -704,13 +729,13 @@ export function App() {
 
 
   return (
-    <MantineProvider forceColorScheme={colorScheme}>
+    <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
       <div className="app-shell">
         {/* Designer Sidebar */}
         <aside className="sidebar">
           <div className="brand">
-            <span className="brand-mark">c</span>
-            <span>critix</span>
+            <img className="brand-logo" src={actionLogo} alt="Логотип Актион" />
+            <span>Актион</span>
           </div>
 
           <div className="workspace-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
@@ -2480,7 +2505,7 @@ export function App() {
             const succ = draft.tasks.find((t) => t.id === currentDep.successor_id);
             return (
               <Stack gap="sm">
-                <Card withBorder p="xs" style={{ background: "rgba(90, 117, 233, 0.05)" }}>
+                <Card withBorder p="xs" style={{ background: "rgba(210, 10, 46, 0.04)" }}>
                   <Text size="xs" fw={700} c="dimmed">СВЯЗАННЫЕ ЗАДАЧИ:</Text>
                   <Text size="sm" fw={600}>
                     «{pred?.name || currentDep.predecessor_id}» → «{succ?.name || currentDep.successor_id}»
@@ -2728,7 +2753,7 @@ export function App() {
               {projects.map((p) => {
                 const isCurrent = saved?.id === p.id;
                 return (
-                  <Card key={p.id} withBorder p="xs" style={{ background: isCurrent ? "rgba(90, 117, 233, 0.08)" : undefined }}>
+                  <Card key={p.id} withBorder p="xs" style={{ background: isCurrent ? "rgba(210, 10, 46, 0.07)" : undefined }}>
                     <Group justify="space-between">
                       <Group gap="xs">
                         <span className="project-dot" />
@@ -3132,7 +3157,7 @@ export function App() {
                   )}
 
                   {/* Add predecessor inline */}
-                  <Card withBorder p="xs" radius="sm" style={{ background: "rgba(90, 117, 233, 0.03)" }}>
+                  <Card withBorder p="xs" radius="sm" style={{ background: "rgba(210, 10, 46, 0.03)" }}>
                     <Text size="xs" fw={700} mb={6}>+ Привязать задачу-предшественника:</Text>
                     <Stack gap="xs">
                       <Select
@@ -3300,7 +3325,7 @@ export function App() {
 
                 <Divider my="sm" />
 
-                <Card withBorder p="sm" style={{ background: "rgba(90, 117, 233, 0.04)" }}>
+                <Card withBorder p="sm" style={{ background: "rgba(210, 10, 46, 0.04)" }}>
                   <Group justify="space-between" align="center">
                     <div>
                       <Text size="xs" fw={700} c="blue">
@@ -3369,23 +3394,23 @@ export function App() {
         <Modal
           opened={helpModal}
           onClose={() => setHelpModal(false)}
-          title="Справка и возможности Critix"
+          title="Справка и возможности Актион"
           size="lg"
         >
           <Stack gap="md">
-            <Card withBorder p="sm" style={{ background: "rgba(90, 117, 233, 0.05)" }}>
+            <Card withBorder p="sm" style={{ background: "rgba(210, 10, 46, 0.04)" }}>
               <Group gap="xs" mb={4}>
                 <Target size={16} color="#e57470" />
                 <Text fw={700} size="sm">Метод критического пути (CPM) и Базовый план</Text>
               </Group>
               <Text size="xs" c="dimmed">
-                Critix автоматически рассчитывает самый длинный путь технологических зависимостей. Задачи с нулевым резервом времени (резерв = 0 ч) отмечены красной рамкой. Любая задержка на критическом пути сдвигает срок сдачи всего проекта.
+                Актион автоматически рассчитывает самый длинный путь технологических зависимостей. Задачи с нулевым резервом времени (резерв = 0 ч) отмечены красной рамкой. Любая задержка на критическом пути сдвигает срок сдачи всего проекта.
               </Text>
             </Card>
 
             <Card withBorder p="sm">
               <Group gap="xs" mb={4}>
-                <GitBranch size={16} color="#5a75e9" />
+                <GitBranch size={16} color="var(--brand)" />
                 <Text fw={700} size="sm">Интерактивная карта графа (ReactFlow)</Text>
               </Group>
               <Text size="xs" c="dimmed">
