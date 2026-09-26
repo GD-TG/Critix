@@ -1,0 +1,144 @@
+import { ActionIcon, Group, SegmentedControl, Text } from "@mantine/core";
+import {
+  AlertTriangle, Check, ChevronDown, GitBranch,
+  LayoutDashboard, Link as LinkIcon, LogOut, Plus,
+  Settings, Users,
+} from "lucide-react";
+import { useApp } from "../../context/AppContext";
+
+type Props = {
+  actionLogo: string;
+  onScrollTo: (id: string) => void;
+};
+
+export function SideForm({ actionLogo, onScrollTo }: Props) {
+  const {
+    draft, saved, colorScheme, toggleTheme,
+    activeView, setActiveView,
+    setProjectManageModal, setSettings,
+    setSelectedAssigneeId, addPerson, logout,
+    preview,
+  } = useApp();
+
+  const view = preview || saved;
+  const totalTasksCount = draft?.tasks.length || 0;
+  const overdueTasks = (view?.analysis.tasks || []).filter((r) => r.risk_flags.includes("overdue"));
+  const overloadedAssigneeIds = new Set(view?.analysis.overloads.map((o) => o.assignee_id) || []);
+
+  return (
+    <aside className="sidebar">
+      <div className="brand">
+        <img className="brand-logo" src={actionLogo} alt="Логотип Актион" />
+        <span>Актион</span>
+      </div>
+
+      <div className="workspace-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+
+      <button className="project-switcher" onClick={() => setProjectManageModal(true)}>
+        <span className="project-dot" />
+        <span>
+          <strong>{draft?.name || "Выберите проект"}</strong>
+          <small>{draft?.timezone || "Проект не выбран"}</small>
+        </span>
+        <ChevronDown size={15} />
+      </button>
+
+      <nav className="main-nav">
+        <button className="nav-item" onClick={() => onScrollTo("overview")}>
+          <LayoutDashboard size={16} /> Обзор
+        </button>
+        <button className="nav-item" onClick={() => onScrollTo("timeline")}>
+          <GitBranch size={16} /> План проекта
+        </button>
+        <button className={`nav-item ${activeView === "tasks_table" ? "active" : ""}`} onClick={() => setActiveView("tasks_table")}>
+          <Check size={16} /> Задачи
+          <span className="nav-count">{totalTasksCount}</span>
+        </button>
+        <button className={`nav-item ${activeView === "graph" ? "active" : ""}`} onClick={() => setActiveView("graph")}>
+          <GitBranch size={16} /> Карта связей
+        </button>
+        <button className={`nav-item ${activeView === "team" ? "active" : ""}`} onClick={() => setActiveView("team")}>
+          <Users size={16} /> Команда
+          {overloadedAssigneeIds.size > 0 && <span className="nav-count warning">!</span>}
+        </button>
+        <button className={`nav-item ${activeView === "links" ? "active" : ""}`} onClick={() => setActiveView("links")}>
+          <LinkIcon size={16} /> Зависимости
+          <span className="nav-count">{draft?.dependencies.length || 0}</span>
+        </button>
+        <button className={`nav-item ${activeView === "ai" ? "active" : ""}`} onClick={() => setActiveView("ai")}>
+          <AlertTriangle size={16} /> Риски & AI
+          {overdueTasks.length > 0 && <span className="nav-count warning">{overdueTasks.length}</span>}
+        </button>
+      </nav>
+
+      <div className="sidebar-divider" />
+
+      <div className="workspace-label">КОМАНДА</div>
+      <div className="team-stack">
+        {(draft?.assignees || []).map((person) => (
+          <span
+            key={person.id}
+            title={person.name}
+            className={`avatar ${getAvatarClass(person.id)}`}
+            onClick={() => {
+              setSelectedAssigneeId(person.id);
+              setActiveView("team");
+            }}
+            style={{ cursor: "pointer" }}
+          >
+            {getInitials(person.name)}
+          </span>
+        ))}
+        <button className="avatar add-person" title="Добавить участника" onClick={addPerson}>
+          <Plus size={14} />
+        </button>
+      </div>
+      <div className="workspace-label team-caption" onClick={() => setActiveView("team")} style={{ cursor: "pointer" }}>
+        {draft?.assignees.length || 0} участников · роли и графики
+      </div>
+
+      <div className="sidebar-bottom">
+        <button className="nav-item" onClick={() => setSettings(true)}>
+          <Settings size={16} /> Настройки проекта
+        </button>
+
+        <Group justify="space-between" mt="xs" px="xs">
+          <Text size="xs" c="dimmed">Тема:</Text>
+          <SegmentedControl
+            size="xs"
+            value={colorScheme}
+            onChange={(v) => toggleTheme(v as "dark" | "light")}
+            data={[
+              { label: "Светлая", value: "light" },
+              { label: "Тёмная", value: "dark" },
+            ]}
+          />
+        </Group>
+
+        <div className="user-card">
+          <span className="avatar avatar-ink">PM</span>
+          <span>
+            <strong>Руководитель</strong>
+            <small>Администратор проекта</small>
+          </span>
+          <ActionIcon variant="subtle" color="gray" size="sm" title="Выйти" onClick={() => void logout()}>
+            <LogOut size={15} />
+          </ActionIcon>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
+
+const AVATAR_COLORS = ["ink", "orange", "green", "blue", "lilac"];
+function getAvatarClass(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  return `avatar-${AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]}`;
+}

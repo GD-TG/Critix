@@ -93,6 +93,9 @@ import {
   type Skill,
   type Task,
 } from "./types";
+import { AppProvider, useApp } from "./context/AppContext";
+import { AuthForm } from "./feature/AuthForm/AuthForm";
+import { SideForm } from "./feature/SideForm/SideForm";
 
 const actionLogo = new URL("./action-logo-transparent.png", import.meta.url).href;
 const actionRed: MantineColorsTuple = [
@@ -668,232 +671,15 @@ export function App() {
 
   // Login View
   if (!logged) {
-    return (
-      <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
-        <main className="login-screen">
-          <aside className="login-panel">
-            <div className="login-statement">
-              <span className="login-overline">РАБОЧЕЕ ПРОСТРАНСТВО</span>
-              <h1>Проект<br />в фокусе<span>.</span></h1>
-              <p>Сроки, связи и решения команды — в одном плане.</p>
-            </div>
-            <div className="login-panel-footer"><span>ПРОЕКТНОЕ УПРАВЛЕНИЕ</span><span>АКТИОН</span></div>
-          </aside>
-          <section className="login-main">
-            <div className="login-form">
-              <div className="login-lockup">
-                <img src={actionLogo} alt="Логотип Актион" />
-                <span>Актион</span>
-              </div>
-              <div className="login-form-heading">
-                <span>ВХОД В СИСТЕМУ</span>
-                <Title order={2}>С возвращением</Title>
-                <Text c="dimmed" size="sm">Введите пароль руководителя, чтобы продолжить.</Text>
-              </div>
-
-              {error && <Alert color="red">{error}</Alert>}
-
-              <PasswordInput
-                label="Пароль руководителя"
-                placeholder="Введите пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-
-              <Button
-                className="login-submit"
-                fullWidth
-                loading={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await api("/login", "POST", { password });
-                    setLogged(true);
-                    const data = await list();
-                    if (data.length > 0) {
-                      accept(await api<Result>(`/projects/${data[0].id}`));
-                    }
-                  })
-                }
-              >
-                Войти в рабочее пространство
-              </Button>
-              <div className="login-secure-note"><span />Доступ только для участников команды</div>
-            </div>
-            <span className="login-copyright">© АКТИОН · ПЛАНИРОВАНИЕ ПРОЕКТОВ</span>
-          </section>
-        </main>
-      </MantineProvider>
-    );
+    return <AuthForm colorScheme={colorScheme} actionLogo={actionLogo} actionTheme={actionTheme} />;
   }
-
 
 
   return (
     <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
       <div className="app-shell">
         {/* Designer Sidebar */}
-        <aside className="sidebar">
-          <div className="brand">
-            <img className="brand-logo" src={actionLogo} alt="Логотип Актион" />
-            <span>Актион</span>
-          </div>
-
-          <div className="workspace-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
-
-          <button className="project-switcher" onClick={() => setProjectManageModal(true)}>
-            <span className="project-dot" />
-            <span>
-              <strong>{draft?.name || "Выберите проект"}</strong>
-              <small>{draft?.timezone || "Проект не выбран"}</small>
-            </span>
-            <ChevronDown size={15} />
-          </button>
-
-          <nav className="main-nav">
-            <button
-              className={`nav-item ${activeView === "dashboard" ? "active" : ""}`}
-              onClick={() => scrollToSection("overview")}
-            >
-              <LayoutDashboard size={16} /> Обзор
-            </button>
-            <button
-              className={`nav-item ${activeView === "dashboard" ? "" : ""}`}
-              onClick={() => scrollToSection("timeline")}
-            >
-              <GitBranch size={16} /> План проекта
-            </button>
-            <button
-              className={`nav-item ${activeView === "tasks_table" ? "active" : ""}`}
-              onClick={() => setActiveView("tasks_table")}
-            >
-              <Check size={16} /> Задачи
-              <span className="nav-count">{totalTasksCount}</span>
-            </button>
-            <button
-              className={`nav-item ${activeView === "graph" ? "active" : ""}`}
-              onClick={() => setActiveView("graph")}
-            >
-              <GitBranch size={16} /> Карта связей
-            </button>
-            <button
-              className={`nav-item ${activeView === "team" ? "active" : ""}`}
-              onClick={() => setActiveView("team")}
-            >
-              <Users size={16} /> Команда
-              {overloadedAssigneeIds.size > 0 && (
-                <span className="nav-count warning">!</span>
-              )}
-            </button>
-            <button
-              className={`nav-item ${activeView === "links" ? "active" : ""}`}
-              onClick={() => setActiveView("links")}
-            >
-              <LinkIcon size={16} /> Зависимости
-              <span className="nav-count">{draft?.dependencies.length || 0}</span>
-            </button>
-            <button
-              className={`nav-item ${activeView === "ai" ? "active" : ""}`}
-              onClick={() => setActiveView("ai")}
-            >
-              <AlertTriangle size={16} /> Риски & AI
-              {overdueTasks.length > 0 && <span className="nav-count warning">{overdueTasks.length}</span>}
-            </button>
-          </nav>
-
-          <div className="sidebar-divider" />
-
-          <div className="workspace-label">КОМАНДА</div>
-          <div className="team-stack">
-            {(draft?.assignees || []).map((person) => (
-              <span
-                key={person.id}
-                title={`${person.name} ${person.role ? `· ${person.role}` : ""} · ${(person.skills || []).map((s) => s.name).join(", ") || "Навыки не указаны"}`}
-                className={`avatar ${getAvatarClass(person.id)}`}
-                onClick={() => {
-                  setSelectedAssigneeId(person.id);
-                  setActiveView("team");
-                }}
-                style={{ cursor: "pointer" }}
-              >
-                {getInitials(person.name)}
-              </span>
-            ))}
-            <button
-              className="avatar add-person"
-              title="Добавить участника команды"
-              onClick={() => {
-                if (draft) {
-                  const newId = crypto.randomUUID();
-                  const newPerson: Person = {
-                    id: newId,
-                    name: `Сотрудник ${draft.assignees.length + 1}`,
-                    role: "Разработчик",
-                    skills: [],
-                    calendar: defaultCalendar(),
-                  };
-                  change({
-                    ...draft,
-                    assignees: [...draft.assignees, newPerson],
-                  });
-                  setSelectedAssigneeId(newId);
-                  setActiveView("team");
-                }
-              }}
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-          <div
-            className="workspace-label team-caption"
-            style={{ cursor: "pointer" }}
-            onClick={() => setActiveView("team")}
-          >
-            {draft?.assignees.length || 0} участников · роли и графики
-          </div>
-
-          <div className="sidebar-bottom">
-            <button className="nav-item" onClick={() => setSettings(true)}>
-              <Settings size={16} /> Настройки проекта
-            </button>
-
-            <Group justify="space-between" mt="xs" px="xs">
-              <Text size="xs" c="dimmed">Тема:</Text>
-              <SegmentedControl
-                size="xs"
-                value={colorScheme}
-                onChange={(v) => toggleTheme(v as "dark" | "light")}
-                data={[
-                  { label: "Светлая", value: "light" },
-                  { label: "Тёмная", value: "dark" },
-                ]}
-              />
-            </Group>
-
-            <div className="user-card">
-              <span className="avatar avatar-ink">PM</span>
-              <span>
-                <strong>Руководитель</strong>
-                <small>Администратор проекта</small>
-              </span>
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                title="Выйти"
-                onClick={() =>
-                  void run(async () => {
-                    await api("/logout", "POST");
-                    setLogged(false);
-                    setSaved(null);
-                    setDraft(null);
-                  })
-                }
-              >
-                <LogOut size={15} />
-              </ActionIcon>
-            </div>
-          </div>
-        </aside>
+        <SideForm actionLogo={actionLogo} onScrollTo={() => {}} />
 
         {/* Designer Main Content */}
         <main className="main-content">
@@ -3451,6 +3237,8 @@ export function App() {
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <AppProvider>
+      <App />
+    </AppProvider>
   </React.StrictMode>,
 );

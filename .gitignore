@@ -28,3 +28,4 @@ dist/
 .coverage
 tmp/
 *.tsbuildinfo
+uv.lock
