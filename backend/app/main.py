@@ -3,6 +3,7 @@ import hmac
 import os
 import secrets
 import time
+from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -11,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 
 from app import models, service
-from app.ai import explain
+from app.ai import chat, explain
 from app.db import session
 from app.demo import demo
 from app.engine.analysis import analyze
@@ -136,6 +137,11 @@ def update(project_id: UUID, body: SaveProject, db=Depends(session)):
     return service.update(db, project_id, body)
 
 
+@app.delete("/api/projects/{project_id}", dependencies=auth)
+def delete_project(project_id: UUID, db=Depends(session)):
+    return service.delete_project(db, project_id)
+
+
 @app.post("/api/projects/{project_id}/simulate", dependencies=auth)
 def simulate(project_id: UUID, body: SaveProject, db=Depends(session)):
     return service.update(db, project_id, body, simulate=True)
@@ -145,3 +151,29 @@ def simulate(project_id: UUID, body: SaveProject, db=Depends(session)):
 async def ai(project_id: UUID, db=Depends(session)):
     data = service.snapshot(db, service.load(db, project_id))
     return await explain(data, analyze(data))
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1, max_length=10)
+
+
+@app.post("/api/projects/{project_id}/chat", dependencies=auth)
+async def chat_copilot(project_id: UUID, body: ChatRequest, db=Depends(session)):
+    data = service.snapshot(db, service.load(db, project_id))
+    return await chat(data, analyze(data), [m.model_dump() for m in body.messages])
+
+
+
+@app.get("/api/projects/{project_id}/history", dependencies=auth)
+def project_history(project_id: UUID, db=Depends(session)):
+    service.load(db, project_id)
+    changes = db.scalars(select(models.Change).where(models.Change.project_id == project_id)
+                         .order_by(models.Change.version.desc()).limit(20)).all()
+    return [{"version": item.version, "created_at": item.created_at,
+             "finish": item.analysis.get("finish"),
+             "task_count": len(item.snapshot.get("tasks", []))} for item in changes]

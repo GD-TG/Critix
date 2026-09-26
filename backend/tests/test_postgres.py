@@ -60,6 +60,12 @@ def test_http_login_demo_simulation_save_and_reopen(monkeypatch):
             first.update(status="todo", actual_start=None, actual_finish=None)
             result = client.put(url, headers=headers, json={"version": 2, "project": changed})
             assert result.status_code == 200, result.text
+            history = client.get(url + "/history")
+            assert history.status_code == 200
+            assert [entry["version"] for entry in history.json()] == [3, 2, 1]
+            assert history.json()[0]["task_count"] == 10
+            assert client.delete(url, headers=headers).status_code == 200
+            assert client.get(url).status_code == 404
     finally:
         app.dependency_overrides.pop(session, None)
         if project_id:

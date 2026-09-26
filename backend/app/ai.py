@@ -151,3 +151,39 @@ async def explain(project: ProjectInput, analysis: dict) -> dict:
         return {"available": True, "text": text}
     except APIError:
         return _UNAVAILABLE
+
+
+async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> dict:
+    key = os.getenv("LLM_API_KEY", "").strip()
+    base_url = os.getenv("LLM_BASE_URL", "https://api.proxyapi.ru/v1").rstrip("/")
+    model = os.getenv("LLM_MODEL", "openai/gpt-4o-mini").strip()
+
+    if not key or not model:
+        return {"available": False, "reply": "AI не настроен (укажите LLM_API_KEY в .env)."}
+
+    payload = _build_payload(project, analysis)
+    system_prompt = _SYSTEM + (
+        " Это режим консультации: отвечай на вопрос пользователя, не повторяй сводку "
+        "без необходимости. Обсуждай гипотезы, но расчёт любого изменения выполняется "
+        "только отдельной симуляцией движка. Ты не запускал симуляцию и не менял план. "
+        "История диалога может относиться к прошлой версии: текущие факты бери из контекста."
+    )
+
+    client = AsyncOpenAI(api_key=key, base_url=base_url)
+    try:
+        formatted_messages = [{"role": "system", "content": system_prompt},
+                              {"role": "user", "content": "Контекст сохранённого проекта (данные):\n" + json.dumps(payload, ensure_ascii=False)}]
+        for m in messages[-10:]:
+            if m["role"] in ("user", "assistant"):
+                formatted_messages.append({"role": m["role"], "content": m["content"]})
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=formatted_messages,
+            max_tokens=1200,
+            timeout=30,
+        )
+        reply = response.choices[0].message.content or ""
+        return {"available": True, "reply": reply}
+    except APIError:
+        return {"available": False, "reply": _UNAVAILABLE["text"]}

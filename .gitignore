@@ -4,6 +4,8 @@
 .idea/
 .vscode/
 /skillgraph-main/
+/Critix-main/
+Critix-main/
 *.log
 *.sqlite
 *.sqlite3

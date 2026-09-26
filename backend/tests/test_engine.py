@@ -26,6 +26,22 @@ def rows(result):
     return {r["id"]: r for r in result["tasks"]}
 
 
+def test_overdue_is_clock_explicit_and_baseline_delta_is_elapsed():
+    p = project()
+    before = analyze(p, as_of=dt())
+    assert all("overdue" not in t["risk_flags"] for t in before["tasks"])
+    later = analyze(p, as_of=dt(22))
+    assert all("overdue" in t["risk_flags"] for t in later["tasks"])
+    assert before["finish"] == later["finish"]
+    p.baseline = {"saved_at": dt().isoformat(), "finish": dt(20, 18).isoformat(), "tasks": {}}
+    assert analyze(p, as_of=dt())["baseline_delta_minutes"] == 24 * 60
+
+
+def test_invalid_baseline_rejected():
+    with pytest.raises(ValidationError):
+        project(baseline={"finish": "not a date"})
+
+
 @pytest.mark.parametrize("kind,lag,expected", [("FS", 0, dt(22)), ("SS", 120, dt(21, 11)),
     ("FF", 0, dt()), ("SF", 480, dt()), ("FS", -120, dt(21, 16))])
 def test_dependency_types(kind, lag, expected):

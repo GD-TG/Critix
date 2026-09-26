@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ActionIcon,
@@ -10,12 +10,14 @@ import {
   Container,
   Divider,
   Drawer,
+  FileInput,
   Group,
   MantineProvider,
   Modal,
   NumberInput,
   PasswordInput,
   Progress,
+  ScrollArea,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -29,12 +31,49 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { Background, Controls, MarkerType, ReactFlow } from "@xyflow/react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  CircleHelp,
+  Gauge,
+  GitBranch,
+  LayoutDashboard,
+  List,
+  MoreHorizontal,
+  Plus,
+  Settings,
+  SlidersHorizontal,
+  Sparkles,
+  Target,
+  X,
+  Zap,
+  Download,
+  Upload,
+  Sun,
+  Moon,
+  LogOut,
+  RefreshCw,
+  Users,
+  Trash2,
+  Edit,
+  Link as LinkIcon,
+  FileText,
+  ChevronRight,
+} from "lucide-react";
 import "@mantine/core/styles.css";
 import "@xyflow/react/dist/style.css";
 import "./style.css";
 import { api } from "./api";
+import { AICopilotChat } from "./AICopilotChat";
 import { CalendarEditor } from "./CalendarEditor";
+import { ExecutiveReportModal } from "./ExecutiveReportModal";
 import { ProjectDateInput } from "./ProjectDateInput";
+import { parseCsvToTasks, tasksToCsv } from "./taskCsv";
+import { ProjectGraph } from "./ProjectGraph";
 import { changeTaskStatus, rescheduleOverdueTasks } from "./taskEditing";
 import {
   defaultCalendar,
@@ -49,14 +88,14 @@ import {
   type Task,
 } from "./types";
 
-const statusLabels = {
-  todo: "Запланирована",
+const statusLabels: Record<string, string> = {
+  todo: "Запланировано",
   in_progress: "В работе",
-  done: "Завершена",
-  blocked: "Заблокирована",
+  done: "Завершено",
+  blocked: "Заблокировано",
 };
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   todo: "gray",
   in_progress: "blue",
   done: "teal",
@@ -84,13 +123,6 @@ const skillLevelLabels: Record<Skill["level"], string> = {
   expert: "Эксперт",
 };
 
-const riskLabels: Record<string, string> = {
-  blocked: "Блокировка",
-  overload: "Перегрузка",
-  past_deadline: "За дедлайном",
-  dependency_conflict: "Конфликт фактических дат",
-};
-
 export const TIMEZONE_OPTIONS = [
   { value: "Asia/Yekaterinburg", label: "Екатеринбург, Тюмень, Пермь (UTC+5)" },
   { value: "Europe/Moscow", label: "Москва, Санкт-Петербург (UTC+3)" },
@@ -112,31 +144,13 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-const AVATAR_COLORS = ["teal", "blue", "indigo", "cyan", "violet", "grape", "orange", "green"];
+const AVATAR_COLORS = ["ink", "orange", "green", "blue", "lilac"];
 
-function getAvatarColor(id: string): string {
+function getAvatarClass(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function getWeeklyHours(calendar: Calendar): number {
-  let minutes = 0;
-  for (let day = 0; day < 7; day++) {
-    const shifts = calendar.week[String(day)] || calendar.week[day] || [];
-    for (const shift of shifts) {
-      if (shift.start && shift.end) {
-        const [sh, sm] = shift.start.split(":").map(Number);
-        const [eh, em] = shift.end.split(":").map(Number);
-        const startMin = sh * 60 + sm;
-        const endMin = eh * 60 + em;
-        if (endMin > startMin) {
-          minutes += endMin - startMin;
-        }
-      }
-    }
-  }
-  return Math.round((minutes / 60) * 10) / 10;
+  const color = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  return `avatar-${color}`;
 }
 
 function calculateSkillMatch(task: Task, person: Person): number {
@@ -152,300 +166,272 @@ function calculateSkillMatch(task: Task, person: Person): number {
   return Math.round((matchCount / task.required_skills.length) * 100);
 }
 
-function calculateReliabilityScore(person: Person, tasks: Task[]): number {
-  const assigned = tasks.filter((t) => t.assignee_id === person.id);
-  if (assigned.length === 0) return 100;
-  const doneCount = assigned.filter((t) => t.status === "done").length;
-  const blockedCount = assigned.filter((t) => t.status === "blocked").length;
-  const score = ((doneCount + (assigned.length - blockedCount)) / (assigned.length * 2)) * 100;
-  return Math.round(score);
-}
-
 function exportTasksToCsv(project: Project) {
-  const headers = [
-    "ID",
-    "Название задачи",
-    "Приоритет",
-    "Статус",
-    "Рабочие часы",
-    "Исполнитель",
-    "Требуемые навыки",
-    "Занятость %",
-    "Начать не раньше",
-    "Фактическое начало",
-    "Фактическое окончание",
-  ];
-
-  const rows = project.tasks.map((t) => {
-    const assignee = project.assignees.find((p) => p.id === t.assignee_id);
-    return [
-      t.id,
-      `"${t.name.replace(/"/g, '""')}"`,
-      priorityLabels[t.priority || "medium"],
-      t.status,
-      t.duration_minutes / 60,
-      assignee ? `"${assignee.name.replace(/"/g, '""')}"` : "",
-      `"${(t.required_skills || []).join(", ").replace(/"/g, '""')}"`,
-      t.allocation_percent,
-      t.not_before || "",
-      t.actual_start || "",
-      t.actual_finish || "",
-    ];
-  });
-
-  const csvContent =
-    "\uFEFF" +
-    [headers.join(";"), ...rows.map((r) => r.join(";"))].join("\r\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", `${project.name || "tasks"}_export.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const url = URL.createObjectURL(new Blob([tasksToCsv(project.tasks)], {type: "text/csv;charset=utf-8"}));
+  const link = document.createElement("a"); link.href = url; link.download = `${project.name}_tasks.csv`;
+  document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
 }
 
-function parseCsvTasks(csvText: string, existingAssignees: Person[]): Task[] {
-  const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return [];
-
-  const newTasks: Task[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const cols = line.split(/;|\t/);
-    if (cols.length < 2) continue;
-
-    const name = cols[1]?.replace(/^"|"$/g, "").trim() || cols[0]?.replace(/^"|"$/g, "").trim();
-    if (!name) continue;
-
-    const prioStr = (cols[2] || "").toLowerCase();
-    let priority: Priority = "medium";
-    if (prioStr.includes("низк") || prioStr.includes("low")) priority = "low";
-    else if (prioStr.includes("высок") || prioStr.includes("high")) priority = "high";
-    else if (prioStr.includes("сроч") || prioStr.includes("urgent")) priority = "urgent";
-
-    const hours = parseFloat(cols[4] || cols[3] || "8") || 8;
-    const assigneeName = (cols[5] || "").replace(/^"|"$/g, "").trim();
-    const assignee = existingAssignees.find(
-      (a) => a.name.toLowerCase() === assigneeName.toLowerCase(),
-    );
-
-    const skillsStr = (cols[6] || "").replace(/^"|"$/g, "").trim();
-    const required_skills = skillsStr
-      ? skillsStr.split(",").map((s) => s.trim())
-      : [];
-
-    newTasks.push({
-      id: crypto.randomUUID(),
-      name,
-      duration_minutes: Math.round(hours * 60),
-      priority,
-      required_skills,
-      not_before: null,
-      assignee_id: assignee ? assignee.id : null,
-      allocation_percent: 100,
-      status: "todo",
-      actual_start: null,
-      actual_finish: null,
-    });
-  }
-
-  return newTasks;
-}
-
-function App() {
-  const [logged, setLogged] = useState(false);
-  const [password, setPassword] = useState("");
+export function App() {
   const [colorScheme, setColorScheme] = useState<"dark" | "light">(() => {
-    return (localStorage.getItem("critix_theme") as "dark" | "light") || "dark";
+    const savedTheme = localStorage.getItem("critix_theme");
+    return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "light";
   });
 
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [saved, setSaved] = useState<Result | null>(null);
-  const [preview, setPreview] = useState<Result | null>(null);
-  const [draft, setDraft] = useState<Project | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [task, setTask] = useState<Task | null>(null);
-  const [settings, setSettings] = useState(false);
-  const [newProject, setNewProject] = useState(false);
-  const [importModal, setImportModal] = useState(false);
-  const [importText, setImportText] = useState("");
-
-  const [name, setName] = useState("");
-  const [start, setStart] = useState("2026-09-28T09:00:00+05:00");
-  const [deadline, setDeadline] = useState("2026-10-16T18:00:00+05:00");
-  const [timezone, setTimezone] = useState("Asia/Yekaterinburg");
-  const [ai, setAi] = useState("");
-  const [newSkillName, setNewSkillName] = useState("");
-
-  const [dep, setDep] = useState<Dependency>({
-    predecessor_id: "",
-    successor_id: "",
-    kind: "FS",
-    lag_minutes: 0,
-    lag_mode: "working",
-  });
-  const view = preview || saved;
-
-  function toggleTheme(value: "dark" | "light") {
-    setColorScheme(value);
-    localStorage.setItem("critix_theme", value);
-    document.documentElement.setAttribute("data-mantine-color-scheme", value);
-  }
+  const toggleTheme = (theme: "dark" | "light") => {
+    setColorScheme(theme);
+    localStorage.setItem("critix_theme", theme);
+    document.documentElement.setAttribute("data-mantine-color-scheme", theme);
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mantine-color-scheme", colorScheme);
   }, [colorScheme]);
 
-  const date = (value: string) =>
-    new Intl.DateTimeFormat("ru-RU", {
-      timeZone: view?.project.timezone || "Asia/Yekaterinburg",
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
+  const [logged, setLogged] = useState(false);
+  const [password, setPassword] = useState("");
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
+  const [saved, setSaved] = useState<Result | null>(null);
+  const [draft, setDraft] = useState<Project | null>(null);
+  const zone = draft?.timezone || saved?.project.timezone || "UTC";
+  const date = (iso: string) => new Date(iso).toLocaleString("ru-RU", {timeZone: zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
+  const shortDate = (iso: string) => new Date(iso).toLocaleDateString("ru-RU", {timeZone: zone, day: "numeric", month: "short"});
+  const [history, setHistory] = useState<Array<{version: number; created_at: string; finish: string; task_count: number}>>([]);
+  const [historyError, setHistoryError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    setHistory([]); setHistoryError("");
+    if (saved) void api<typeof history>(`/projects/${saved.id}/history`).then(data => {
+      if (!cancelled) setHistory(data);
+    }).catch(() => { if (!cancelled) setHistoryError("Не удалось загрузить историю версий"); });
+    return () => { cancelled = true; };
+  }, [saved?.id, saved?.version]);
+  const [preview, setPreview] = useState<Result | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
-  const shortDate = (value: string) =>
-    new Intl.DateTimeFormat("ru-RU", {
-      timeZone: view?.project.timezone || "Asia/Yekaterinburg",
-      day: "numeric",
-      month: "short",
-    }).format(new Date(value));
+  // Modals & Drawers
+  const [newProjectModal, setNewProjectModal] = useState(false);
+  const [projectManageModal, setProjectManageModal] = useState(false);
+  const [deleteConfirmProject, setDeleteConfirmProject] = useState<{ id: string; name: string } | null>(null);
 
-  async function run(action: () => Promise<void>) {
+  // CSV Import modal
+  const [importModal, setImportModal] = useState(false);
+  const [csvInput, setCsvInput] = useState("");
+
+  // Dependencies management modal
+  const [depModal, setDepModal] = useState(false);
+  const [newDepPred, setNewDepPred] = useState("");
+  const [newDepSucc, setNewDepSucc] = useState("");
+  const [newDepKind, setNewDepKind] = useState<Dependency["kind"]>("FS");
+  const [newDepLagHours, setNewDepLagHours] = useState<number>(0);
+  const [newDepLagMode, setNewDepLagMode] = useState<Dependency["lag_mode"]>("working");
+
+  const [newProjName, setNewProjName] = useState("Новый проект");
+  const [newProjTz, setNewProjTz] = useState("Asia/Yekaterinburg");
+  const [newProjStart, setNewProjStart] = useState(() => new Date(Math.ceil(Date.now() / 60000) * 60000).toISOString());
+  const [newProjDeadline, setNewProjDeadline] = useState(() => new Date(Math.ceil(Date.now() / 60000) * 60000 + 14 * 86400000).toISOString());
+
+  const [task, setTask] = useState<Task | null>(null);
+  const [newTaskSkill, setNewTaskSkill] = useState("");
+  const [settings, setSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<string | null>("project");
+  const [helpModal, setHelpModal] = useState(false);
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [executiveReportModal, setExecutiveReportModal] = useState(false);
+
+  // Active view section
+  const [activeView, setActiveView] = useState<"dashboard" | "graph" | "tasks_table" | "team" | "links" | "ai">("dashboard");
+
+  // Skill management in Settings Drawer
+  const [newSkillName, setNewSkillName] = useState("");
+  const [newSkillLevel, setNewSkillLevel] = useState<Skill["level"]>("expert");
+  const [skillTargetAssigneeId, setSkillTargetAssigneeId] = useState<string | null>(null);
+
+  // Simulation modal
+  const [showScenarioModal, setShowScenarioModal] = useState(false);
+  const [simTaskChoice, setSimTaskChoice] = useState<string>("");
+  const [simDelayDays, setSimDelayDays] = useState<number>(2);
+  const [simResult, setSimResult] = useState<Result | null>(null);
+  const [simError, setSimError] = useState("");
+  const [simBusy, setSimBusy] = useState(false);
+
+  const [timelineMode, setTimelineMode] = useState<"timeline" | "list">("timeline");
+  const [dependencyVisible, setDependencyVisible] = useState(true);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(""), 2600);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const showNotification = (msg: string) => setToast(msg);
+
+  const run = async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true);
     setError("");
     try {
-      await action();
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Не удалось выполнить действие",
-      );
+      return await fn();
+    } catch (e: any) {
+      setError(e.message || "Ошибка сервера");
+      return undefined;
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  async function list() {
-    const data = await api<{ id: string; name: string }[]>("/projects");
+  const list = async () => {
+    const data = await api<Array<{ id: string; name: string }>>("/projects");
     setProjects(data);
-    setLogged(true);
-  }
+    return data;
+  };
 
-  function accept(result: Result) {
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const accept = (result: Result) => {
     setSaved(result);
     setDraft(copy(result.project));
     setPreview(null);
-    setAi("");
-  }
+    setAiText("");
+    setLastUpdated(new Date());
+  };
+
+  const change = (p: Project) => {
+    setDraft(p);
+    setPreview(null);
+    setAiText("");
+    setLastUpdated(new Date());
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    await run(async () => {
+      await api(`/projects/${id}`, "DELETE");
+      showNotification("Проект успешно удален");
+      const updatedList = await list();
+      setDeleteConfirmProject(null);
+      if (saved?.id === id) {
+        if (updatedList.length > 0) {
+          accept(await api<Result>(`/projects/${updatedList[0].id}`));
+        } else {
+          setSaved(null);
+          setDraft(null);
+        }
+      }
+    });
+  };
+
+  const handleCreateProjectSubmit = async () => {
+    if (!newProjName.trim()) return;
+    await run(async () => {
+      const created = await api<Result>("/projects", "POST", {
+        name: newProjName.trim(),
+        timezone: newProjTz,
+        start: newProjStart,
+        deadline: newProjDeadline,
+        calendar: defaultCalendar(),
+        assignees: [],
+        tasks: [],
+        dependencies: [],
+      });
+      await list();
+      accept(created);
+      setNewProjectModal(false);
+      showNotification(`Проект «${newProjName}» создан`);
+    });
+  };
+
+  const handleImportCsvSubmit = () => {
+    if (!draft || !csvInput.trim()) return;
+    let parsed: Task[];
+    try { parsed = parseCsvToTasks(csvInput, draft.assignees, draft.tasks.map(t => t.id)); }
+    catch (e) { setError(e instanceof Error ? e.message : "Ошибка CSV"); return; }
+    if (parsed.length === 0) {
+      setError("Не удалось распознать задачи из введенного CSV");
+      return;
+    }
+    change({
+      ...draft,
+      tasks: [...draft.tasks, ...parsed],
+    });
+    setImportModal(false);
+    setCsvInput("");
+    showNotification(`Импортировано ${parsed.length} задач`);
+  };
+
+  const handleAddDependencySubmit = () => {
+    if (!draft || !newDepPred || !newDepSucc || newDepPred === newDepSucc) {
+      setError("Выберите двух разных участников зависимости");
+      return;
+    }
+    const exists = draft.dependencies.some(
+      (d) => d.predecessor_id === newDepPred && d.successor_id === newDepSucc
+    );
+    if (exists) {
+      setError("Такая зависимость уже существует");
+      return;
+    }
+    change({
+      ...draft,
+      dependencies: [
+        ...draft.dependencies,
+        {
+          predecessor_id: newDepPred,
+          successor_id: newDepSucc,
+          kind: newDepKind,
+          lag_minutes: Math.round(newDepLagHours * 60),
+          lag_mode: newDepLagMode,
+        },
+      ],
+    });
+    setDepModal(false);
+    setNewDepPred("");
+    setNewDepSucc("");
+    showNotification("Связь успешно добавлена");
+  };
+
+  const scrollToSection = (id: string) => {
+    setActiveView("dashboard");
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  };
 
   useEffect(() => {
-    api<{ id: string; name: string }[]>("/projects")
-      .then((data) => {
-        setProjects(data);
-        setLogged(true);
-      })
-      .catch(() => {});
+    void run(async () => {
+      const data = await list();
+      if (data.length > 0) {
+        accept(await api<Result>(`/projects/${data[0].id}`));
+      }
+      setLogged(true);
+    });
   }, []);
 
-  function change(next: Project) {
-    setDraft(next);
-    setPreview(null);
-  }
+  const view = preview || saved;
+  const dirty = Boolean(
+    saved && draft && JSON.stringify(saved.project) !== JSON.stringify(draft),
+  );
 
-  const dirty =
-    !!saved && JSON.stringify(saved.project) !== JSON.stringify(draft);
-
-  if (!logged)
-    return (
-      <MantineProvider forceColorScheme={colorScheme}>
-        <Container size={420} pt="15vh">
-          <Stack>
-            <Group justify="space-between" align="center">
-              <Text className="eyebrow">CRITIX / PROJECT INTELLIGENCE</Text>
-              <SegmentedControl
-                size="xs"
-                value={colorScheme}
-                onChange={(v) => toggleTheme(v as "dark" | "light")}
-                data={[
-                  { label: "Тёмная", value: "dark" },
-                  { label: "Светлая", value: "light" },
-                ]}
-              />
-            </Group>
-            <Title order={1}>Изменения под контролем.</Title>
-            <Text c="dimmed">
-              Сроки, зависимости, Диаграмма Ганта и реальное время — в одном месте.
-            </Text>
-            <Card withBorder mt="xl">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void run(async () => {
-                    await api("/login", "POST", { password });
-                    setPassword("");
-                    await list();
-                  });
-                }}
-              >
-                <Stack>
-                  <Text fw={600}>Вход руководителя</Text>
-                  <PasswordInput
-                    label="Пароль"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
-                  {error && <Alert color="red">{error}</Alert>}
-                  <Button type="submit" loading={busy}>
-                    Войти
-                  </Button>
-                </Stack>
-              </form>
-            </Card>
-          </Stack>
-        </Container>
-      </MantineProvider>
-    );
-
-  const taskOptions =
-    draft?.tasks.map((t) => ({ value: t.id, label: t.name })) || [];
-  const rows = new Map(view?.analysis.tasks.map((t) => [t.id, t]));
+  const rows = new Map((view?.analysis.tasks || []).map((r) => [r.id, r]));
   const affected = new Set(preview?.changes?.changed_task_ids || []);
 
-  const nodes = (view?.analysis.tasks || []).map((row, i) => {
-    const t = view!.project.tasks.find((t) => t.id === row.id)!;
-    const assignee = view!.project.assignees.find((p) => p.id === t.assignee_id);
+  const nodes = (draft?.tasks || []).map((t, idx) => {
+    const row = rows.get(t.id);
+    if (!row) return { id: t.id, position: { x: 0, y: 0 }, data: { label: t.name } };
+    const p = draft?.assignees.find((a) => a.id === t.assignee_id);
     return {
-      id: row.id,
-      position: { x: (i % 4) * 260, y: Math.floor(i / 4) * 155 },
+      id: t.id,
+      position: { x: (idx % 3) * 260, y: Math.floor(idx / 3) * 140 },
       data: {
         label: (
           <div>
-            <Group justify="space-between" align="center" mb={4}>
-              <Badge size="xs" color={priorityColors[t.priority || "medium"]}>
-                {priorityLabels[t.priority || "medium"]}
-              </Badge>
-              {assignee && (
-                <Tooltip label={`Исполнитель: ${assignee.name}`}>
-                  <Avatar
-                    size={20}
-                    radius="xl"
-                    color={getAvatarColor(assignee.id)}
-                  >
-                    {getInitials(assignee.name)}
-                  </Avatar>
-                </Tooltip>
-              )}
-            </Group>
+            <Badge size="xs" color={priorityColors[t.priority || "medium"]} mb={2}>
+              {priorityLabels[t.priority || "medium"]}
+            </Badge>
             <strong>{t.name}</strong>
-            <span>
-              {date(row.start)} → {date(row.finish)}
-            </span>
+            <small>{p ? `${p.name} ${p.role ? `· ${p.role}` : ""}` : "Не назначен"}</small>
             <span>
               {row.critical
                 ? "Критическая задача"
@@ -458,10 +444,10 @@ function App() {
       },
       style: {
         borderColor: affected.has(row.id)
-          ? "#dd8631"
+          ? "#ee9564"
           : row.critical
-            ? "#d4545c"
-            : "#bad0c9",
+            ? "#e57470"
+            : "#5a75e9",
         width: 230,
       },
     };
@@ -472,21 +458,12 @@ function App() {
   const progressPercent = totalTasksCount ? Math.round((completedCount / totalTasksCount) * 100) : 0;
   const overloadedAssigneeIds = new Set(view?.analysis.overloads.map((o) => o.assignee_id) || []);
 
-  const now = new Date();
-  const overdueTasks = (view?.analysis.tasks || []).filter((r) => {
-    const t = draft?.tasks.find((x) => x.id === r.id);
-    return t && t.status !== "done" && new Date(r.finish) < now;
-  });
-
-  let baselineVarianceHours: number | null = null;
-  if (draft?.baseline && view) {
-    const baseFinish = new Date(draft.baseline.finish).getTime();
-    const currFinish = new Date(view.analysis.finish).getTime();
-    baselineVarianceHours = Math.round((currFinish - baseFinish) / (1000 * 3600));
-  }
+  const overdueTasks = (view?.analysis.tasks || []).filter(r => r.risk_flags.includes("overdue"));
+  const baselineVarianceHours = view?.analysis.baseline_delta_minutes == null ? null : view.analysis.baseline_delta_minutes / 60;
 
   function handleSaveBaseline() {
     if (!draft || !view) return;
+    if (dirty && !preview) { setError("Сначала рассчитайте последствия черновика, затем фиксируйте базовый план"); return; }
     const taskMap: Record<string, { start: string; finish: string }> = {};
     for (const r of view.analysis.tasks) {
       taskMap[r.id] = { start: r.start, finish: r.finish };
@@ -499,6 +476,7 @@ function App() {
         tasks: taskMap,
       },
     });
+    showNotification("Базовый план добавлен в черновик. Сохраните изменения.");
   }
 
   function handleRescheduleOverdue() {
@@ -508,1052 +486,1534 @@ function App() {
       ...draft,
       tasks: updatedTasks,
     });
+    showNotification("Ограничения начала обновлены в черновике. Проверьте последствия.");
   }
 
   const projStartMs = draft ? new Date(draft.start).getTime() : 0;
-  const projEndMs = draft ? new Date(draft.deadline).getTime() : 1;
+  const projEndMs = view ? Math.max(new Date(view.analysis.finish).getTime(), projStartMs + 60000) : draft ? new Date(draft.deadline).getTime() : 1;
   const projTotalMs = Math.max(1, projEndMs - projStartMs);
 
-  return (
-    <MantineProvider forceColorScheme={colorScheme}>
-      <header>
-        <Group justify="space-between">
-          <Group gap="md">
-            <Text className="brand">
-              critix<span>●</span>
-            </Text>
-            <Text c="dimmed" size="sm">
-              Система анализа рисков и изменений проекта
-            </Text>
-          </Group>
+  const daysRemaining = useMemo(() => {
+    if (!view && !draft) return 0;
+    const targetMs = view
+      ? new Date(view.analysis.finish).getTime()
+      : draft
+      ? new Date(draft.deadline).getTime()
+      : Date.now();
+    const diff = targetMs - Date.now();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [view?.analysis.finish, draft?.deadline]);
 
-          <Group gap="sm">
-            <SegmentedControl
-              size="xs"
-              value={colorScheme}
-              onChange={(v) => toggleTheme(v as "dark" | "light")}
-              data={[
-                { label: "Тёмная", value: "dark" },
-                { label: "Светлая", value: "light" },
-              ]}
-            />
-            <Button
-              variant="subtle"
-              color="gray"
-              onClick={() =>
-                void run(async () => {
-                  await api("/logout", "POST");
-                  setLogged(false);
-                  setSaved(null);
-                  setDraft(null);
-                })
-              }
-            >
-              Выйти
-            </Button>
-          </Group>
-        </Group>
-      </header>
+  const timelineTicks = useMemo(() => {
+    if (!draft) return [];
+    const s = new Date(draft.start).getTime();
+    const f = view
+      ? new Date(view.analysis.finish).getTime()
+      : new Date(draft.deadline).getTime();
+    const total = Math.max(1, f - s);
+    const count = 9;
+    const step = total / (count - 1);
+    const result = [];
+    for (let i = 0; i < count; i++) {
+      const d = new Date(s + step * i);
+      result.push({
+        day: d.toLocaleDateString("ru-RU", { timeZone: zone, day: "2-digit" }),
+        full: d.toLocaleDateString("ru-RU", { timeZone: zone, day: "numeric", month: "short" }),
+      });
+    }
+    return result;
+  }, [draft?.start, draft?.deadline, view?.analysis.finish, zone]);
 
-      <Container size="xl" py="xl">
-        <Stack gap="lg">
-          <Group justify="space-between">
-            <Group>
-              <Select
-                aria-label="Проект"
-                placeholder="Выберите проект"
-                data={projects.map((p) => ({ value: p.id, label: p.name }))}
-                value={saved?.id || null}
-                disabled={busy || dirty}
-                w={320}
-                onChange={(id) =>
-                  id &&
-                  void run(async () =>
-                    accept(await api<Result>(`/projects/${id}`)),
-                  )
-                }
+  const timelineHeading = useMemo(() => {
+    if (!draft) return "ПЛАН ПРОЕКТА";
+    const dStart = new Date(draft.start);
+    const dEnd = view ? new Date(view.analysis.finish) : new Date(draft.deadline);
+    const mStart = dStart.toLocaleDateString("ru-RU", { timeZone: zone, month: "short" });
+    const mEnd = dEnd.toLocaleDateString("ru-RU", { timeZone: zone, month: "short", year: "numeric" });
+    return `${mStart.toUpperCase()} — ${mEnd.toUpperCase()}`;
+  }, [draft?.start, draft?.deadline, view?.analysis.finish, zone]);
+
+  const todayMarkerPercent = useMemo(() => {
+    if (!draft) return null;
+    const nowMs = Date.now();
+    const s = new Date(draft.start).getTime();
+    const f = view
+      ? new Date(view.analysis.finish).getTime()
+      : new Date(draft.deadline).getTime();
+    const total = Math.max(1, f - s);
+    const pct = ((nowMs - s) / total) * 85;
+    if (pct >= 0 && pct <= 85) return pct;
+    return null;
+  }, [draft?.start, draft?.deadline, view?.analysis.finish, zone]);
+
+  const handleRunSimulation = async () => {
+    if (!saved || !draft) return;
+    const targetTaskId = simTaskChoice || draft.tasks.find(t => t.status !== "done")?.id;
+    if (!targetTaskId) { setSimError("Нет незавершённых задач для изменения"); return; }
+    setSimResult(null); setSimError(""); setSimBusy(true);
+    try {
+      const res = await api<Result>(`/projects/${saved.id}/simulate`, "POST", {
+        version: saved.version,
+        project: {...draft, tasks: draft.tasks.map(t => t.id === targetTaskId
+          ? {...t, duration_minutes: t.duration_minutes + Math.round(simDelayDays * 60)} : t)},
+      });
+      setSimResult(res);
+    } catch (e) { setSimError(e instanceof Error ? e.message : "Не удалось рассчитать сценарий"); }
+    finally { setSimBusy(false); }
+  };
+
+  // Login View
+  if (!logged) {
+    return (
+      <MantineProvider forceColorScheme={colorScheme}>
+        <Container size={420} my={80}>
+          <Card withBorder p="xl" radius="md">
+            <Stack gap="md">
+              <Group gap="xs">
+                <span className="brand-mark">c</span>
+                <Title order={2}>critix</Title>
+              </Group>
+              <Text c="dimmed" size="sm">
+                Вход в систему анализа рисков и управления критическим путем
+              </Text>
+
+              {error && <Alert color="red">{error}</Alert>}
+
+              <PasswordInput
+                label="Пароль руководителя"
+                placeholder="Введи пароль из .env"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
+
               <Button
-                variant="light"
-                disabled={busy || dirty}
-                onClick={() => setNewProject(true)}
-              >
-                Новый проект
-              </Button>
-            </Group>
-            <Group gap="sm">
-              {draft && (
-                <>
-                  <Button
-                    variant="outline"
-                    color="teal"
-                    onClick={() => exportTasksToCsv(draft)}
-                  >
-                    Экспорт в CSV
-                  </Button>
-                  <Button
-                    variant="outline"
-                    color="blue"
-                    onClick={() => setImportModal(true)}
-                  >
-                    Импорт из CSV
-                  </Button>
-                  <Button
-                    variant="default"
-                    onClick={handleSaveBaseline}
-                    title="Зафиксировать текущий расчёт как эталонный базовый план"
-                  >
-                    Зафиксировать Базовый план
-                  </Button>
-                </>
-              )}
-              <Button
-                variant="subtle"
-                disabled={busy || dirty}
+                fullWidth
+                loading={busy}
                 onClick={() =>
                   void run(async () => {
-                    accept(await api<Result>("/demo", "POST"));
-                    await list();
+                    await api("/login", "POST", { password });
+                    setLogged(true);
+                    const data = await list();
+                    if (data.length > 0) {
+                      accept(await api<Result>(`/projects/${data[0].id}`));
+                    }
                   })
                 }
               >
-                Открыть новый демопроект
+                Войти в рабочее пространство
               </Button>
-            </Group>
-          </Group>
+            </Stack>
+          </Card>
+        </Container>
+      </MantineProvider>
+    );
+  }
 
-          {error && (
-            <Alert
-              color="red"
-              title="Не удалось выполнить действие"
-              withCloseButton
-              onClose={() => setError("")}
+
+
+  return (
+    <MantineProvider forceColorScheme={colorScheme}>
+      <div className="app-shell">
+        {/* Designer Sidebar */}
+        <aside className="sidebar">
+          <div className="brand">
+            <span className="brand-mark">c</span>
+            <span>critix</span>
+          </div>
+
+          <div className="workspace-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+
+          <button className="project-switcher" onClick={() => setProjectManageModal(true)}>
+            <span className="project-dot" />
+            <span>
+              <strong>{draft?.name || "Выберите проект"}</strong>
+              <small>{draft?.timezone || "Проект не выбран"}</small>
+            </span>
+            <ChevronDown size={15} />
+          </button>
+
+          <nav className="main-nav">
+            <button
+              className={`nav-item ${activeView === "dashboard" ? "active" : ""}`}
+              onClick={() => scrollToSection("overview")}
             >
-              {error}
-            </Alert>
-          )}
+              <LayoutDashboard size={16} /> Обзор
+            </button>
+            <button
+              className={`nav-item ${activeView === "dashboard" ? "" : ""}`}
+              onClick={() => scrollToSection("timeline")}
+            >
+              <GitBranch size={16} /> План проекта
+            </button>
+            <button
+              className={`nav-item ${activeView === "tasks_table" ? "active" : ""}`}
+              onClick={() => setActiveView("tasks_table")}
+            >
+              <Check size={16} /> Задачи
+              <span className="nav-count">{totalTasksCount}</span>
+            </button>
+            <button
+              className={`nav-item ${activeView === "graph" ? "active" : ""}`}
+              onClick={() => setActiveView("graph")}
+            >
+              <GitBranch size={16} /> Карта связей
+            </button>
+            <button
+              className={`nav-item ${activeView === "team" ? "active" : ""}`}
+              onClick={() => setActiveView("team")}
+            >
+              <Users size={16} /> Команда
+              {overloadedAssigneeIds.size > 0 && (
+                <span className="nav-count warning">!</span>
+              )}
+            </button>
+            <button
+              className={`nav-item ${activeView === "links" ? "active" : ""}`}
+              onClick={() => setActiveView("links")}
+            >
+              <LinkIcon size={16} /> Зависимости
+              <span className="nav-count">{draft?.dependencies.length || 0}</span>
+            </button>
+            <button
+              className={`nav-item ${activeView === "ai" ? "active" : ""}`}
+              onClick={() => setActiveView("ai")}
+            >
+              <AlertTriangle size={16} /> Риски & AI
+              {overdueTasks.length > 0 && <span className="nav-count warning">{overdueTasks.length}</span>}
+            </button>
+          </nav>
 
-          {!view && (
-            <Card withBorder padding={50}>
-              <Text className="eyebrow">НАЧНИТЕ С ГЛАВНОГО</Text>
-              <Title order={2} mt="sm">
-                Что произойдёт, если задача задержится?
-              </Title>
-              <Text c="dimmed" mt="sm">
-                Создайте проект или откройте пример из 10 задач. Измените
-                длительность Backend API и посмотрите, какие работы сдвинутся.
-              </Text>
-            </Card>
-          )}
+          <div className="sidebar-divider" />
 
-          {view && draft && (
-            <>
-              <Group justify="space-between" align="start">
-                <div>
-                  <Group gap="xs">
-                    <Text className="eyebrow">ОБЗОР ПРОЕКТА</Text>
-                    <Badge variant="light" size="sm">
-                      {view.project.timezone}
-                    </Badge>
-                    {draft.baseline && (
-                      <Badge variant="outline" color="teal" size="sm">
-                        Базовый план сохранен ({shortDate(draft.baseline.saved_at)})
-                      </Badge>
-                    )}
-                  </Group>
-                  <Title order={1} mt={4}>
-                    {view.project.name}
-                  </Title>
+          <div className="workspace-label">КОМАНДА</div>
+          <div className="team-stack">
+            {(draft?.assignees || []).map((person) => (
+              <span
+                key={person.id}
+                title={`${person.name} ${person.role ? `· ${person.role}` : ""} · ${(person.skills || []).map((s) => s.name).join(", ") || "Навыки не указаны"}`}
+                className={`avatar ${getAvatarClass(person.id)}`}
+                onClick={() => setSettings(true)}
+                style={{ cursor: "pointer" }}
+              >
+                {getInitials(person.name)}
+              </span>
+            ))}
+            <button className="avatar add-person" title="Настройка команды и графиков" onClick={() => setSettings(true)}>
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="workspace-label team-caption">
+            {draft?.assignees.length || 0} участников · роли и графики
+          </div>
+
+          <div className="sidebar-bottom">
+            <button className="nav-item" onClick={() => setSettings(true)}>
+              <Settings size={16} /> Настройки
+            </button>
+
+            <Group justify="space-between" mt="xs" px="xs">
+              <Text size="xs" c="dimmed">Тема:</Text>
+              <SegmentedControl
+                size="xs"
+                value={colorScheme}
+                onChange={(v) => toggleTheme(v as "dark" | "light")}
+                data={[
+                  { label: "Светлая", value: "light" },
+                  { label: "Тёмная", value: "dark" },
+                ]}
+              />
+            </Group>
+
+            <div className="user-card">
+              <span className="avatar avatar-ink">PM</span>
+              <span>
+                <strong>Руководитель</strong>
+                <small>Администратор проекта</small>
+              </span>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                title="Выйти"
+                onClick={() =>
+                  void run(async () => {
+                    await api("/logout", "POST");
+                    setLogged(false);
+                    setSaved(null);
+                    setDraft(null);
+                  })
+                }
+              >
+                <LogOut size={15} />
+              </ActionIcon>
+            </div>
+          </div>
+        </aside>
+
+        {/* Designer Main Content */}
+        <main className="main-content">
+          <header className="topbar">
+            <div className="breadcrumbs">
+              <button
+                type="button"
+                className="breadcrumb-btn"
+                onClick={() => setProjectManageModal(true)}
+                title="Переключить проект"
+              >
+                <span>Проекты</span>
+                <ChevronDown size={13} />
+              </button>
+              <span>/</span>
+              <button
+                type="button"
+                className="breadcrumb-current"
+                onClick={() => setProjectManageModal(true)}
+                title="Настройки проекта"
+              >
+                <strong>{draft?.name || "Выбор проекта"}</strong>
+              </button>
+            </div>
+            <div className="top-actions">
+              <button
+                className="secondary-button"
+                style={{ height: 32, padding: "0 10px" }}
+                onClick={() => setSettings(true)}
+              >
+                <Settings size={14} /> Настройки
+              </button>
+              <button className="icon-button" aria-label="Уведомления" onClick={() => scrollToSection("risks")}>
+                <Bell size={17} />
+                {overdueTasks.length > 0 && <i />}
+              </button>
+              <button className="help-button" aria-label="Помощь" onClick={() => setHelpModal(true)}>
+                <CircleHelp size={14} />
+              </button>
+            </div>
+          </header>
+
+          <div className="content-wrap" id="overview">
+            {!draft && <Card withBorder><Stack><Title order={3}>Нет выбранного проекта</Title><Text>Создайте проект или откройте существующий.</Text><Button onClick={() => setProjectManageModal(true)}>Управление проектами</Button></Stack></Card>}
+            <section className="page-heading">
+              <div>
+                <div className="eyebrow">
+                  <span className="status-dot" />
+                  {view?.analysis.deadline_exceeded ? "Есть превышение" : "В работе"}
+                  <span className="heading-separator">·</span>
+                  обновлено в {lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
                 </div>
-                <Button variant="default" onClick={() => setSettings(true)}>
-                  Настройки и календари
-                </Button>
-              </Group>
+                <h1>{draft?.name || "Создайте или выберите проект"}</h1>
+                <p>План, команда и последствия изменений — на одном экране. Часовой пояс: {zone}.</p>
+                {dirty && !preview && <Text c="orange" size="sm">Черновик изменён. Даты, риски, отчёт и AI относятся к сохранённому плану до проверки последствий.</Text>}
+              </div>
 
-              <SimpleGrid cols={{ base: 1, sm: 4 }}>
-                <Card withBorder>
-                  <Text c="dimmed" size="sm">
-                    Прогноз завершения
-                  </Text>
-                  <Title order={3} mt={8}>
-                    {date(view.analysis.finish)}
-                  </Title>
-                  <Group gap={6} mt={6}>
-                    <Text
-                      size="sm"
-                      c={view.analysis.deadline_exceeded ? "red" : "teal"}
-                      fw={500}
+              <div className="heading-actions">
+                <button className="secondary-button" disabled={!draft?.tasks.length} onClick={() => {setSimResult(null); setShowScenarioModal(true);}}>
+                  <Sparkles size={14} /> Проверить изменение
+                </button>
+                <button className="primary-button" disabled={!draft} onClick={() => setTask(defaultTask())}>
+                  <Plus size={16} /> Новая задача
+                </button>
+                {draft && (
+                  <>
+                    <button
+                      className="secondary-button"
+                      onClick={() => setExecutiveReportModal(true)}
+                      title="Сформировать исполнительный отчет для руководства"
                     >
-                      {view.analysis.deadline_exceeded
-                        ? `Превышение дедлайна на ${view.analysis.delay_minutes / 60} ч`
-                        : "В пределах дедлайна"}
-                    </Text>
-                    {baselineVarianceHours !== null && (
-                      <Badge
-                        size="xs"
-                        color={baselineVarianceHours > 0 ? "red" : "teal"}
-                        variant="light"
+                      <FileText size={14} /> Отчет (PDF/MD)
+                    </button>
+                    <button className="secondary-button" onClick={() => exportTasksToCsv(draft)}>
+                      <Download size={14} /> Экспорт CSV
+                    </button>
+                    <button className="secondary-button" onClick={() => setImportModal(true)}>
+                      <Upload size={14} /> Импорт CSV
+                    </button>
+                    <button className="secondary-button" onClick={handleSaveBaseline}>
+                      <Check size={14} /> Базовый план
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {error && (
+              <div className="api-note">
+                <Zap size={14} /> {error}
+              </div>
+            )}
+
+            {/* Metrics Grid */}
+            {view && draft && <section className="metric-grid">
+              <article className="metric-card">
+                <div className="metric-top">
+                  <span className="metric-label">Прогресс проекта</span>
+                  <span className="metric-icon purple">
+                    <Gauge size={15} />
+                  </span>
+                </div>
+                <div className="metric-value">{progressPercent}%</div>
+                <div className="progress-track">
+                  <span style={{ width: `${progressPercent}%` }} />
+                </div>
+                <div className="metric-foot">
+                  <span>{completedCount} из {totalTasksCount} задач</span>
+                  <span className="positive">В работе</span>
+                </div>
+              </article>
+
+              <article className="metric-card">
+                <div className="metric-top">
+                  <span className="metric-label">До завершения</span>
+                  <span className="metric-icon blue">
+                    <CalendarDays size={15} />
+                  </span>
+                </div>
+                <div className="metric-value">
+                  {daysRemaining}{" "}
+                  <small>дней</small>
+                </div>
+                <div className="metric-foot">
+                  <span>Финиш: {view ? shortDate(view.analysis.finish) : draft ? shortDate(draft.deadline) : "—"}</span>
+                  {view?.analysis.deadline_exceeded ? (
+                    <span className="coral-text">Превышен</span>
+                  ) : (
+                    <span className="positive">В дедлайне</span>
+                  )}
+                </div>
+              </article>
+
+              <article className="metric-card">
+                <div className="metric-top">
+                  <span className="metric-label">Просроченные задачи</span>
+                  <span className="metric-icon coral">
+                    <AlertTriangle size={15} />
+                  </span>
+                </div>
+                <div className={`metric-value ${overdueTasks.length > 0 ? "coral-text" : ""}`}>
+                  {overdueTasks.length || 0}
+                </div>
+                <div className="metric-foot">
+                  <span>
+                    {overdueTasks.length > 0 ? (
+                      <button
+                        style={{ border: 0, background: "none", color: "var(--red)", cursor: "pointer", padding: 0, font: "inherit" }}
+                        onClick={handleRescheduleOverdue}
+                        disabled={!overdueTasks.some(r => !draft?.tasks.find(t => t.id === r.id)?.actual_start)}
                       >
-                        {baselineVarianceHours > 0
-                          ? `Отклонение: +${baselineVarianceHours} ч`
-                          : "В графике базового плана"}
-                      </Badge>
+                        Перенести ещё не начатые
+                      </button>
+                    ) : (
+                      "Нет просрочек по расчёту"
                     )}
-                  </Group>
-                </Card>
+                  </span>
+                  <span className="metric-symbol">!</span>
+                </div>
+              </article>
 
-                <Card withBorder>
-                  <Text c="dimmed" size="sm">
-                    Прогресс задач
-                  </Text>
-                  <Group align="baseline" gap="xs" mt={8}>
-                    <Title order={2}>{completedCount}</Title>
-                    <Text size="sm" c="dimmed">
-                      из {totalTasksCount} завершено
-                    </Text>
-                  </Group>
-                  <Progress value={progressPercent} color="teal" mt="sm" size="sm" radius="xl" />
-                </Card>
+              <article className="metric-card">
+                <div className="metric-top">
+                  <span className="metric-label">Критический путь</span>
+                  <span className="metric-icon green">
+                    <Target size={15} />
+                  </span>
+                </div>
+                <div className="metric-value">
+                  {(view?.analysis.tasks || []).filter((t) => t.critical).length}{" "}
+                  <small>задач</small>
+                </div>
+                <div className="metric-foot">
+                  <span>
+                    {baselineVarianceHours !== null
+                      ? baselineVarianceHours > 0
+                        ? `Сдвиг от эталона: +${baselineVarianceHours} ч`
+                        : "В графике эталона"
+                      : "Базовый план не зафиксирован"}
+                  </span>
+                  <span className="metric-symbol">↗</span>
+                </div>
+              </article>
+            </section>}
 
-                <Card withBorder>
-                  <Text c="dimmed" size="sm">
-                    Просрочки в реальном времени
+            {dirty && (
+              <Alert
+                color={preview ? "orange" : "blue"}
+                title={preview ? "Предпросмотр последствий" : "Есть изменения в черновике"}
+                mb="lg"
+              >
+                <Group justify="space-between">
+                  <Text size="sm">
+                    {preview
+                      ? `Изменились даты ${affected.size} задач. Сдвиг завершения: ${preview.changes!.finish_delta_minutes / 60} календарных ч.`
+                      : "Рассчитайте последствия перед сохранением."}
                   </Text>
-                  <Group align="baseline" gap="xs" mt={8}>
-                    <Title order={2} c={overdueTasks.length > 0 ? "red" : undefined}>
-                      {overdueTasks.length}
-                    </Title>
-                    <Text size="sm" c="dimmed">
-                      задач
-                    </Text>
-                  </Group>
-                  {overdueTasks.length > 0 ? (
+                  <Group>
                     <Button
                       variant="subtle"
-                      color="red"
-                      size="xs"
-                      p={0}
-                      mt={4}
-                      onClick={handleRescheduleOverdue}
-                      disabled={!overdueTasks.some((r) => !draft.tasks.find((t) => t.id === r.id)?.actual_start)}
-                      title="Переносит только задачи без фактического начала. Для начатых задач уточните длительность."
+                      disabled={busy}
+                      onClick={() => {
+                        setDraft(copy(saved!.project));
+                        setPreview(null);
+                      }}
                     >
-                      Перенести ещё не начатые задачи
+                      Отменить
                     </Button>
-                  ) : (
-                    <Text size="sm" mt={6} c="teal">
-                      Нет просроченных задач
-                    </Text>
-                  )}
-                </Card>
-
-                <Card withBorder>
-                  <Text c="dimmed" size="sm">
-                    Команда и загрузка
-                  </Text>
-                  <Group align="baseline" gap="xs" mt={8}>
-                    <Title order={2}>{draft.assignees.length}</Title>
-                    <Text size="sm" c="dimmed">
-                      чел.
-                    </Text>
-                  </Group>
-                  <Text
-                    size="sm"
-                    mt={4}
-                    c={overloadedAssigneeIds.size > 0 ? "red" : "teal"}
-                    fw={500}
-                  >
-                    {overloadedAssigneeIds.size > 0
-                      ? `Перегружено: ${overloadedAssigneeIds.size} чел.`
-                      : "Загрузка в норме"}
-                  </Text>
-                </Card>
-              </SimpleGrid>
-
-              {dirty && (
-                <Alert
-                  color={preview ? "orange" : "blue"}
-                  title={
-                    preview
-                      ? "Предпросмотр последствий"
-                      : "Есть изменения в черновике"
-                  }
-                >
-                  <Group justify="space-between">
-                    <Text size="sm">
-                      {preview
-                        ? `Изменились даты ${affected.size} задач. Сдвиг завершения: ${preview.changes!.finish_delta_minutes / 60} календарных ч.`
-                        : "Рассчитайте последствия перед сохранением."}
-                    </Text>
-                    <Group>
+                    {!preview ? (
                       <Button
-                        variant="subtle"
-                        disabled={busy}
-                        onClick={() => {
-                          setDraft(copy(saved!.project));
-                          setPreview(null);
-                        }}
-                      >
-                        Отменить
-                      </Button>
-                      {!preview ? (
-                        <Button
-                          loading={busy}
-                          onClick={() =>
-                            void run(async () =>
-                              setPreview(
-                                await api<Result>(
-                                  `/projects/${saved!.id}/simulate`,
-                                  "POST",
-                                  { version: saved!.version, project: draft },
-                                ),
+                        loading={busy}
+                        onClick={() =>
+                          void run(async () =>
+                            setPreview(
+                              await api<Result>(
+                                `/projects/${saved!.id}/simulate`,
+                                "POST",
+                                { version: saved!.version, project: draft },
                               ),
-                            )
-                          }
-                        >
-                          Показать последствия
-                        </Button>
-                      ) : (
-                        <Button
-                          loading={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              accept(
-                                await api<Result>(
-                                  `/projects/${saved!.id}`,
-                                  "PUT",
-                                  { version: saved!.version, project: draft },
-                                ),
-                              );
-                              await list();
-                            })
-                          }
-                        >
-                          Применить изменения
-                        </Button>
-                      )}
-                    </Group>
-                  </Group>
-                </Alert>
-              )}
-
-              <Tabs defaultValue="graph">
-                <Tabs.List>
-                  <Tabs.Tab value="graph">Карта зависимостей</Tabs.Tab>
-                  <Tabs.Tab value="tasks">Задачи</Tabs.Tab>
-                  <Tabs.Tab value="gantt">Диаграмма Ганта</Tabs.Tab>
-                  <Tabs.Tab value="links">Связи</Tabs.Tab>
-                  <Tabs.Tab value="team">
-                    Команда и навыки
-                    {overloadedAssigneeIds.size > 0 && (
-                      <Badge size="xs" color="red" ml={6} circle>
-                        !
-                      </Badge>
-                    )}
-                  </Tabs.Tab>
-                  <Tabs.Tab value="risks">Риски и AI</Tabs.Tab>
-                </Tabs.List>
-
-                <Tabs.Panel value="graph" pt="md">
-                  <Card withBorder p={0}>
-                    <div className="graph">
-                      <ReactFlow
-                        nodes={nodes}
-                        edges={view.project.dependencies.map((d, i) => ({
-                          id: String(i),
-                          source: d.predecessor_id,
-                          target: d.successor_id,
-                          label: `${d.kind}${d.lag_minutes ? " " + d.lag_minutes / 60 + " ч" : ""}`,
-                          markerEnd: { type: MarkerType.ArrowClosed },
-                          style: {
-                            stroke: affected.has(d.successor_id)
-                              ? "#dd8631"
-                              : "#7b9690",
-                          },
-                        }))}
-                        fitView
-                        nodesDraggable={false}
-                        nodesConnectable={false}
-                        onNodeClick={(_, node) =>
-                          setTask(
-                            copy(draft.tasks.find((t) => t.id === node.id)!),
+                            ),
                           )
                         }
                       >
-                        <Background color={colorScheme === "dark" ? "#223330" : "#e6eee9"} />
-                        <Controls />
-                      </ReactFlow>
-                    </div>
-                  </Card>
-                  <Text size="xs" c="dimmed" mt="xs">
-                    Красная рамка — критическая задача. Оранжевая — изменение
-                    дат в сценарии. Нажмите на задачу для редактирования.
-                  </Text>
-                </Tabs.Panel>
-
-                <Tabs.Panel value="tasks" pt="md">
-                  <Stack>
-                    <Group justify="space-between">
-                      <Text c="dimmed" size="sm">
-                        Длительность — рабочее время задачи; приоритет подсвечивает важность задачи.
-                      </Text>
-                      <Button onClick={() => setTask(defaultTask())}>
-                        Добавить задачу
+                        Показать последствия
                       </Button>
-                    </Group>
-                    <Table.ScrollContainer minWidth={900}>
-                      <Table striped highlightOnHover>
-                        <Table.Thead>
-                          <Table.Tr>
-                            <Table.Th>Приоритет</Table.Th>
-                            <Table.Th>Задача</Table.Th>
-                            <Table.Th>Исполнитель</Table.Th>
-                            <Table.Th>Статус</Table.Th>
-                            <Table.Th>Рабочие часы</Table.Th>
-                            <Table.Th>Прогноз</Table.Th>
-                            <Table.Th>Резерв</Table.Th>
-                          </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                          {draft.tasks.map((t) => {
-                            const person = draft.assignees.find(
-                              (p) => p.id === t.assignee_id,
+                    ) : (
+                      <Button
+                        loading={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            accept(
+                              await api<Result>(
+                                `/projects/${saved!.id}`,
+                                "PUT",
+                                { version: saved!.version, project: draft },
+                              ),
                             );
-                            const r = rows.get(t.id);
-                            const isOverdue = r && t.status !== "done" && new Date(r.finish) < now;
-                            return (
-                              <Table.Tr
-                                key={t.id}
-                                onClick={() => setTask(copy(t))}
-                                style={{ cursor: "pointer" }}
-                              >
-                                <Table.Td>
-                                  <Badge
-                                    size="xs"
-                                    color={priorityColors[t.priority || "medium"]}
-                                  >
-                                    {priorityLabels[t.priority || "medium"]}
-                                  </Badge>
-                                </Table.Td>
-                                <Table.Td fw={600}>
-                                  <Group gap={6}>
-                                    <Text size="sm" fw={600}>
-                                      {t.name}
-                                    </Text>
-                                    {isOverdue && (
-                                      <Badge size="xs" color="red" variant="filled">
-                                        Просрочена
-                                      </Badge>
-                                    )}
-                                  </Group>
-                                  {t.required_skills && t.required_skills.length > 0 && (
-                                    <Group gap={4} mt={2}>
-                                      {t.required_skills.map((skill, idx) => (
-                                        <Badge key={idx} size="xs" variant="outline" color="gray">
-                                          {skill}
-                                        </Badge>
-                                      ))}
-                                    </Group>
-                                  )}
-                                </Table.Td>
-                                <Table.Td>
-                                  {person ? (
-                                    <Group gap="xs">
-                                      <Avatar
-                                        size={22}
-                                        radius="xl"
-                                        color={getAvatarColor(person.id)}
-                                      >
-                                        {getInitials(person.name)}
-                                      </Avatar>
-                                      <Text size="sm">{person.name}</Text>
-                                    </Group>
-                                  ) : (
-                                    <Text size="sm" c="dimmed">
-                                      Не назначен
-                                    </Text>
-                                  )}
-                                </Table.Td>
-                                <Table.Td>
-                                  <Badge color={statusColors[t.status]} variant="light">
-                                    {statusLabels[t.status]}
-                                  </Badge>
-                                </Table.Td>
-                                <Table.Td>{t.duration_minutes / 60} ч</Table.Td>
-                                <Table.Td>
-                                  {rows.has(t.id)
-                                    ? date(rows.get(t.id)!.finish)
-                                    : "После расчёта"}
-                                </Table.Td>
-                                <Table.Td>
-                                  {rows.get(t.id)?.slack_minutes == null
-                                    ? "—"
-                                    : `${rows.get(t.id)!.slack_minutes! / 60} ч`}
-                                </Table.Td>
-                              </Table.Tr>
-                            );
-                          })}
-                        </Table.Tbody>
-                      </Table>
-                    </Table.ScrollContainer>
-                  </Stack>
-                </Tabs.Panel>
+                            await list();
+                          })
+                        }
+                      >
+                        Применить изменения
+                      </Button>
+                    )}
+                  </Group>
+                </Group>
+              </Alert>
+            )}
 
-                <Tabs.Panel value="gantt" pt="md">
-                  <Card withBorder padding="md">
-                    <Stack gap="md">
-                      <Group justify="space-between" align="center">
-                        <div>
-                          <Title order={3}>Интерактивная Диаграмма Ганта</Title>
-                          <Text size="sm" c="dimmed">
-                            Каскадная шкала времени с отображением критического пути и базового плана.
-                          </Text>
+            {/* Views Mode Rendering */}
+            {activeView === "dashboard" && draft && view && (
+              <>
+                {/* Dashboard Grid Layout */}
+                <section className="dashboard-grid">
+                  {/* Timeline Main Panel with Baseline Reference Support */}
+                  <article className="panel timeline-panel" id="timeline">
+                    <div className="panel-header">
+                      <div>
+                        <h2>План проекта</h2>
+                        <p>Последовательность работ, базовый план и зависимости</p>
+                      </div>
+                      <div className="view-tabs">
+                        <button
+                          className={`view-tab ${timelineMode === "timeline" ? "active" : ""}`}
+                          onClick={() => setTimelineMode("timeline")}
+                        >
+                          Timeline
+                        </button>
+                        <button
+                          className={`view-tab ${timelineMode === "list" ? "active" : ""}`}
+                          onClick={() => setTimelineMode("list")}
+                        >
+                          <List size={12} /> Список
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="timeline-toolbar">
+                      <div className="legend">
+                        <span><i className="legend-dot done" />Завершено</span>
+                        <span><i className="legend-dot progress" />В работе</span>
+                        <span><i className="legend-dot planned" />Запланировано</span>
+                        <span><i className="legend-dot critical" />Критический путь</span>
+                        {draft?.baseline && (
+                          <span style={{ opacity: 0.8 }}><i style={{ width: 8, height: 2, borderBottom: "1px dashed #8994a4", display: "inline-block", marginRight: 4 }} />Базовый план</span>
+                        )}
+                      </div>
+                      <button className="filter-button" onClick={() => setActiveView("tasks_table")}>
+                        <SlidersHorizontal size={12} /> Таблица задач <ChevronDown size={12} />
+                      </button>
+                    </div>
+
+                    {timelineMode === "timeline" ? (
+                      <div className="timeline">
+                        <div className="timeline-head">
+                          <div className="task-heading">ЗАДАЧА</div>
+                          <div className="date-heading">
+                            {timelineHeading}
+                            <div className="dates">
+                              {timelineTicks.map((tick, i) => (
+                                <span key={i} title={tick.full}>
+                                  {tick.day}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                        <Group gap="xs">
-                          <Badge color="red" size="sm">Критический путь</Badge>
-                          <Badge color="teal" size="sm">Обычная задача</Badge>
-                          {draft.baseline && <Badge color="gray" variant="outline" size="sm">Базовый план</Badge>}
-                        </Group>
-                      </Group>
 
-                      <Divider />
-
-                      <Stack gap="xs">
-                        {draft.tasks.map((t) => {
+                        {(draft?.tasks || []).map((t, idx) => {
                           const r = rows.get(t.id);
                           if (!r) return null;
-                          const person = draft.assignees.find((p) => p.id === t.assignee_id);
+                          const person = draft?.assignees.find((p) => p.id === t.assignee_id);
                           const tStartMs = new Date(r.start).getTime();
                           const tEndMs = new Date(r.finish).getTime();
 
-                          const leftPct = Math.max(0, Math.min(100, ((tStartMs - projStartMs) / projTotalMs) * 100));
-                          const widthPct = Math.max(1, Math.min(100 - leftPct, ((tEndMs - tStartMs) / projTotalMs) * 100));
+                          const leftPct = Math.max(0, Math.min(85, ((tStartMs - projStartMs) / projTotalMs) * 85));
+                          const widthPct = Math.max(0.3, Math.min(85 - leftPct, ((tEndMs - tStartMs) / projTotalMs) * 85));
 
                           let baseLeftPct = 0;
                           let baseWidthPct = 0;
-                          if (draft.baseline && draft.baseline.tasks[t.id]) {
+                          if (draft?.baseline && draft.baseline.tasks[t.id]) {
                             const bStartMs = new Date(draft.baseline.tasks[t.id].start).getTime();
                             const bEndMs = new Date(draft.baseline.tasks[t.id].finish).getTime();
-                            baseLeftPct = Math.max(0, Math.min(100, ((bStartMs - projStartMs) / projTotalMs) * 100));
-                            baseWidthPct = Math.max(1, Math.min(100 - baseLeftPct, ((bEndMs - bStartMs) / projTotalMs) * 100));
+                            baseLeftPct = Math.max(0, Math.min(85, ((bStartMs - projStartMs) / projTotalMs) * 85));
+                            baseWidthPct = Math.max(0.3, Math.min(85 - baseLeftPct, ((bEndMs - bStartMs) / projTotalMs) * 85));
                           }
 
-                          const isOverdue = t.status !== "done" && new Date(r.finish) < now;
+                          const statusClass = t.status === "done" ? "done" : t.status === "in_progress" ? "progress" : "planned";
 
                           return (
-                            <Card
-                              key={t.id}
-                              withBorder
-                              p="xs"
-                              style={{ cursor: "pointer" }}
-                              onClick={() => setTask(copy(t))}
-                            >
-                              <Group justify="space-between" align="center" mb={6}>
-                                <Group gap="xs">
-                                  <Badge size="xs" color={priorityColors[t.priority || "medium"]}>
-                                    {priorityLabels[t.priority || "medium"]}
-                                  </Badge>
-                                  <Text size="sm" fw={600}>
-                                    {t.name}
-                                  </Text>
-                                  {person && (
-                                    <Text size="xs" c="dimmed">
-                                      ({person.name})
-                                    </Text>
-                                  )}
-                                  {isOverdue && (
-                                    <Badge size="xs" color="red">
-                                      Просрочена
-                                    </Badge>
-                                  )}
-                                </Group>
-                                <Text size="xs" c="dimmed">
-                                  {date(r.start)} → {date(r.finish)}
-                                </Text>
-                              </Group>
+                            <div className="task-row" key={t.id} onClick={() => setTask(copy(t))} style={{ cursor: "pointer" }}>
+                              <div className="task-info">
+                                <span className={`avatar mini-avatar ${person ? getAvatarClass(person.id) : "avatar-ink"}`}>
+                                  {person ? getInitials(person.name) : "—"}
+                                </span>
+                                <div>
+                                  <span className="task-name">{t.name}</span>
+                                  <span className="task-meta">
+                                    <i className={`task-status-dot ${statusClass}`} />
+                                    {statusLabels[t.status]} · {person?.role ? `${person.role} · ` : ""}{t.duration_minutes / 60} ч.
+                                  </span>
+                                </div>
+                              </div>
 
-                              <div style={{ position: "relative", height: "24px", background: colorScheme === "dark" ? "#141e1c" : "#f0f5f3", borderRadius: "4px" }}>
-                                {draft.baseline && draft.baseline.tasks[t.id] && (
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: "2px",
-                                      bottom: "2px",
-                                      left: `${baseLeftPct}%`,
-                                      width: `${baseWidthPct}%`,
-                                      background: "rgba(150, 150, 150, 0.3)",
-                                      border: "1px stroke gray",
-                                      borderRadius: "3px",
-                                    }}
-                                    title="Базовый план"
+                              <div className="task-chart">
+                                {draft?.baseline && draft.baseline.tasks[t.id] && (
+                                  <span
+                                    className="baseline-bar"
+                                    style={{ left: `${baseLeftPct}%`, width: `${baseWidthPct}%` }}
+                                    title={`Базовый эталон: ${date(draft.baseline.tasks[t.id].start)} → ${date(draft.baseline.tasks[t.id].finish)}`}
                                   />
                                 )}
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: "4px",
-                                    bottom: "4px",
-                                    left: `${leftPct}%`,
-                                    width: `${widthPct}%`,
-                                    background: r.critical ? "#d4545c" : "#0d947a",
-                                    borderRadius: "3px",
-                                  }}
-                                  title={`Сроки: ${date(r.start)} - ${date(r.finish)}`}
-                                />
+
+                                <span
+                                  className={`task-bar ${statusClass} ${r.critical ? "critical" : ""}`}
+                                  style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                                >
+                                  {t.duration_minutes / 60} ч.
+                                </span>
+                                {dependencyVisible && (draft?.dependencies || []).some((d) => d.successor_id === t.id) && (
+                                  <span className="task-connector" />
+                                )}
+                                {todayMarkerPercent !== null && (
+                                  <span
+                                    className="today-marker"
+                                    style={{ left: `${todayMarkerPercent}%` }}
+                                    title={`Сегодня: ${shortDate(new Date().toISOString())}`}
+                                  />
+                                )}
                               </div>
-                            </Card>
+                            </div>
                           );
                         })}
-                      </Stack>
-                    </Stack>
-                  </Card>
-                </Tabs.Panel>
-
-                <Tabs.Panel value="links" pt="md">
-                  <Stack>
-                    <Text size="sm" c="dimmed">
-                      FS: окончание → начало; SS: начало → начало; FF: окончание
-                      → окончание; SF: начало → окончание. Отрицательная
-                      задержка разрешает перекрытие.
-                    </Text>
-                    {draft.dependencies.map((d, i) => (
-                      <Group key={i}>
-                        <Text flex={1}>
-                          {
-                            draft.tasks.find((t) => t.id === d.predecessor_id)
-                              ?.name
-                          }{" "}
-                          →{" "}
-                          {
-                            draft.tasks.find((t) => t.id === d.successor_id)
-                              ?.name
-                          }
-                        </Text>
-                        <Badge>
-                          {d.kind} · {d.lag_minutes / 60}{" "}
-                          {d.lag_mode === "working" ? "раб." : "кал."} ч
-                        </Badge>
-                        <Button
-                          variant="subtle"
-                          color="red"
-                          onClick={() =>
-                            change({
-                              ...draft,
-                              dependencies: draft.dependencies.filter(
-                                (_, j) => j !== i,
-                              ),
-                            })
-                          }
-                        >
-                          Удалить
-                        </Button>
-                      </Group>
-                    ))}
-                    <Divider />
-                    <Group align="end">
-                      <Select
-                        label="Предшественник"
-                        data={taskOptions}
-                        value={dep.predecessor_id}
-                        onChange={(v) =>
-                          setDep({ ...dep, predecessor_id: v || "" })
-                        }
-                      />
-                      <Select
-                        label="Последователь"
-                        data={taskOptions}
-                        value={dep.successor_id}
-                        onChange={(v) =>
-                          setDep({ ...dep, successor_id: v || "" })
-                        }
-                      />
-                      <Select
-                        label="Тип"
-                        data={["FS", "SS", "FF", "SF"]}
-                        value={dep.kind}
-                        w={80}
-                        onChange={(v) =>
-                          setDep({ ...dep, kind: v as Dependency["kind"] })
-                        }
-                      />
-                      <NumberInput
-                        label="Задержка, ч"
-                        value={dep.lag_minutes / 60}
-                        w={130}
-                        onChange={(v) =>
-                          setDep({
-                            ...dep,
-                            lag_minutes: Math.round(Number(v) * 60),
-                          })
-                        }
-                      />
-                      <Select
-                        label="Часы"
-                        data={[
-                          { value: "working", label: "Рабочие" },
-                          { value: "elapsed", label: "Календарные" },
-                        ]}
-                        value={dep.lag_mode}
-                        w={140}
-                        onChange={(v) =>
-                          setDep({
-                            ...dep,
-                            lag_mode: v as Dependency["lag_mode"],
-                          })
-                        }
-                      />
-                      <Button
-                        disabled={!dep.predecessor_id || !dep.successor_id}
-                        onClick={() =>
-                          change({
-                            ...draft,
-                            dependencies: [...draft.dependencies, copy(dep)],
-                          })
-                        }
-                      >
-                        Добавить связь
-                      </Button>
-                    </Group>
-                  </Stack>
-                </Tabs.Panel>
-
-                <Tabs.Panel value="team" pt="md">
-                  <Stack gap="lg">
-                    <Group justify="space-between" align="center">
-                      <div>
-                        <Title order={3}>Матрица компетенций и надёжность команды</Title>
-                        <Text size="sm" c="dimmed">
-                          Уровень навыков, загрузка и индекс надёжности выполнения задач.
-                        </Text>
                       </div>
-                    </Group>
-
-                    {draft.assignees.length === 0 ? (
-                      <Card withBorder padding="lg">
-                        <Text c="dimmed" ta="center">
-                          В проекте пока нет исполнителей. Добавьте их в настройках проекта.
-                        </Text>
-                      </Card>
                     ) : (
-                      <SimpleGrid cols={{ base: 1, md: 2 }}>
-                        {draft.assignees.map((person) => {
-                          const assignedTasks = draft.tasks.filter(
-                            (t) => t.assignee_id === person.id,
-                          );
-                          const totalHours = assignedTasks.reduce(
-                            (sum, t) => sum + t.duration_minutes / 60,
-                            0,
-                          );
-                          const isOverloaded = overloadedAssigneeIds.has(person.id);
-                          const weeklyHours = getWeeklyHours(person.calendar);
-                          const reliability = calculateReliabilityScore(person, draft.tasks);
+                      <div className="list-view-container">
+                        <div className="list-view-header">
+                          <span className="col-task">Задача</span>
+                          <span className="col-assignee">Исполнитель</span>
+                          <span className="col-status">Статус</span>
+                          <span className="col-priority">Приоритет</span>
+                          <span className="col-duration">Длит.</span>
+                          <span className="col-dates">Сроки CPM</span>
+                          <span className="col-slack">Резерв</span>
+                          <span className="col-action" />
+                        </div>
+                        <div className="list-view-body">
+                          {(draft?.tasks || []).map((t) => {
+                            const r = rows.get(t.id);
+                            const person = draft?.assignees.find((p) => p.id === t.assignee_id);
+                            const isCritical = Boolean(r?.critical);
+                            const isOverdue = r?.risk_flags.includes("overdue");
+                            const statusClass = t.status === "done" ? "done" : t.status === "in_progress" ? "progress" : "planned";
 
-                          return (
-                            <Card key={person.id} withBorder p="md">
-                              <Stack gap="sm">
-                                <Group justify="space-between">
-                                  <Group gap="sm">
-                                    <Avatar
-                                      size={44}
-                                      radius="xl"
-                                      color={getAvatarColor(person.id)}
-                                    >
-                                      {getInitials(person.name)}
-                                    </Avatar>
-                                    <div>
-                                      <Text fw={600} size="lg">{person.name}</Text>
-                                      <Group gap={6} mt={2}>
-                                        <Badge size="xs" variant="outline" color="gray">
-                                          {weeklyHours} ч/нед
-                                        </Badge>
-                                        <Badge size="xs" color="teal">
-                                          Индекс надёжности: {reliability}%
-                                        </Badge>
-                                      </Group>
-                                    </div>
-                                  </Group>
-                                  {isOverloaded ? (
-                                    <Badge color="red" variant="filled">
-                                      Перегрузка
-                                    </Badge>
-                                  ) : (
-                                    <Badge color="teal" variant="light">
-                                      Норма
-                                    </Badge>
-                                  )}
-                                </Group>
-
-                                {person.skills && person.skills.length > 0 && (
-                                  <div>
-                                    <Text size="xs" fw={600} c="dimmed" mb={4}>
-                                      Компетенции / Скиллы:
-                                    </Text>
-                                    <Group gap={4}>
-                                      {person.skills.map((sk, idx) => (
-                                        <Badge key={idx} size="xs" color="indigo" variant="light">
-                                          {sk.name} ({skillLevelLabels[sk.level]})
-                                        </Badge>
-                                      ))}
-                                    </Group>
+                            return (
+                              <div
+                                className={`list-view-row ${isCritical ? "is-critical" : ""} ${isOverdue ? "is-overdue" : ""}`}
+                                key={t.id}
+                                onClick={() => setTask(copy(t))}
+                                title="Нажмите для редактирования задачи"
+                              >
+                                <div className="col-task">
+                                  <div className="list-task-name-wrap">
+                                    <span className="list-task-name">{t.name}</span>
+                                    {isCritical && <span className="cpm-tag" title="Задача на критическом пути">CPM</span>}
+                                    {isOverdue && <span className="overdue-tag">Просрочена</span>}
                                   </div>
-                                )}
-
-                                <Divider />
-
-                                <div>
-                                  <Group justify="space-between" mb={4}>
-                                    <Text size="xs" fw={500} c="dimmed">
-                                      Назначенные задачи ({assignedTasks.length}):
-                                    </Text>
-                                    <Text size="xs" fw={600}>
-                                      Всего: {totalHours} рабочих ч
-                                    </Text>
-                                  </Group>
-                                  {assignedTasks.length === 0 ? (
-                                    <Text size="xs" c="dimmed" fs="italic">
-                                      Нет назначенных задач
-                                    </Text>
-                                  ) : (
-                                    <Stack gap={6} mt={6}>
-                                      {assignedTasks.map((t) => (
-                                        <Group
-                                          key={t.id}
-                                          justify="space-between"
-                                          style={{ cursor: "pointer" }}
-                                          onClick={() => setTask(copy(t))}
-                                        >
-                                          <Group gap={6}>
-                                            <Badge
-                                              size="xs"
-                                              color={priorityColors[t.priority || "medium"]}
-                                            >
-                                              {priorityLabels[t.priority || "medium"]}
-                                            </Badge>
-                                            <Text size="sm">{t.name}</Text>
-                                          </Group>
-                                          <Text size="xs" c="dimmed">
-                                            {t.duration_minutes / 60} ч
-                                          </Text>
-                                        </Group>
+                                  {t.required_skills && t.required_skills.length > 0 && (
+                                    <div className="list-task-skills">
+                                      {t.required_skills.map((s, idx) => (
+                                        <span key={idx} className="skill-chip">{s}</span>
                                       ))}
-                                    </Stack>
+                                    </div>
                                   )}
                                 </div>
 
-                                <Button
-                                  variant="subtle"
-                                  size="xs"
-                                  color="teal"
-                                  mt="xs"
-                                  onClick={() => setSettings(true)}
-                                >
-                                  Изменить график и навыки
-                                </Button>
-                              </Stack>
-                            </Card>
+                                <div className="col-assignee">
+                                  {person ? (
+                                    <div className="list-person">
+                                      <span className={`avatar mini-avatar ${getAvatarClass(person.id)}`}>
+                                        {getInitials(person.name)}
+                                      </span>
+                                      <div className="list-person-details">
+                                        <span className="list-person-name">{person.name}</span>
+                                        <span className="list-person-role">{person.role || "Участник"}</span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="list-unassigned">Не назначен</span>
+                                  )}
+                                </div>
+
+                                <div className="col-status">
+                                  <span className={`status-pill ${statusClass}`}>
+                                    <i className={`task-status-dot ${statusClass}`} />
+                                    {statusLabels[t.status]}
+                                  </span>
+                                </div>
+
+                                <div className="col-priority">
+                                  <span className={`priority-tag ${t.priority || "medium"}`}>
+                                    {priorityLabels[t.priority || "medium"]}
+                                  </span>
+                                </div>
+
+                                <div className="col-duration">
+                                  <span className="duration-val">{t.duration_minutes / 60} ч.</span>
+                                  <span className="duration-sub">{t.allocation_percent || 100}% закр.</span>
+                                </div>
+
+                                <div className="col-dates">
+                                  {r ? (
+                                    <div className="list-date-wrap">
+                                      <span>{shortDate(r.start)}</span>
+                                      <span className="date-arrow">→</span>
+                                      <span className={isOverdue ? "coral-text" : ""}>{shortDate(r.finish)}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="list-unassigned">—</span>
+                                  )}
+                                </div>
+
+                                <div className="col-slack">
+                                  {isCritical ? (
+                                    <span className="slack-badge critical" title="Критический путь">
+                                      Крит. путь
+                                    </span>
+                                  ) : r?.slack_minutes != null ? (
+                                    <span className="slack-badge non-critical" title={`Свободный резерв: ${r.slack_minutes / 60} ч.`}>
+                                      +{Math.round(r.slack_minutes / 60)} ч.
+                                    </span>
+                                  ) : (
+                                    <span className="slack-badge">—</span>
+                                  )}
+                                </div>
+
+                                <div className="col-action">
+                                  <button className="list-row-btn" title="Редактировать">
+                                    <ChevronRight size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="timeline-footer">
+                      <span>Сегодня, {new Date().toLocaleDateString("ru-RU", { timeZone: zone, day: "numeric", month: "long", year: "numeric" })}</span>
+                      <span className="today-line" />
+                      <span>
+                        Показать зависимости{" "}
+                        <button
+                          className={`toggle ${dependencyVisible ? "active" : ""}`}
+                          onClick={() => setDependencyVisible(!dependencyVisible)}
+                        >
+                          <span />
+                        </button>
+                      </span>
+                    </div>
+                  </article>
+
+                  {/* Side Column Widgets */}
+                  <aside className="side-column">
+                    <article className="panel attention-panel" id="risks">
+                      <div className="panel-header">
+                        <div>
+                          <h2>Требует внимания</h2>
+                          <p>Изменения и риски проекта</p>
+                        </div>
+                        <button className="round-action" onClick={() => setActiveView("ai")}>
+                          <ArrowRight size={17} />
+                        </button>
+                      </div>
+
+                      <div className="attention-list">
+                        {overdueTasks.map((t) => {
+                          const taskObj = draft?.tasks.find((x) => x.id === t.id);
+                          return (
+                            <div className="attention-item high" key={t.id}>
+                              <span className="attention-icon">
+                                <AlertTriangle size={13} />
+                              </span>
+                              <div>
+                                <strong>Задача не завершена к плановому финишу</strong>
+                                <p>«{taskObj?.name}» задерживается от финиша.</p>
+                                <button className="text-action" onClick={() => taskObj && setTask(copy(taskObj))}>
+                                  Открыть задачу <ArrowRight size={10} />
+                                </button>
+                              </div>
+                              <span className="time">{shortDate(t.finish)}</span>
+                            </div>
                           );
                         })}
-                      </SimpleGrid>
-                    )}
-                  </Stack>
-                </Tabs.Panel>
 
-                <Tabs.Panel value="risks" pt="md">
-                  <SimpleGrid cols={{ base: 1, md: 2 }}>
-                    <Card withBorder>
-                      <Title order={3}>Требуют внимания</Title>
-                      <Stack mt="md">
-                        {!view.analysis.tasks.some(
-                          (t) => t.risk_flags.length,
-                        ) && (
-                          <Text c="dimmed">
-                            По текущему плану предупреждений нет.
-                          </Text>
-                        )}
-                        {view.analysis.tasks
-                          .filter((t) => t.risk_flags.length)
-                          .map((t) => (
-                            <div key={t.id}>
-                              <Text fw={600}>
-                                {
-                                  view.project.tasks.find((x) => x.id === t.id)
-                                    ?.name
-                                }
-                              </Text>
-                              <Text size="sm" c="red">
-                                {t.risk_flags
-                                  .map((f) => riskLabels[f] || f)
-                                  .join(" · ")}
-                              </Text>
+                        {overloadedAssigneeIds.size > 0 && (
+                          <div className="attention-item medium">
+                            <span className="attention-icon">
+                              <ArrowRight size={13} />
+                            </span>
+                            <div>
+                              <strong>Перегрузка исполнителей</strong>
+                              <p>Перегрузка {overloadedAssigneeIds.size} сотрудников.</p>
+                              <button className="text-action" onClick={() => setActiveView("team")}>
+                                Посмотреть <ArrowRight size={10} />
+                              </button>
                             </div>
-                          ))}
-                        {view.analysis.overloads.slice(0, 20).map((o, i) => (
-                          <Text key={i} size="sm">
-                            {
-                              view.project.assignees.find(
-                                (p) => p.id === o.assignee_id,
-                              )?.name
-                            }
-                            : {o.allocation_percent}% · {date(o.start)} —{" "}
-                            {date(o.finish)}
-                          </Text>
-                        ))}
-                        {view.analysis.overloads.length > 20 && (
-                          <Text size="sm">
-                            Показаны первые 20 интервалов из{" "}
-                            {view.analysis.overloads.length}.
-                          </Text>
+                            
+                          </div>
                         )}
-                      </Stack>
-                    </Card>
 
-                    <Card withBorder>
-                      <Title order={3}>Объяснение AI</Title>
-                      <Text c="dimmed" size="sm" mt="sm">
-                        AI объясняет сохранённый план и предлагает действия. Все
-                        даты и риски рассчитаны сервером.
-                      </Text>
+                        {overdueTasks.length === 0 && (
+                          <div className="attention-item neutral">
+                            <span className="attention-icon">
+                              <Check size={13} />
+                            </span>
+                            <div>
+                              <strong>Готово к проверке</strong>
+                              <p>Незавершённых задач с прошедшей датой финиша не обнаружено. Другие риски приведены в результатах движка.</p>
+                              <button className="text-action" onClick={() => setShowScenarioModal(true)}>
+                                Открыть <ArrowRight size={10} />
+                              </button>
+                            </div>
+                            
+                          </div>
+                        )}
+                      </div>
+                    </article>
+
+                    <article className="panel decision-panel">
+                      <div className="decision-badge">КОНТРОЛЬНАЯ ТОЧКА</div>
+                      <h2>
+                        Что изменится,<br />
+                        <em>если опоздать?</em>
+                      </h2>
+                      <p>Измените срок задачи и сразу увидите влияние на проект.</p>
+                      <button className="outline-button" onClick={() => setShowScenarioModal(true)}>
+                        Запустить сценарий <ArrowRight size={14} />
+                      </button>
+                    </article>
+                  </aside>
+                </section>
+
+                {/* Bottom Grid Layout */}
+                <section className="bottom-grid">
+                  <article className="panel activity-panel" id="tasks">
+                    <div className="panel-header"><div><h2>История сохранений</h2><p>Последние 20 версий проекта</p></div></div>
+                    {historyError && <Text c="red">{historyError}</Text>}
+                    {!history.length && !historyError && <Text c="dimmed">Нет загруженных версий</Text>}
+                    {history.map(item => <div className="activity-row" key={item.version}>
+                      <div><strong>Версия {item.version}</strong><span> · {item.task_count} задач</span>
+                      <small>{date(item.created_at)} · прогноз: {date(item.finish)}</small></div>
+                    </div>)}
+                  </article>
+                  <article className="panel health-panel">
+                    <div className="panel-header"><div><h2>Результаты движка</h2><p>{preview ? "Проверенный сценарий" : "Сохранённый план"}</p></div></div>
+                    <Stack gap="sm">
+                      <Text>Дедлайн: {view?.analysis.deadline_exceeded ? `превышен на ${view.analysis.delay_minutes} календарных минут` : "не превышен в расчёте"}</Text>
+                      <Text>Конфликты зависимостей: {view?.analysis.tasks.filter(t => t.risk_flags.includes("dependency_conflict")).length || 0}</Text>
+                      <Text>Заблокированные задачи: {view?.analysis.tasks.filter(t => t.risk_flags.includes("blocked")).length || 0}</Text>
+                      <Text>Периоды перегрузки: {view?.analysis.overloads.length || 0}</Text>
+                      <Text size="xs" c="dimmed">Отсутствие превышения дедлайна не гарантирует выполнение плана. Резервы рассчитаны относительно прогнозного финиша.</Text>
+                    </Stack>
+                  </article>
+                </section>
+              </>
+            )}
+
+            {/* Graph View */}
+            {activeView === "graph" && draft && (
+              <Card withBorder p="md">
+                <Group justify="space-between" mb="md">
+                  <div>
+                    <Title order={3}>Интерактивная карта графа задач</Title>
+                    <Text size="sm" c="dimmed">
+                      Перемещайте блоки задач мышью, соединяйте стрелками для добавления связей и кликайте на задачу для редактирования.
+                    </Text>
+                  </div>
+                  <Group gap="xs">
+                    <Button size="xs" onClick={() => setDepModal(true)}>+ Добавить связь</Button>
+                    <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>
+                      ← Вернуться на Главную
+                    </Button>
+                  </Group>
+                </Group>
+                <ProjectGraph
+                  project={draft}
+                  result={view}
+                  affectedTaskIds={affected}
+                  colorScheme={colorScheme}
+                  onEditTask={(t) => setTask(copy(t))}
+                  onAddDependency={(d) => {
+                    change({
+                      ...draft,
+                      dependencies: [...draft.dependencies, d],
+                    });
+                    showNotification(`Добавлена связь: ${d.kind}`);
+                  }}
+                />
+              </Card>
+            )}
+
+            {/* Tasks Table View */}
+            {activeView === "tasks_table" && (
+              <Card withBorder p="md">
+                <Group justify="space-between" mb="md">
+                  <div>
+                    <Title order={3}>Полная таблица задач проекта</Title>
+                    <Text size="sm" c="dimmed">Кликните по задаче для детального редактирования дат, навыков и исполнителя.</Text>
+                  </div>
+                  <Group gap="xs">
+                    <Button size="xs" onClick={() => setTask(defaultTask())}>+ Добавить задачу</Button>
+                    <Button size="xs" variant="light" onClick={() => setImportModal(true)}>Импорт CSV</Button>
+                    <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← Вернуться на Главную</Button>
+                  </Group>
+                </Group>
+
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Приоритет</Table.Th>
+                      <Table.Th>Задача</Table.Th>
+                      <Table.Th>Исполнитель</Table.Th>
+                      <Table.Th>Статус</Table.Th>
+                      <Table.Th>Загрузка</Table.Th>
+                      <Table.Th>Часы</Table.Th>
+                      <Table.Th>Прогноз</Table.Th>
+                      <Table.Th>Резерв</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {(draft?.tasks || []).map((t) => {
+                      const person = draft?.assignees.find((p) => p.id === t.assignee_id);
+                      const r = rows.get(t.id);
+                      const isOverdue = r?.risk_flags.includes("overdue");
+                      const skillMatch = person ? calculateSkillMatch(t, person) : null;
+                      return (
+                        <Table.Tr key={t.id} onClick={() => setTask(copy(t))} style={{ cursor: "pointer" }}>
+                          <Table.Td>
+                            <Badge size="xs" color={priorityColors[t.priority || "medium"]}>
+                              {priorityLabels[t.priority || "medium"]}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td fw={600}>
+                            <Group gap={6}>
+                              <Text size="sm" fw={600}>{t.name}</Text>
+                              {isOverdue && <Badge size="xs" color="red">Просрочена</Badge>}
+                            </Group>
+                            {t.required_skills && t.required_skills.length > 0 && (
+                              <Group gap={4} mt={2}>
+                                {t.required_skills.map((s, idx) => (
+                                  <Badge key={idx} size="xs" variant="outline" color="gray">
+                                    {s}
+                                  </Badge>
+                                ))}
+                              </Group>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            {person ? (
+                              <Group gap="xs">
+                                <span className={`avatar ${getAvatarClass(person.id)}`} style={{ width: 22, height: 22, fontSize: 8 }}>
+                                  {getInitials(person.name)}
+                                </span>
+                                <div>
+                                  <Text size="sm">{person.name}</Text>
+                                  {skillMatch !== null && (
+                                    <Badge size="xs" color={skillMatch >= 80 ? "teal" : skillMatch >= 50 ? "yellow" : "red"} variant="light">
+                                      Match {skillMatch}%
+                                    </Badge>
+                                  )}
+                                </div>
+                              </Group>
+                            ) : (
+                              <Text size="sm" c="dimmed">Не назначен</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            <Badge color={statusColors[t.status]}>{statusLabels[t.status]}</Badge>
+                          </Table.Td>
+                          <Table.Td>{t.allocation_percent || 100}%</Table.Td>
+                          <Table.Td>{t.duration_minutes / 60} ч</Table.Td>
+                          <Table.Td>{r ? date(r.finish) : "—"}</Table.Td>
+                          <Table.Td>{r?.slack_minutes == null ? "—" : `${r.slack_minutes / 60} ч`}</Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </Card>
+            )}
+
+            {/* Team View with Skill Match and Roles */}
+            {activeView === "team" && (
+              <Card withBorder p="md">
+                <Group justify="space-between" mb="md">
+                  <div>
+                    <Title order={3}>Матрица компетенций и команды</Title>
+                    <Text size="sm" c="dimmed">Исполнители, роли, навыки, процент соответствия задачам и персональные отпуска.</Text>
+                  </div>
+                  <Group gap="xs">
+                    <Button size="xs" variant="light" onClick={() => setSettings(true)}>Управлять командой</Button>
+                    <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
+                  </Group>
+                </Group>
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }}>
+                  {(draft?.assignees || []).map((p) => {
+                    const isOverloaded = overloadedAssigneeIds.has(p.id);
+                    const assignedTasks = (draft?.tasks || []).filter((t) => t.assignee_id === p.id);
+                    
+                    // Average skill match across assigned tasks
+                    let avgSkillMatch = 100;
+                    if (assignedTasks.length > 0) {
+                      const totalMatch = assignedTasks.reduce((acc, t) => acc + calculateSkillMatch(t, p), 0);
+                      avgSkillMatch = Math.round(totalMatch / assignedTasks.length);
+                    }
+
+                    return (
+                      <Card key={p.id} withBorder p="md">
+                        <Group justify="space-between" mb="xs">
+                          <Group gap="xs">
+                            <span className={`avatar ${getAvatarClass(p.id)}`}>{getInitials(p.name)}</span>
+                            <div>
+                              <Text fw={700} size="sm">{p.name}</Text>
+                              <Text size="xs" c="blue" fw={600}>{p.role || "Роль не указана"}</Text>
+                            </div>
+                          </Group>
+                          <Group gap="xs">
+                            <Badge color={avgSkillMatch >= 80 ? "teal" : avgSkillMatch >= 50 ? "yellow" : "red"} variant="light">
+                              Skill Match: {avgSkillMatch}%
+                            </Badge>
+                            {isOverloaded && <Badge color="red">Перегрузка &gt;100%</Badge>}
+                          </Group>
+                        </Group>
+
+                        <Group justify="space-between" mb={4}>
+                          <Text size="xs" c="dimmed">Задач назначено: {assignedTasks.length}</Text>
+                          <Badge size="xs" color={Object.keys(p.calendar?.exceptions || {}).length > 0 ? "orange" : "gray"} variant="outline">
+                            {Object.keys(p.calendar?.exceptions || {}).length} отпусков / исключений
+                          </Badge>
+                        </Group>
+                        <Text size="xs" fw={600} mb={4}>Компетенции:</Text>
+                        <Group gap={4} mb="xs">
+                          {(p.skills || []).map((s, idx) => (
+                            <Badge key={idx} size="xs" variant="light" color="indigo">
+                              {s.name} ({skillLevelLabels[s.level]})
+                            </Badge>
+                          ))}
+                          {(!p.skills || p.skills.length === 0) && (
+                            <Text size="xs" c="dimmed">Навыки не указаны</Text>
+                          )}
+                        </Group>
+                        <Button
+                          size="compact-xs"
+                          variant="light"
+                          onClick={() => setSettings(true)}
+                        >
+                          Настроить график и отпуска
+                        </Button>
+                      </Card>
+                    );
+                  })}
+                </SimpleGrid>
+              </Card>
+            )}
+
+            {/* Links / Dependencies View */}
+            {activeView === "links" && (
+              <Card withBorder p="md">
+                <Group justify="space-between" mb="md">
+                  <div>
+                    <Title order={3}>Зависимости и связи между задачами</Title>
+                    <Text size="sm" c="dimmed">Связи задают технологическую последовательность и типы зависимостей.</Text>
+                  </div>
+                  <Group gap="xs">
+                    <Button size="xs" onClick={() => setDepModal(true)}>+ Добавить связь</Button>
+                    <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
+                  </Group>
+                </Group>
+
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Предшествующая задача</Table.Th>
+                      <Table.Th>Тип связи</Table.Th>
+                      <Table.Th>Последующая задача</Table.Th>
+                      <Table.Th>Задержка (лаг)</Table.Th>
+                      <Table.Th>Режим</Table.Th>
+                      <Table.Th style={{ width: 60 }}></Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {(draft?.dependencies || []).map((d, idx) => {
+                      const pred = draft?.tasks.find((t) => t.id === d.predecessor_id);
+                      const succ = draft?.tasks.find((t) => t.id === d.successor_id);
+                      return (
+                        <Table.Tr key={idx}>
+                          <Table.Td fw={600}>{pred?.name || d.predecessor_id}</Table.Td>
+                          <Table.Td>
+                            <Badge variant="outline">{d.kind}</Badge>
+                          </Table.Td>
+                          <Table.Td fw={600}>{succ?.name || d.successor_id}</Table.Td>
+                          <Table.Td>{d.lag_minutes / 60} ч.</Table.Td>
+                          <Table.Td>
+                            <Badge size="xs" color={d.lag_mode === "working" ? "blue" : "gray"}>
+                              {d.lag_mode === "working" ? "Рабочее время" : "Календарное время"}
+                            </Badge>
+                          </Table.Td>
+                          <Table.Td>
+                            <ActionIcon
+                              color="red"
+                              variant="subtle"
+                              title="Удалить связь"
+                              onClick={() => {
+                                if (!draft) return;
+                                change({
+                                  ...draft,
+                                  dependencies: (draft.dependencies || []).filter((_, j) => j !== idx),
+                                });
+                                showNotification("Связь удалена");
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </ActionIcon>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </Card>
+            )}
+
+            {/* AI Copilot & Risks View */}
+            {activeView === "ai" && saved && draft && (
+              <Stack gap="md">
+                <Group justify="space-between">
+                  <div>
+                    <Title order={3}>AI Copilot и Центр анализа рисков</Title>
+                    <Text size="sm" c="dimmed">
+                      Интерактивный диалог с AI по проекту, экспресс-аудит критического пути и стратегические рекомендации.
+                    </Text>
+                  </div>
+                  <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>
+                    ← На Главную
+                  </Button>
+                </Group>
+
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                  <AICopilotChat
+                    key={saved.id}
+                    project={saved.project}
+                    projectId={saved.id}
+                    result={saved}
+                  />
+
+                  <Card withBorder p="md">
+                    <Group justify="space-between" mb="sm">
+                      <Title order={4} style={{ fontSize: 16 }}>
+                        Экспресс-аудит рисков (Автоотчет)
+                      </Title>
                       <Button
-                        mt="md"
-                        variant="light"
-                        disabled={busy || dirty}
+                        size="xs"
+                        loading={aiBusy}
                         onClick={() =>
                           void run(async () => {
-                            const result = await api<{ text: string }>(
-                              `/projects/${saved!.id}/ai`,
-                              "POST",
-                            );
-                            setAi(result.text);
+                            setAiBusy(true);
+                            try {
+                              const res = await api<{ available: boolean; text: string }>(
+                                `/projects/${saved.id}/ai`,
+                                "POST",
+                              );
+                              setAiText(res.text);
+                            } finally {
+                              setAiBusy(false);
+                            }
                           })
                         }
                       >
-                        Объяснить ситуацию
+                        <Sparkles size={14} style={{ marginRight: 6 }} /> Сформировать аудит
                       </Button>
-                      <Text mt="md" style={{ whiteSpace: "pre-wrap" }}>
-                        {ai}
+                    </Group>
+
+                    <Divider mb="sm" />
+
+                    {aiText ? (
+                      <ScrollArea style={{ maxHeight: 460 }}>
+                        <Text size="sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                          {aiText}
+                        </Text>
+                      </ScrollArea>
+                    ) : (
+                      <Text size="sm" c="dimmed">
+                        Нажмите «Сформировать аудит», чтобы AI объяснил готовые расчёты движка и предложил гипотезы действий.
                       </Text>
-                    </Card>
-                  </SimpleGrid>
-                </Tabs.Panel>
-              </Tabs>
-            </>
-          )}
-        </Stack>
-      </Container>
+                    )}
+                  </Card>
+                </SimpleGrid>
+              </Stack>
+            )}
+          </div>
+        </main>
+      </div>
 
-      <Modal
-        opened={newProject}
-        onClose={() => setNewProject(false)}
-        title="Создание нового проекта"
-      >
-        <Stack gap="md">
-          <TextInput
-            label="Название проекта"
-            placeholder="Например: Запуск мобильного приложения"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
+      {/* Toast notification component */}
+      <div className={`toast ${toast ? "show" : ""}`} role="status">
+        {toast}
+      </div>
 
-          <Select
-            label="Часовой пояс IANA"
-            description="Проект будет рассчитывать рабочие смены в выбранной часовой зоне"
-            data={TIMEZONE_OPTIONS}
-            value={timezone}
-            onChange={(v) => v && setTimezone(v)}
-            searchable
-          />
+      {/* Dependency / Link Creation Modal */}
+      {depModal && (
+        <Modal
+          opened={depModal}
+          onClose={() => setDepModal(false)}
+          title="Добавить связь между задачами"
+          size="md"
+        >
+          <Stack gap="sm">
+            <Select
+              label="Предшествующая задача"
+              placeholder="Выберите задачу-предшественник"
+              data={(draft?.tasks || []).map((t) => ({ value: t.id, label: t.name }))}
+              value={newDepPred}
+              onChange={(v) => setNewDepPred(v || "")}
+              required
+            />
 
-          <ProjectDateInput
-            label="Дата начала проекта"
-            zone={timezone}
-            value={start}
-            onChange={setStart}
-            required
-          />
+            <Select
+              label="Тип связи"
+              data={[
+                { value: "FS", label: "Окончание → Начало (FS)" },
+                { value: "SS", label: "Начало → Начало (SS)" },
+                { value: "FF", label: "Окончание → Окончание (FF)" },
+                { value: "SF", label: "Начало → Окончание (SF)" },
+              ]}
+              value={newDepKind}
+              onChange={(v) => setNewDepKind((v as Dependency["kind"]) || "FS")}
+            />
 
-          <ProjectDateInput
-            label="Целевой дедлайн проекта"
-            zone={timezone}
-            value={deadline}
-            onChange={setDeadline}
-            required
-          />
+            <Select
+              label="Последующая задача"
+              placeholder="Выберите зависимую задачу"
+              data={(draft?.tasks || []).map((t) => ({ value: t.id, label: t.name }))}
+              value={newDepSucc}
+              onChange={(v) => setNewDepSucc(v || "")}
+              required
+            />
 
-          <Button
-            loading={busy}
-            disabled={!name.trim()}
-            onClick={() =>
-              void run(async () => {
-                accept(
-                  await api<Result>("/projects", "POST", {
-                    name,
-                    start,
-                    deadline,
-                    timezone,
-                    calendar: defaultCalendar(),
-                    assignees: [],
-                    tasks: [],
-                    dependencies: [],
-                  }),
-                );
-                await list();
-                setNewProject(false);
-              })
-            }
-          >
-            Создать проект
-          </Button>
-        </Stack>
-      </Modal>
+            <Group grow>
+              <NumberInput
+                label="Задержка / лаг (в часах)"
+                value={newDepLagHours}
+                onChange={(v) => setNewDepLagHours(Number(v || 0))}
+              />
+              <Select
+                label="Режим задержки"
+                data={[
+                  { value: "working", label: "Рабочее время" },
+                  { value: "elapsed", label: "Календарное время" },
+                ]}
+                value={newDepLagMode}
+                onChange={(v) => setNewDepLagMode((v as Dependency["lag_mode"]) || "working")}
+              />
+            </Group>
 
-      <Modal
-        opened={importModal}
-        onClose={() => setImportModal(false)}
-        title="Импорт задач из CSV"
-        size="lg"
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            Вставьте содержимое CSV-файла или скопируйте строки из Excel.
-            Формат столбцов: <code>ID; Название задачи; Приоритет; Статус; Длительность (ч); Исполнитель; Навыки</code>
-          </Text>
-          <Textarea
-            label="Данные в формате CSV"
-            rows={8}
-            placeholder={`ID;Название задачи;Приоритет;Статус;Длительность;Исполнитель;Навыки\n1;Backend API;Высокий;todo;24;Мария;Python, SQL\n2;Frontend UI;Средний;todo;16;Денис;React`}
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-          />
-          <Group justify="flex-end">
-            <Button variant="subtle" onClick={() => setImportModal(false)}>
-              Отмена
-            </Button>
-            <Button
-              disabled={!importText.trim() || !draft}
-              onClick={() => {
-                if (!draft) return;
-                const imported = parseCsvTasks(importText, draft.assignees);
-                if (imported.length > 0) {
-                  change({
-                    ...draft,
-                    tasks: [...draft.tasks, ...imported],
-                  });
-                  setImportText("");
-                  setImportModal(false);
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setDepModal(false)}>Отмена</Button>
+              <Button onClick={handleAddDependencySubmit}>Добавить связь</Button>
+            </Group>
+          </Stack>
+        </Modal>
+      )}
+
+      {/* CSV Import Modal */}
+      {importModal && (
+        <Modal
+          opened={importModal}
+          onClose={() => setImportModal(false)}
+          title="Импорт задач из CSV"
+          size="lg"
+        >
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              Вставьте текст CSV или загрузите файл (разделители: точка с запятой или запятая).
+              Формат колонок: ID; Название; Приоритет; Часы/Мин; Исполнитель; Статус; Не раньше; Требуемые навыки.
+            </Text>
+
+            <FileInput
+              label="Загрузить файл .csv"
+              placeholder="Выберите .csv файл"
+              accept=".csv,text/csv"
+              onChange={(file) => {
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (e) => setCsvInput((e.target?.result as string) || "");
+                  reader.readAsText(file, "UTF-8");
                 }
               }}
-            >
-              Импортировать {importText.trim().split("\n").length - 1} задач
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+            />
 
+            <Textarea
+              label="Либо вставьте содержимое CSV напрямую:"
+              rows={8}
+              placeholder="Название задачи; medium; 8; Алексей; todo; 2026-09-22T09:00:00+05:00; React, TypeScript"
+              value={csvInput}
+              onChange={(e) => setCsvInput(e.target.value)}
+            />
+
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setImportModal(false)}>Отмена</Button>
+              <Button onClick={handleImportCsvSubmit} disabled={!csvInput.trim()}>
+                Импортировать задачи
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+      )}
+
+      {/* Project Management & Delete Modal */}
+      {projectManageModal && (
+        <Modal
+          opened={projectManageModal}
+          onClose={() => setProjectManageModal(false)}
+          title="Управление проектами"
+          size="lg"
+        >
+          <Stack gap="md">
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">
+                Выберите проект для переключения или удалите ненужные.
+              </Text>
+              <Button size="xs" onClick={() => setNewProjectModal(true)}>
+                + Создать новый проект
+              </Button>
+            </Group>
+
+            <Divider />
+
+            <Stack gap="xs">
+              {projects.map((p) => {
+                const isCurrent = saved?.id === p.id;
+                return (
+                  <Card key={p.id} withBorder p="xs" style={{ background: isCurrent ? "rgba(90, 117, 233, 0.08)" : undefined }}>
+                    <Group justify="space-between">
+                      <Group gap="xs">
+                        <span className="project-dot" />
+                        <div>
+                          <Text fw={700} size="sm">{p.name}</Text>
+                          {isCurrent && <Badge size="xs" color="blue">Текущий активный</Badge>}
+                        </div>
+                      </Group>
+
+                      <Group gap="xs">
+                        {!isCurrent && (
+                          <Button
+                            size="xs"
+                            variant="light"
+                            onClick={() =>
+                              void run(async () => {
+                                accept(await api<Result>(`/projects/${p.id}`));
+                                setProjectManageModal(false);
+                                showNotification(`Переключено на проект «${p.name}»`);
+                              })
+                            }
+                          >
+                            Переключиться
+                          </Button>
+                        )}
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          title="Удалить проект"
+                          onClick={() => setDeleteConfirmProject(p)}
+                        >
+                          <Trash2 size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Group>
+                  </Card>
+                );
+              })}
+            </Stack>
+          </Stack>
+        </Modal>
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {deleteConfirmProject && (
+        <Modal
+          opened={Boolean(deleteConfirmProject)}
+          onClose={() => setDeleteConfirmProject(null)}
+          title="Подтверждение удаления проекта"
+          size="sm"
+        >
+          <Stack gap="md">
+            <Text size="sm">
+              Вы уверены, что хотите навсегда удалить проект <strong>«{deleteConfirmProject.name}»</strong>? Все его задачи и графики будут безвозвратно удалены.
+            </Text>
+
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setDeleteConfirmProject(null)}>
+                Отмена
+              </Button>
+              <Button
+                color="red"
+                loading={busy}
+                onClick={() => handleDeleteProject(deleteConfirmProject.id)}
+              >
+                Удалить проект
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+      )}
+
+      {/* New Project Modal */}
+      {newProjectModal && (
+        <Modal
+          opened={newProjectModal}
+          onClose={() => setNewProjectModal(false)}
+          title="Создание нового проекта"
+          size="md"
+        >
+          <Stack gap="sm">
+            <TextInput
+              label="Название проекта"
+              value={newProjName}
+              onChange={(e) => setNewProjName(e.target.value)}
+              required
+            />
+
+            <Select
+              label="Часовой пояс IANA"
+              data={TIMEZONE_OPTIONS}
+              value={newProjTz}
+              onChange={(v) => v && setNewProjTz(v)}
+            />
+
+            <Group grow>
+              <ProjectDateInput
+                label="Дата начала"
+                zone={newProjTz}
+                value={newProjStart}
+                onChange={setNewProjStart}
+              />
+              <ProjectDateInput
+                label="Целевой дедлайн"
+                zone={newProjTz}
+                value={newProjDeadline}
+                onChange={setNewProjDeadline}
+              />
+            </Group>
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setNewProjectModal(false)}>
+                Отмена
+              </Button>
+              <Button onClick={handleCreateProjectSubmit} loading={busy}>
+                Создать проект
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
+      )}
+
+      {/* Scenario Modal (What if?) */}
+      {showScenarioModal && (
+        <Modal
+          opened={showScenarioModal}
+          onClose={() => {
+            setShowScenarioModal(false);
+            setSimResult(null);
+          }}
+          title="ПРОВЕРКА ИЗМЕНЕНИЯ — Что если?"
+          size="md"
+        >
+          <Stack gap="sm">
+            <Text size="sm" c="dimmed">
+              Проверьте последствия до того, как менять план проекта.
+            </Text>
+
+            <Select
+              label="Выберите незавершённую задачу"
+              data={(draft?.tasks || []).filter(t => t.status !== "done").map((t) => ({ value: t.id, label: t.name }))}
+              value={simTaskChoice || (draft?.tasks.find(t => t.status !== "done")?.id || "")}
+              onChange={(v) => { setSimTaskChoice(v || ""); setSimResult(null); }}
+            />
+
+            <div>
+              <Text size="xs" fw={700} mb={4}>Увеличение длительности: <strong>{simDelayDays} рабочих часов</strong></Text>
+              <input
+                type="range"
+                min="0"
+                max="40"
+                value={simDelayDays}
+                onChange={(e) => { setSimDelayDays(Number(e.target.value)); setSimResult(null); }}
+                style={{ width: "100%", accentColor: "var(--purple)" }}
+              />
+            </div>
+
+            {simError && <Alert color="red">{simError}</Alert>}
+            <Button onClick={handleRunSimulation} loading={simBusy}>
+              Запустить сценарий
+            </Button>
+
+            {simResult && <Card withBorder p="sm"><Stack gap="xs">
+              <Text fw={700}>Результат движка относительно сохранённого плана</Text>
+              <Text>Прогноз завершения: {date(simResult.analysis.finish)}</Text>
+              <Text>Сдвиг: {simResult.changes?.finish_delta_minutes || 0} календарных минут</Text>
+              <Text>Задачи с изменёнными датами: {simResult.changes?.changed_task_ids.length || 0}</Text>
+              <Text>Дедлайн: {simResult.analysis.deadline_exceeded ? "превышен" : "не превышен"}</Text>
+              <Text>Периоды перегрузки: {simResult.analysis.overloads.length}</Text>
+              <Button onClick={() => {setDraft(copy(simResult.project)); setPreview(simResult); setAiText(""); setShowScenarioModal(false);}}>Перенести сценарий в черновик</Button>
+            </Stack></Card>}
+          </Stack>
+        </Modal>
+      )}
+
+      {/* FULL TASK DRAWER — Со всеми полями: not_before, allocation_percent, required_skills, actual_dates */}
       <Drawer
-        opened={!!task}
+        opened={Boolean(task)}
         onClose={() => setTask(null)}
-        title="Параметры задачи"
+        title={task?.id && draft?.tasks.some((t) => t.id === task.id) ? "Редактирование задачи" : "Новая задача"}
         position="right"
         size="md"
       >
@@ -1563,20 +2023,10 @@ function App() {
               label="Название задачи"
               value={task.name}
               onChange={(e) => setTask({ ...task, name: e.target.value })}
+              required
             />
 
             <Group grow>
-              <NumberInput
-                label="Длительность, раб. ч"
-                min={1 / 60}
-                value={task.duration_minutes / 60}
-                onChange={(v) =>
-                  setTask({
-                    ...task,
-                    duration_minutes: Math.round(Number(v) * 60),
-                  })
-                }
-              />
               <Select
                 label="Приоритет"
                 data={[
@@ -1586,177 +2036,197 @@ function App() {
                   { value: "urgent", label: "Срочный" },
                 ]}
                 value={task.priority || "medium"}
-                onChange={(v) =>
-                  setTask({ ...task, priority: (v as Priority) || "medium" })
-                }
+                onChange={(v) => setTask({ ...task, priority: (v as Priority) || "medium" })}
+              />
+
+              <NumberInput
+                label="Длительность (часы)"
+                value={task.duration_minutes / 60}
+                min={0.5}
+                step={0.5}
+                onChange={(val) => setTask({ ...task, duration_minutes: Math.round(Number(val || 1) * 60) })}
               />
             </Group>
 
+            <Group grow>
+              <Select
+                label="Исполнитель"
+                data={[
+                  { value: "", label: "Не назначен" },
+                  ...draft.assignees.map((a) => ({ value: a.id, label: `${a.name} ${a.role ? `(${a.role})` : ""}` })),
+                ]}
+                value={task.assignee_id || ""}
+                onChange={(v) => setTask({ ...task, assignee_id: v || null })}
+              />
+
+              <NumberInput
+                label="Загрузка сотрудника (%)"
+                min={1}
+                max={100}
+                value={task.allocation_percent || 100}
+                onChange={(val) => setTask({ ...task, allocation_percent: Number(val || 100) })}
+              />
+            </Group>
+
+            {task.assignee_id && (
+              <Group gap="xs">
+                {(() => {
+                  const assignedPerson = draft.assignees.find((a) => a.id === task.assignee_id);
+                  if (!assignedPerson) return null;
+                  const match = calculateSkillMatch(task, assignedPerson);
+                  return (
+                    <Badge color={match >= 80 ? "teal" : match >= 50 ? "yellow" : "red"} variant="light" size="sm">
+                      Соответствие навыкам: {match}%
+                    </Badge>
+                  );
+                })()}
+              </Group>
+            )}
+
             <Select
               label="Статус задачи"
-              data={Object.entries(statusLabels).map(([value, label]) => ({
-                value,
-                label,
-              }))}
+              data={[
+                { value: "todo", label: "Запланировано" },
+                { value: "in_progress", label: "В работе" },
+                { value: "done", label: "Завершено" },
+                { value: "blocked", label: "Заблокировано" },
+              ]}
               value={task.status}
-              onChange={(v) =>
-                v && setTask(changeTaskStatus(task, v as Task["status"]))
-              }
-            />
-
-            <TextInput
-              label="Требуемые навыки (через запятую)"
-              placeholder="Например: Python, React, SQL"
-              value={(task.required_skills || []).join(", ")}
-              onChange={(e) =>
-                setTask({
-                  ...task,
-                  required_skills: e.target.value
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                })
-              }
+              onChange={(v) => setTask(changeTaskStatus(task, v as any))}
             />
 
             <div>
-              <Select
-                label="Ответственный исполнитель"
-                clearable
-                placeholder="Выберите исполнителя"
-                data={draft.assignees.map((p) => {
-                  const matchScore = calculateSkillMatch(task, p);
-                  const isOverloaded = overloadedAssigneeIds.has(p.id);
-                  return {
-                    value: p.id,
-                    label: `${p.name} (Совпадение: ${matchScore}%)${isOverloaded ? " — Перегрузка" : ""}`,
-                  };
-                })}
-                value={task.assignee_id}
-                onChange={(v) => setTask({ ...task, assignee_id: v })}
-              />
-
-              {task.assignee_id && (
-                <Card withBorder p="xs" mt="xs">
-                  {(() => {
-                    const person = draft.assignees.find((p) => p.id === task.assignee_id);
-                    if (!person) return null;
-                    const matchScore = calculateSkillMatch(task, person);
-                    return (
-                      <Group justify="space-between">
-                        <Group gap="xs">
-                          <Avatar size={26} radius="xl" color={getAvatarColor(person.id)}>
-                            {getInitials(person.name)}
-                          </Avatar>
-                          <div>
-                            <Text size="xs" fw={600}>
-                              {person.name}
-                            </Text>
-                            <Text size="xs" c="dimmed">
-                              Соответствие навыкам: {matchScore}%
-                            </Text>
-                          </div>
-                        </Group>
-                        <Badge size="xs" color={matchScore > 50 ? "teal" : "orange"}>
-                          {matchScore}% Match
-                        </Badge>
-                      </Group>
-                    );
-                  })()}
-                </Card>
-              )}
+              <Text size="xs" fw={600} mb={4}>Требуемые навыки (компетенции):</Text>
+              <Group gap={4} mb={6}>
+                {(task.required_skills || []).map((sk, skIdx) => (
+                  <Badge
+                    key={skIdx}
+                    size="sm"
+                    variant="light"
+                    color="indigo"
+                    rightSection={
+                      <ActionIcon
+                        size="xs"
+                        color="blue"
+                        radius="xl"
+                        variant="transparent"
+                        onClick={() =>
+                          setTask({
+                            ...task,
+                            required_skills: (task.required_skills || []).filter((_, i) => i !== skIdx),
+                          })
+                        }
+                      >
+                        ✕
+                      </ActionIcon>
+                    }
+                  >
+                    {sk}
+                  </Badge>
+                ))}
+              </Group>
+              <Group gap="xs">
+                <TextInput
+                  placeholder="Добавить навык (React, SQL, Figma...)"
+                  size="xs"
+                  value={newTaskSkill}
+                  onChange={(e) => setNewTaskSkill(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newTaskSkill.trim()) {
+                      e.preventDefault();
+                      setTask({
+                        ...task,
+                        required_skills: [...(task.required_skills || []), newTaskSkill.trim()],
+                      });
+                      setNewTaskSkill("");
+                    }
+                  }}
+                />
+                <Button
+                  size="xs"
+                  variant="light"
+                  disabled={!newTaskSkill.trim()}
+                  onClick={() => {
+                    setTask({
+                      ...task,
+                      required_skills: [...(task.required_skills || []), newTaskSkill.trim()],
+                    });
+                    setNewTaskSkill("");
+                  }}
+                >
+                  + Добавить
+                </Button>
+              </Group>
             </div>
 
-            <NumberInput
-              label="Процент занятости, %"
-              description="Используется для выявления локальной перегрузки сотрудника"
-              min={1}
-              max={100}
-              value={task.allocation_percent}
-              onChange={(v) =>
-                setTask({ ...task, allocation_percent: Number(v) })
-              }
-            />
+            <Divider my="xs" />
 
             <ProjectDateInput
-              label="Начать не раньше (необязательно)"
+              label="Начать не раньше чем (not_before)"
               zone={draft.timezone}
               value={task.not_before}
-              onChange={(value) =>
-                setTask({
-                  ...task,
-                  not_before: value || null,
-                })
-              }
+              onChange={(val) => setTask({ ...task, not_before: val })}
             />
 
-            {task.status === "in_progress" || task.status === "done" || task.status === "blocked" ? (
+            {(task.status === "in_progress" || task.status === "done" || task.status === "blocked") && (
               <ProjectDateInput
                 label="Фактическое начало"
                 zone={draft.timezone}
                 value={task.actual_start}
-                onChange={(value) =>
-                  setTask({
-                    ...task,
-                    actual_start: value || null,
-                  })
-                }
+                onChange={(val) => setTask({ ...task, actual_start: val })}
               />
-            ) : null}
+            )}
 
-            {task.status === "done" ? (
+            {task.status === "done" && (
               <ProjectDateInput
                 label="Фактическое окончание"
                 zone={draft.timezone}
                 value={task.actual_finish}
-                onChange={(value) =>
-                  setTask({
-                    ...task,
-                    actual_finish: value || null,
-                  })
-                }
+                onChange={(val) => setTask({ ...task, actual_finish: val })}
               />
-            ) : null}
+            )}
 
-            <Button
-              disabled={!task.name.trim() || !task.duration_minutes}
-              onClick={() => {
-                change({
-                  ...draft,
-                  tasks: draft.tasks.some((t) => t.id === task.id)
-                    ? draft.tasks.map((t) => (t.id === task.id ? task : t))
-                    : [...draft.tasks, task],
-                });
-                setTask(null);
-              }}
-            >
-              Сохранить в черновик
-            </Button>
+            <Group justify="space-between" mt="md">
+              {draft.tasks.some((t) => t.id === task.id) && (
+                <Button
+                  color="red"
+                  variant="subtle"
+                  onClick={() => {
+                    change({
+                      ...draft,
+                      tasks: draft.tasks.filter((t) => t.id !== task.id),
+                      dependencies: draft.dependencies.filter(
+                        (d) => d.predecessor_id !== task.id && d.successor_id !== task.id
+                      ),
+                    });
+                    setTask(null);
+                    showNotification(`Задача «${task.name}» удалена`);
+                  }}
+                >
+                  Удалить задачу
+                </Button>
+              )}
 
-            {draft.tasks.some((t) => t.id === task.id) && (
               <Button
-                variant="light"
-                color="red"
                 onClick={() => {
                   change({
                     ...draft,
-                    tasks: draft.tasks.filter((t) => t.id !== task.id),
-                    dependencies: draft.dependencies.filter(
-                      (d) =>
-                        d.predecessor_id !== task.id &&
-                        d.successor_id !== task.id,
-                    ),
+                    tasks: draft.tasks.some((t) => t.id === task.id)
+                      ? draft.tasks.map((t) => (t.id === task.id ? task : t))
+                      : [...draft.tasks, task],
                   });
                   setTask(null);
+                  showNotification(`Задача «${task.name}» сохранена`);
                 }}
               >
-                Удалить задачу и ее связи
+                Сохранить задачу
               </Button>
-            )}
+            </Group>
           </Stack>
         )}
       </Drawer>
 
+      {/* FULL SETTINGS DRAWER — Организован по вкладкам (Параметры, Календарь, Команда и Отпуска) */}
       <Drawer
         opened={settings}
         onClose={() => setSettings(false)}
@@ -1765,223 +2235,347 @@ function App() {
         size="xl"
       >
         {draft && (
-          <Stack gap="lg">
-            <TextInput
-              label="Название проекта"
-              value={draft.name}
-              onChange={(e) => change({ ...draft, name: e.target.value })}
-            />
+          <Tabs value={settingsTab} onChange={setSettingsTab} defaultValue="project">
+            <Tabs.List mb="md">
+              <Tabs.Tab value="project">Параметры проекта</Tabs.Tab>
+              <Tabs.Tab value="calendar">Календарь проекта</Tabs.Tab>
+              <Tabs.Tab value="team">Команда и отпуска ({draft.assignees.length})</Tabs.Tab>
+            </Tabs.List>
 
-            <Select
-              label="Часовой пояс IANA"
-              data={TIMEZONE_OPTIONS}
-              value={draft.timezone}
-              onChange={(v) => v && change({ ...draft, timezone: v })}
-              searchable
-            />
+            <Tabs.Panel value="project">
+              <Stack gap="md">
+                <TextInput
+                  label="Название проекта"
+                  value={draft.name}
+                  onChange={(e) => change({ ...draft, name: e.target.value })}
+                />
 
-            <Group grow>
-              <ProjectDateInput
-                label="Дата начала проекта"
-                zone={draft.timezone}
-                value={draft.start}
-                onChange={(value) =>
-                  change({
-                    ...draft,
-                    start: value,
-                  })
-                }
-              />
-              <ProjectDateInput
-                label="Целевой дедлайн"
-                zone={draft.timezone}
-                value={draft.deadline}
-                onChange={(value) =>
-                  change({
-                    ...draft,
-                    deadline: value,
-                  })
-                }
-              />
-            </Group>
+                <Select
+                  label="Часовой пояс IANA"
+                  data={TIMEZONE_OPTIONS}
+                  value={draft.timezone}
+                  onChange={(v) => v && change({ ...draft, timezone: v })}
+                  searchable
+                />
 
-            <Divider />
+                <Group grow>
+                  <ProjectDateInput
+                    label="Дата начала проекта"
+                    zone={draft.timezone}
+                    value={draft.start}
+                    onChange={(value) => change({ ...draft, start: value })}
+                  />
+                  <ProjectDateInput
+                    label="Целевой дедлайн"
+                    zone={draft.timezone}
+                    value={draft.deadline}
+                    onChange={(value) => change({ ...draft, deadline: value })}
+                  />
+                </Group>
 
-            <Title order={4}>Календарь проекта (Общее расписание)</Title>
-            <CalendarEditor
-              value={draft.calendar}
-              onChange={(calendar) => change({ ...draft, calendar })}
-            />
+                <Divider my="sm" />
 
-            <Divider />
-
-            <Group justify="space-between" align="center">
-              <div>
-                <Title order={4}>Состав команды и компетенции</Title>
-                <Text size="sm" c="dimmed">
-                  Добавляйте навыки сотрудникам и редактируйте их персональные графики.
-                </Text>
-              </div>
-              <Button
-                variant="light"
-                size="xs"
-                onClick={() =>
-                  change({
-                    ...draft,
-                    assignees: [
-                      ...draft.assignees,
-                      {
-                        id: crypto.randomUUID(),
-                        name: `Исполнитель ${draft.assignees.length + 1}`,
-                        skills: [],
-                        calendar: defaultCalendar(),
-                      },
-                    ],
-                  })
-                }
-              >
-                + Добавить исполнителя
-              </Button>
-            </Group>
-
-            {draft.assignees.map((p, i) => (
-              <Card key={p.id} withBorder p="md">
-                <Stack gap="sm">
-                  <Group justify="space-between">
-                    <Group gap="xs">
-                      <Avatar size={32} radius="xl" color={getAvatarColor(p.id)}>
-                        {getInitials(p.name)}
-                      </Avatar>
-                      <TextInput
-                        label="Имя исполнителя"
-                        value={p.name}
-                        w={250}
-                        onChange={(e) =>
-                          change({
-                            ...draft,
-                            assignees: draft.assignees.map((a, j) =>
-                              i === j ? { ...a, name: e.target.value } : a,
-                            ),
-                          })
-                        }
-                      />
-                    </Group>
-                    <Button
-                      variant="subtle"
-                      color="red"
-                      size="xs"
-                      onClick={() =>
-                        change({
-                          ...draft,
-                          assignees: draft.assignees.filter((_, j) => i !== j),
-                          tasks: draft.tasks.map((t) =>
-                            t.assignee_id === p.id ? { ...t, assignee_id: null } : t,
-                          ),
-                        })
-                      }
-                    >
-                      Удалить
+                <Card withBorder p="sm" style={{ background: "rgba(90, 117, 233, 0.04)" }}>
+                  <Group justify="space-between" align="center">
+                    <div>
+                      <Text size="xs" fw={700} c="blue">
+                        БАЗОВЫЙ ПЛАН (BASELINE)
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {draft.baseline
+                          ? `Зафиксирован: ${date(draft.baseline.saved_at)}`
+                          : "Эталонный график еще не зафиксирован"}
+                      </Text>
+                    </div>
+                    <Button variant="light" size="xs" onClick={handleSaveBaseline}>
+                      Зафиксировать текущий снимок
                     </Button>
                   </Group>
+                </Card>
+              </Stack>
+            </Tabs.Panel>
 
+            <Tabs.Panel value="calendar">
+              <Stack gap="md">
+                <Text size="xs" c="dimmed">
+                  Общий рабочий календарь определяет стандартные смены и праздничные нерабочие дни для всей компании/проекта.
+                </Text>
+                <CalendarEditor
+                  value={draft.calendar}
+                  onChange={(calendar) => change({ ...draft, calendar })}
+                />
+              </Stack>
+            </Tabs.Panel>
+
+            <Tabs.Panel value="team">
+              <Stack gap="md">
+                <Group justify="space-between" align="center">
                   <div>
-                    <Text size="xs" fw={600} mb={4}>
-                      Навыки и компетенции:
+                    <Text fw={700} size="sm">Состав команды, роли и персональные отпуска</Text>
+                    <Text size="xs" c="dimmed">
+                      Настраивайте должности, компетенции и персональные графики отпусков каждому сотруднику.
                     </Text>
-                    <Group gap={4} mb={6}>
-                      {(p.skills || []).map((sk, skIdx) => (
-                        <Badge
-                          key={skIdx}
-                          size="sm"
-                          variant="light"
-                          color="indigo"
-                          rightSection={
-                            <ActionIcon
+                  </div>
+                  <Button
+                    variant="light"
+                    size="xs"
+                    onClick={() =>
+                      change({
+                        ...draft,
+                        assignees: [
+                          ...draft.assignees,
+                          {
+                            id: crypto.randomUUID(),
+                            name: `Участник ${draft.assignees.length + 1}`,
+                            role: "Frontend-разработчик",
+                            skills: [],
+                            calendar: defaultCalendar(),
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    + Добавить сотрудника
+                  </Button>
+                </Group>
+
+                {draft.assignees.map((p, i) => (
+                  <Card key={p.id} withBorder p="md">
+                    <Stack gap="sm">
+                      <Group justify="space-between">
+                        <Group gap="xs">
+                          <span className={`avatar ${getAvatarClass(p.id)}`}>{getInitials(p.name)}</span>
+                          <TextInput
+                            label="Имя сотрудника"
+                            value={p.name}
+                            w={200}
+                            onChange={(e) =>
+                              change({
+                                ...draft,
+                                assignees: draft.assignees.map((a, j) =>
+                                  i === j ? { ...a, name: e.target.value } : a,
+                                ),
+                              })
+                            }
+                          />
+                          <TextInput
+                            label="Роль / Должность"
+                            placeholder="Например: Backend · Python"
+                            value={p.role || ""}
+                            w={200}
+                            onChange={(e) =>
+                              change({
+                                ...draft,
+                                assignees: draft.assignees.map((a, j) =>
+                                  i === j ? { ...a, role: e.target.value } : a,
+                                ),
+                              })
+                            }
+                          />
+                        </Group>
+
+                        <Button
+                          variant="subtle"
+                          color="red"
+                          size="xs"
+                          onClick={() =>
+                            change({
+                              ...draft,
+                              assignees: draft.assignees.filter((_, j) => i !== j),
+                              tasks: draft.tasks.map((t) =>
+                                t.assignee_id === p.id ? { ...t, assignee_id: null } : t,
+                              ),
+                            })
+                          }
+                        >
+                          Удалить
+                        </Button>
+                      </Group>
+
+                      <div>
+                        <Text size="xs" fw={600} mb={4}>
+                          Компетенции и навыки:
+                        </Text>
+                        <Group gap={4} mb={6}>
+                          {(p.skills || []).map((sk, skIdx) => (
+                            <Badge
+                              key={skIdx}
+                              size="sm"
+                              variant="light"
+                              color="indigo"
+                              rightSection={
+                                <ActionIcon
+                                  size="xs"
+                                  color="blue"
+                                  radius="xl"
+                                  variant="transparent"
+                                  onClick={() =>
+                                    change({
+                                      ...draft,
+                                      assignees: draft.assignees.map((a, j) =>
+                                        i === j
+                                          ? {
+                                              ...a,
+                                              skills: (a.skills || []).filter((_, idx) => idx !== skIdx),
+                                            }
+                                          : a,
+                                      ),
+                                    })
+                                  }
+                                >
+                                  ✕
+                                </ActionIcon>
+                              }
+                            >
+                              {sk.name} ({skillLevelLabels[sk.level]})
+                            </Badge>
+                          ))}
+                        </Group>
+
+                        {skillTargetAssigneeId === p.id ? (
+                          <Group align="end" gap="xs" mt="xs">
+                            <TextInput
+                              placeholder="Например: Python, React, Figma"
                               size="xs"
-                              color="blue"
-                              radius="xl"
-                              variant="transparent"
-                              onClick={() =>
+                              value={newSkillName}
+                              onChange={(e) => setNewSkillName(e.target.value)}
+                            />
+                            <Select
+                              size="xs"
+                              w={130}
+                              data={[
+                                { value: "beginner", label: "Начинающий" },
+                                { value: "intermediate", label: "Средний" },
+                                { value: "advanced", label: "Продвинутый" },
+                                { value: "expert", label: "Эксперт" },
+                              ]}
+                              value={newSkillLevel}
+                              onChange={(v) => setNewSkillLevel((v as any) || "expert")}
+                            />
+                            <Button
+                              size="xs"
+                              variant="light"
+                              disabled={!newSkillName.trim()}
+                              onClick={() => {
                                 change({
                                   ...draft,
                                   assignees: draft.assignees.map((a, j) =>
                                     i === j
                                       ? {
                                           ...a,
-                                          skills: (a.skills || []).filter((_, idx) => idx !== skIdx),
+                                          skills: [
+                                            ...(a.skills || []),
+                                            { name: newSkillName.trim(), level: newSkillLevel },
+                                          ],
                                         }
                                       : a,
                                   ),
-                                })
-                              }
+                                });
+                                setNewSkillName("");
+                                setSkillTargetAssigneeId(null);
+                              }}
                             >
-                              ✕
-                            </ActionIcon>
-                          }
-                        >
-                          {sk.name} ({skillLevelLabels[sk.level]})
-                        </Badge>
-                      ))}
-                    </Group>
-                    <Group align="end" gap="xs">
-                      <TextInput
-                        placeholder="Например: Python, React, Figma"
-                        size="xs"
-                        value={newSkillName}
-                        onChange={(e) => setNewSkillName(e.target.value)}
-                      />
-                      <Button
-                        size="xs"
-                        variant="light"
-                        disabled={!newSkillName.trim()}
-                        onClick={() => {
+                              Сохранить навык
+                            </Button>
+                          </Group>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="subtle"
+                            p={0}
+                            onClick={() => setSkillTargetAssigneeId(p.id)}
+                          >
+                            + Добавить навык сотруднику
+                          </Button>
+                        )}
+                      </div>
+
+                      <Text size="xs" fw={600} mt="xs">
+                        Персональный график работы и исключения / отпуска сотрудника:
+                      </Text>
+
+                      <CalendarEditor
+                        value={p.calendar}
+                        onChange={(calendar) =>
                           change({
                             ...draft,
                             assignees: draft.assignees.map((a, j) =>
-                              i === j
-                                ? {
-                                    ...a,
-                                    skills: [
-                                      ...(a.skills || []),
-                                      { name: newSkillName.trim(), level: "expert" },
-                                    ],
-                                  }
-                                : a,
+                              i === j ? { ...a, calendar } : a,
                             ),
-                          });
-                          setNewSkillName("");
-                        }}
-                      >
-                        + Навык
-                      </Button>
-                    </Group>
-                  </div>
+                          })
+                        }
+                      />
+                    </Stack>
+                  </Card>
+                ))}
+              </Stack>
+            </Tabs.Panel>
 
-                  <Text size="xs" fw={600} mt="xs">
-                    Персональный график работы и отпуска:
-                  </Text>
-
-                  <CalendarEditor
-                    value={p.calendar}
-                    onChange={(calendar) =>
-                      change({
-                        ...draft,
-                        assignees: draft.assignees.map((a, j) =>
-                          i === j ? { ...a, calendar } : a,
-                        ),
-                      })
-                    }
-                  />
-                </Stack>
-              </Card>
-            ))}
-
-            <Button onClick={() => setSettings(false)}>
-              Готово — перейти к проверке последствий
-            </Button>
-          </Stack>
+            <Group justify="flex-end" mt="xl">
+              <Button onClick={() => setSettings(false)}>
+                Готово
+              </Button>
+            </Group>
+          </Tabs>
         )}
       </Drawer>
+
+      {/* Help & System Guide Modal */}
+      {helpModal && (
+        <Modal
+          opened={helpModal}
+          onClose={() => setHelpModal(false)}
+          title="Справка и возможности Critix"
+          size="lg"
+        >
+          <Stack gap="md">
+            <Card withBorder p="sm" style={{ background: "rgba(90, 117, 233, 0.05)" }}>
+              <Group gap="xs" mb={4}>
+                <Target size={16} color="#e57470" />
+                <Text fw={700} size="sm">Метод критического пути (CPM) и Базовый план</Text>
+              </Group>
+              <Text size="xs" c="dimmed">
+                Critix автоматически рассчитывает самый длинный путь технологических зависимостей. Задачи с нулевым резервом времени (резерв = 0 ч) отмечены красной рамкой. Любая задержка на критическом пути сдвигает срок сдачи всего проекта.
+              </Text>
+            </Card>
+
+            <Card withBorder p="sm">
+              <Group gap="xs" mb={4}>
+                <GitBranch size={16} color="#5a75e9" />
+                <Text fw={700} size="sm">Интерактивная карта графа (ReactFlow)</Text>
+              </Group>
+              <Text size="xs" c="dimmed">
+                Блоки задач можно свободно перемещать по холсту, кликать для детального редактирования, перетягивать стрелки от точки к точке для создания связей (FS/SS/FF/SF) и фильтровать только критический путь.
+              </Text>
+            </Card>
+
+            <Card withBorder p="sm">
+              <Group gap="xs" mb={4}>
+                <Sparkles size={16} color="#9381d7" />
+                <Text fw={700} size="sm">Симуляция последствий «Что если?»</Text>
+              </Group>
+              <Text size="xs" c="dimmed">
+                Проверяйте сценарии сдвигов задач перед внесением изменений. Система покажет точный расчет смещения дедлайна и рекомендации AI по оптимизации ресурсов.
+              </Text>
+            </Card>
+
+            <Group justify="flex-end" mt="xs">
+              <Button onClick={() => setHelpModal(false)}>Понятно</Button>
+            </Group>
+          </Stack>
+        </Modal>
+      )}
+
+      {/* Executive Summary Report Modal */}
+      {draft && (
+        <ExecutiveReportModal
+          opened={executiveReportModal}
+          onClose={() => setExecutiveReportModal(false)}
+          project={view?.project || draft}
+          result={view}
+          aiSummary={aiText}
+        />
+      )}
     </MantineProvider>
   );
 }

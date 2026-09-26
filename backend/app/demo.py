@@ -6,7 +6,8 @@ from app.schemas import Assignee, Dependency, ProjectInput, Skill, Task
 
 def demo():
     zone = ZoneInfo("Asia/Yekaterinburg")
-    start = datetime(2026, 9, 21, 9, tzinfo=zone)
+    now = datetime.now(zone)
+    start = (now - timedelta(days=now.weekday())).replace(hour=9, minute=0, second=0, microsecond=0)
     names = ["Требования", "Архитектура", "Дизайн интерфейса", "Модель данных", "Backend API",
              "Frontend", "Интеграция", "Проверка безопасности", "Приёмочное тестирование", "Релиз"]
     durations = [8, 8, 16, 8, 24, 24, 16, 8, 16, 4]
@@ -33,10 +34,10 @@ def demo():
     pairs = [(1, 2), (1, 3), (2, 4), (4, 5), (3, 6), (5, 7), (6, 7), (7, 8), (7, 9), (8, 10), (9, 10)]
     
     assignees = [
-        Assignee(id="pm", name="Алексей", skills=[Skill(name="PM", level="expert"), Skill(name="QA", level="advanced")]),
-        Assignee(id="be", name="Мария", skills=[Skill(name="Python", level="expert"), Skill(name="SQL", level="expert"), Skill(name="Security", level="intermediate")]),
-        Assignee(id="ux", name="Ирина", skills=[Skill(name="Figma", level="expert"), Skill(name="UI/UX", level="expert")]),
-        Assignee(id="fe", name="Денис", skills=[Skill(name="React", level="expert"), Skill(name="TypeScript", level="advanced")])
+        Assignee(id="pm", name="Алексей", role="Project Manager", skills=[Skill(name="PM", level="expert"), Skill(name="QA", level="advanced")]),
+        Assignee(id="be", name="Мария", role="Backend · Python", skills=[Skill(name="Python", level="expert"), Skill(name="SQL", level="expert"), Skill(name="Security", level="intermediate")]),
+        Assignee(id="ux", name="Ирина", role="UI/UX Дизайнер", skills=[Skill(name="Figma", level="expert"), Skill(name="UI/UX", level="expert")]),
+        Assignee(id="fe", name="Денис", role="Frontend · React", skills=[Skill(name="React", level="expert"), Skill(name="TypeScript", level="advanced")])
     ]
 
     return ProjectInput(

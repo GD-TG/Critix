@@ -27,11 +27,18 @@ def snapshot(db, row):
         name=row.name, timezone=row.timezone, start=row.start, deadline=row.deadline,
         baseline=row.baseline,
         calendar=row.calendar,
-        assignees=children(models.Assignee, ["id", "name", "skills", "calendar"]),
+        assignees=children(models.Assignee, ["id", "name", "role", "skills", "calendar"]),
         tasks=children(models.Task, ["id", "name", "duration_minutes", "priority", "required_skills", "not_before", "assignee_id",
                                     "allocation_percent", "status", "actual_start", "actual_finish"]),
         dependencies=children(models.Dependency, ["predecessor_id", "successor_id", "kind", "lag_minutes", "lag_mode"]),
     )
+
+
+def delete_project(db, project_id):
+    row = load(db, project_id, lock=True)
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
 
 
 def write(db, row, data, result):

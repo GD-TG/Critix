@@ -1,5 +1,5 @@
 from collections import defaultdict, deque
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.engine.calendar import MINUTE, PlanningError, WorkCalendar
 from app.schemas import ProjectInput
@@ -27,11 +27,17 @@ def topology(project: ProjectInput):
     return order, incoming, outgoing
 
 
-def analyze(project: ProjectInput):
+def analyze(project: ProjectInput, as_of=None):
+    # Time-dependent flags are deterministic for an explicitly supplied instant.
+    as_of = as_of or datetime.now(timezone.utc)
+    def baseline_delta(finish):
+        return (int((finish - datetime.fromisoformat(project.baseline["finish"])).total_seconds() / 60)
+                if project.baseline else None)
     order, incoming, outgoing = topology(project)
     if not order:
         return dict(tasks=[], finish=project.start, deadline=project.deadline,
-                    deadline_exceeded=False, delay_minutes=0, overloads=[], critical_dependencies=[])
+                    deadline_exceeded=False, delay_minutes=0, overloads=[], critical_dependencies=[],
+                    as_of=as_of, baseline_delta_minutes=baseline_delta(project.start))
     tasks = {t.id: t for t in project.tasks}
     people = {a.id: a for a in project.assignees}
     lower = project.start.astimezone(timezone.utc) - timedelta(days=370)
@@ -165,6 +171,8 @@ def analyze(project: ProjectInput):
     rows = []
     for task_id in order:
         start, end = early[task_id]
+        if tasks[task_id].status != "done" and end < as_of:
+            flags[task_id].add("overdue")
         if end > project.deadline:
             flags[task_id].add("past_deadline")
         rows.append(dict(id=task_id, start=start, finish=end,
@@ -182,6 +190,7 @@ def analyze(project: ProjectInput):
         if shifted(dep, moved) > early[dep.successor_id][0 if dep.kind[1] == "S" else 1]:
             critical_dependencies.append(dep.model_dump())
     return dict(tasks=rows, finish=finish, deadline=project.deadline,
+                as_of=as_of, baseline_delta_minutes=baseline_delta(finish),
                 deadline_exceeded=finish > project.deadline,
                 delay_minutes=max(0, int((finish-project.deadline).total_seconds()/60)),
                 overloads=overloads, critical_dependencies=critical_dependencies)

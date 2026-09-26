@@ -48,6 +48,7 @@ class Skill(StrictModel):
 class Assignee(StrictModel):
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=120)
+    role: str | None = Field(default=None, max_length=120)
     skills: list[Skill] = Field(default_factory=list)
     calendar: Calendar = Field(default_factory=Calendar)
 
@@ -101,6 +102,29 @@ class ProjectInput(StrictModel):
     assignees: list[Assignee] = Field(default_factory=list, max_length=100)
     tasks: list[Task] = Field(default_factory=list, max_length=200)
     dependencies: list[Dependency] = Field(default_factory=list, max_length=2000)
+
+    @field_validator("baseline")
+    @classmethod
+    def valid_baseline(cls, value):
+        if value is None:
+            return value
+        try:
+            if set(value) != {"saved_at", "finish", "tasks"} or not isinstance(value["tasks"], dict):
+                raise ValueError()
+            if len(value["tasks"]) > 200:
+                raise ValueError()
+            dates = [value["saved_at"], value["finish"]]
+            for key, row in value["tasks"].items():
+                if not isinstance(key, str) or not isinstance(row, dict) or set(row) != {"start", "finish"}:
+                    raise ValueError()
+                dates.extend([row["start"], row["finish"]])
+                if datetime.fromisoformat(row["finish"]) < datetime.fromisoformat(row["start"]):
+                    raise ValueError()
+            if any(datetime.fromisoformat(item).tzinfo is None for item in dates):
+                raise ValueError()
+        except (ValueError, TypeError, KeyError):
+            raise ValueError("Некорректный базовый план: нужны даты с часовым поясом и интервалы задач")
+        return value
 
     @field_validator("timezone")
     @classmethod

@@ -9,6 +9,7 @@ export type Skill = {
 export type Person = {
   id: string;
   name: string;
+  role?: string;
   skills?: Skill[];
   calendar: Calendar;
 };
@@ -49,6 +50,9 @@ export type Project = {
   dependencies: Dependency[];
 };
 export type Analysis = {
+  critical_dependencies: Dependency[];
+  as_of?: string;
+  baseline_delta_minutes?: number | null;
   finish: string;
   deadline_exceeded: boolean;
   delay_minutes: number;

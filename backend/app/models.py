@@ -25,6 +25,7 @@ class Assignee(Base):
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
+    role: Mapped[str | None] = mapped_column(String(120), nullable=True)
     skills: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
     calendar: Mapped[dict] = mapped_column(JSON)
 
