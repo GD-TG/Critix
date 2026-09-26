@@ -4,6 +4,7 @@ import {
   type Person,
   type Priority,
   type Project,
+  type Result,
   type Skill,
   type Task,
 } from "./types";
@@ -128,3 +129,23 @@ export const TIMEZONE_OPTIONS = [
   { value: "Europe/Berlin", label: "Берлин, Париж (UTC+1)" },
   { value: "America/New_York", label: "Нью-Йорк (UTC-5)" },
 ];
+
+export function getZone(draft: Project | null, saved: Result | null): string {
+  return draft?.timezone || saved?.project.timezone || "UTC";
+}
+
+export function formatDateTime(iso: string, zone: string): string {
+  return new Date(iso).toLocaleString("ru-RU", { timeZone: zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+export function formatShortDate(iso: string, zone: string): string {
+  return new Date(iso).toLocaleDateString("ru-RU", { timeZone: zone, day: "numeric", month: "short" });
+}
+
+export function getOverdueTasks(view: Result | null) {
+  return (view?.analysis.tasks || []).filter((r) => r.risk_flags.includes("overdue"));
+}
+
+export function getOverloadedAssigneeIds(view: Result | null): Set<string> {
+  return new Set(view?.analysis.overloads.map((o) => o.assignee_id) || []);
+}

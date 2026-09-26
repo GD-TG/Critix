@@ -6,6 +6,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useProjects } from "@/context/ProjectContext";
+import { rescheduleOverdueTasks } from "@/taskEditing";
 
 export type View = "dashboard" | "graph" | "tasks_table" | "team" | "links" | "ai";
 
@@ -39,11 +41,14 @@ interface UiContextValue {
   setDeleteConfirmProject: (v: { id: string; name: string } | null) => void;
   showScenarioModal: boolean;
   setShowScenarioModal: (v: boolean) => void;
+
+  rescheduleOverdue: () => void;
 }
 
 const UiContext = createContext<UiContextValue | null>(null);
 
 export function UiProvider({ children }: { children: ReactNode }) {
+  const { draft, saved, preview, change } = useProjects();
   const [colorScheme, setColorScheme] = useState<"dark" | "light">(() => {
     const savedTheme = localStorage.getItem("critix_theme");
     return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "light";
@@ -74,6 +79,14 @@ export function UiProvider({ children }: { children: ReactNode }) {
 
   const showNotification = useCallback((msg: string) => setToast(msg), []);
 
+  const rescheduleOverdue = useCallback(() => {
+    const view = preview || saved;
+    if (!draft || !view) return;
+    const updatedTasks = rescheduleOverdueTasks(draft.tasks, view.analysis, new Date());
+    change({ ...draft, tasks: updatedTasks });
+    showNotification("Ограничения начала обновлены в черновике. Проверьте последствия.");
+  }, [draft, saved, preview, change, showNotification]);
+
   const toggleTheme = useCallback((theme: "dark" | "light") => {
     setColorScheme(theme);
     localStorage.setItem("critix_theme", theme);
@@ -93,6 +106,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     settings, setSettings, settingsTab, setSettingsTab,
     deleteConfirmProject, setDeleteConfirmProject,
     showScenarioModal, setShowScenarioModal,
+    rescheduleOverdue,
   };
 
   return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
