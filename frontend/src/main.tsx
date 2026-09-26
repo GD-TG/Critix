@@ -67,6 +67,7 @@ import {
   FileText,
   FileJson,
   ChevronRight,
+  BookmarkCheck,
 } from "lucide-react";
 import "@mantine/core/styles.css";
 import "@xyflow/react/dist/style.css";
@@ -310,6 +311,11 @@ export function App() {
   const [simError, setSimError] = useState("");
   const [simBusy, setSimBusy] = useState(false);
 
+  const [taskInlinePredId, setTaskInlinePredId] = useState("");
+  const [taskInlinePredKind, setTaskInlinePredKind] = useState<Dependency["kind"]>("FS");
+  const [taskInlinePredLagHours, setTaskInlinePredLagHours] = useState<number>(0);
+  const [taskInlinePredLagMode, setTaskInlinePredLagMode] = useState<Dependency["lag_mode"]>("working");
+
   const [timelineMode, setTimelineMode] = useState<"timeline" | "list">("timeline");
   const [dependencyVisible, setDependencyVisible] = useState(true);
 
@@ -320,6 +326,24 @@ export function App() {
   }, [toast]);
 
   const showNotification = (msg: string) => setToast(msg);
+
+  const handleSaveAsBaseline = () => {
+    if (!draft || !view) return;
+    const taskMap: Record<string, { start: string; finish: string }> = {};
+    view.analysis.tasks.forEach((t) => {
+      taskMap[t.id] = { start: t.start, finish: t.finish };
+    });
+    const updated: Project = {
+      ...draft,
+      baseline: {
+        saved_at: new Date().toISOString(),
+        finish: view.analysis.finish,
+        tasks: taskMap,
+      },
+    };
+    change(updated);
+    showNotification("Текущий график зафиксирован как Базовый план (Baseline)");
+  };
 
   const run = async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true);
@@ -1508,23 +1532,156 @@ export function App() {
                 {/* Bottom Grid Layout */}
                 <section className="bottom-grid">
                   <article className="panel activity-panel" id="tasks">
-                    <div className="panel-header"><div><h2>История сохранений</h2><p>Последние 20 версий проекта</p></div></div>
-                    {historyError && <Text c="red">{historyError}</Text>}
-                    {!history.length && !historyError && <Text c="dimmed">Нет загруженных версий</Text>}
-                    {history.map(item => <div className="activity-row" key={item.version}>
-                      <div><strong>Версия {item.version}</strong><span> · {item.task_count} задач</span>
-                      <small>{date(item.created_at)} · прогноз: {date(item.finish)}</small></div>
-                    </div>)}
+                    <div className="panel-header">
+                      <div>
+                        <h2>История сохранений</h2>
+                        <p>Последние 20 версий проекта</p>
+                      </div>
+                    </div>
+                    {historyError && <Text c="red" size="sm" p="sm">{historyError}</Text>}
+                    {!history.length && !historyError && <Text c="dimmed" size="sm" p="md">Нет загруженных версий</Text>}
+                    <ScrollArea h={200}>
+                      {history.map((item) => (
+                        <div className="activity-row" key={item.version}>
+                          <div>
+                            <strong>Версия {item.version}</strong>
+                            <span> · {item.task_count} задач</span>
+                            <small>{date(item.created_at)} · прогноз: {date(item.finish)}</small>
+                          </div>
+                        </div>
+                      ))}
+                    </ScrollArea>
                   </article>
+
                   <article className="panel health-panel">
-                    <div className="panel-header"><div><h2>Результаты движка</h2><p>{preview ? "Проверенный сценарий" : "Сохранённый план"}</p></div></div>
-                    <Stack gap="sm">
-                      <Text>Дедлайн: {view?.analysis.deadline_exceeded ? `превышен на ${view.analysis.delay_minutes} календарных минут` : "не превышен в расчёте"}</Text>
-                      <Text>Конфликты зависимостей: {view?.analysis.tasks.filter(t => t.risk_flags.includes("dependency_conflict")).length || 0}</Text>
-                      <Text>Заблокированные задачи: {view?.analysis.tasks.filter(t => t.risk_flags.includes("blocked")).length || 0}</Text>
-                      <Text>Периоды перегрузки: {view?.analysis.overloads.length || 0}</Text>
-                      <Text size="xs" c="dimmed">Отсутствие превышения дедлайна не гарантирует выполнение плана. Резервы рассчитаны относительно прогнозного финиша.</Text>
-                    </Stack>
+                    <div className="panel-header">
+                      <div>
+                        <Group gap="xs" align="center">
+                          <h2>Результаты аналитического движка</h2>
+                          {preview ? (
+                            <Badge color="yellow" variant="light" size="sm">
+                              Черновик (What-If)
+                            </Badge>
+                          ) : (
+                            <Badge color="teal" variant="light" size="sm">
+                              Сохранённый план
+                            </Badge>
+                          )}
+                        </Group>
+                        <p>Математический расчёт CPM/CCPM, риски и отклонения</p>
+                      </div>
+                      <Group gap="xs">
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<BookmarkCheck size={13} />}
+                          onClick={handleSaveAsBaseline}
+                          title="Зафиксировать текущие даты как исходный базовый план"
+                        >
+                          {draft?.baseline ? "Обновить базовый план" : "Зафиксировать базовый план"}
+                        </Button>
+                      </Group>
+                    </div>
+
+                    <div style={{ padding: "0 20px 20px 20px" }}>
+                      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                        {/* Card 1: Дедлайн и финиш */}
+                        <Card withBorder p="xs" radius="md">
+                          <Group justify="space-between" mb={4}>
+                            <Text size="xs" fw={700} c="dimmed">ДЕДЛАЙН И ФИНИШ</Text>
+                            {view?.analysis.deadline_exceeded ? (
+                              <Badge color="red" size="xs">Превышен</Badge>
+                            ) : (
+                              <Badge color="teal" size="xs">В графике</Badge>
+                            )}
+                          </Group>
+                          <Text size="sm" fw={600}>
+                            Финиш: {view ? date(view.analysis.finish) : "—"}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            Дедлайн: {draft ? date(draft.deadline) : "—"}
+                          </Text>
+                          {view?.analysis.deadline_exceeded && (
+                            <Text size="xs" c="red" fw={600} mt={2}>
+                              Срыв на {Math.round((view.analysis.delay_minutes || 0) / 60)} ч.
+                            </Text>
+                          )}
+                        </Card>
+
+                        {/* Card 2: Базовый план */}
+                        <Card withBorder p="xs" radius="md">
+                          <Group justify="space-between" mb={4}>
+                            <Text size="xs" fw={700} c="dimmed">БАЗОВЫЙ ПЛАН (BASELINE)</Text>
+                            {draft?.baseline ? (
+                              <Badge color="blue" size="xs">Зафиксирован</Badge>
+                            ) : (
+                              <Badge color="gray" size="xs">Не задан</Badge>
+                            )}
+                          </Group>
+                          {draft?.baseline && view ? (
+                            (() => {
+                              const baseFinish = new Date(draft.baseline.finish).getTime();
+                              const curFinish = new Date(view.analysis.finish).getTime();
+                              const deltaMin = Math.round((curFinish - baseFinish) / 60000);
+                              const deltaHours = Math.round(deltaMin / 60);
+                              return (
+                                <>
+                                  <Text size="sm" fw={600}>
+                                    {deltaHours > 0 ? (
+                                      <span style={{ color: "var(--coral, #e5484d)" }}>Отклонение: +{deltaHours} ч.</span>
+                                    ) : deltaHours < 0 ? (
+                                      <span style={{ color: "var(--green, #30a46c)" }}>Опережение: {deltaHours} ч.</span>
+                                    ) : (
+                                      <span style={{ color: "var(--green, #30a46c)" }}>Точно по плану (0 ч.)</span>
+                                    )}
+                                  </Text>
+                                  <Text size="xs" c="dimmed">
+                                    Базовый финиш: {date(draft.baseline.finish)}
+                                  </Text>
+                                </>
+                              );
+                            })()
+                          ) : (
+                            <>
+                              <Text size="sm" c="dimmed">Базовый эталон не сохранён</Text>
+                              <Text size="xs" c="dimmed">Нажмите кнопку фиксации выше</Text>
+                            </>
+                          )}
+                        </Card>
+
+                        {/* Card 3: Критический путь */}
+                        <Card withBorder p="xs" radius="md">
+                          <Group justify="space-between" mb={4}>
+                            <Text size="xs" fw={700} c="dimmed">КРИТИЧЕСКИЙ ПУТЬ (CPM)</Text>
+                            <Badge color="indigo" size="xs">Резерв = 0</Badge>
+                          </Group>
+                          <Text size="sm" fw={600}>
+                            {view?.analysis.tasks.filter((t) => t.critical).length || 0} критических задач
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {view?.analysis.critical_dependencies.length || 0} критических связей
+                          </Text>
+                        </Card>
+
+                        {/* Card 4: Ресурсные риски */}
+                        <Card withBorder p="xs" radius="md">
+                          <Group justify="space-between" mb={4}>
+                            <Text size="xs" fw={700} c="dimmed">РЕСУРСНЫЕ РИСКИ</Text>
+                            {(view?.analysis.overloads.length || 0) > 0 ? (
+                              <Badge color="orange" size="xs">Перегрузка</Badge>
+                            ) : (
+                              <Badge color="teal" size="xs">Норма</Badge>
+                            )}
+                          </Group>
+                          <Text size="sm" fw={600}>
+                            {view?.analysis.overloads.length || 0} перегрузок исполнителей
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {view?.analysis.tasks.filter((t) => t.risk_flags.includes("blocked")).length || 0} заблокированных задач
+                          </Text>
+                        </Card>
+                      </SimpleGrid>
+                    </div>
                   </article>
                 </section>
               </>
@@ -1597,7 +1754,9 @@ export function App() {
                       <Table.Th>Статус</Table.Th>
                       <Table.Th>Загрузка</Table.Th>
                       <Table.Th>Часы</Table.Th>
-                      <Table.Th>Прогноз</Table.Th>
+                      <Table.Th>Прогноз CPM</Table.Th>
+                      <Table.Th>Базовый план</Table.Th>
+                      <Table.Th>Отклонение (Δ)</Table.Th>
                       <Table.Th>Резерв</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
@@ -1607,6 +1766,13 @@ export function App() {
                       const r = rows.get(t.id);
                       const isOverdue = r?.risk_flags.includes("overdue");
                       const skillMatch = person ? calculateSkillMatch(t, person) : null;
+                      const baseTask = draft?.baseline?.tasks[t.id];
+                      let deltaMinutes = 0;
+                      if (r && baseTask) {
+                        deltaMinutes = Math.round((new Date(r.finish).getTime() - new Date(baseTask.finish).getTime()) / 60000);
+                      }
+                      const deltaHours = Math.round(deltaMinutes / 60);
+
                       return (
                         <Table.Tr key={t.id} onClick={() => setTask(copy(t))} style={{ cursor: "pointer" }}>
                           <Table.Td>
@@ -1654,6 +1820,26 @@ export function App() {
                           <Table.Td>{t.allocation_percent || 100}%</Table.Td>
                           <Table.Td>{t.duration_minutes / 60} ч</Table.Td>
                           <Table.Td>{r ? date(r.finish) : "—"}</Table.Td>
+                          <Table.Td>
+                            {baseTask ? (
+                              <Text size="xs" fw={500}>{date(baseTask.finish)}</Text>
+                            ) : (
+                              <Text size="xs" c="dimmed">Не задан</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td>
+                            {baseTask && r ? (
+                              deltaHours > 0 ? (
+                                <Badge color="red" size="xs">+{deltaHours} ч</Badge>
+                              ) : deltaHours < 0 ? (
+                                <Badge color="teal" size="xs">{deltaHours} ч</Badge>
+                              ) : (
+                                <Badge color="gray" variant="light" size="xs">0 ч</Badge>
+                              )
+                            ) : (
+                              <Text size="xs" c="dimmed">—</Text>
+                            )}
+                          </Table.Td>
                           <Table.Td>{r?.slack_minutes == null ? "—" : `${r.slack_minutes / 60} ч`}</Table.Td>
                         </Table.Tr>
                       );
@@ -2575,6 +2761,123 @@ export function App() {
               />
             )}
 
+            <Divider my="xs" label="Связи и зависимости (Предшественники)" labelPosition="center" />
+
+            {/* List of existing incoming predecessors */}
+            {(() => {
+              const incomingDeps = (draft.dependencies || []).filter((d) => d.successor_id === task.id);
+              return (
+                <Stack gap="xs">
+                  {incomingDeps.length === 0 ? (
+                    <Text size="xs" c="dimmed">Нет предшествующих задач (стартует свободно)</Text>
+                  ) : (
+                    <Stack gap={6}>
+                      <Text size="xs" fw={600}>Зависит от следующих задач:</Text>
+                      {incomingDeps.map((dep, depIdx) => {
+                        const predTask = draft.tasks.find((t) => t.id === dep.predecessor_id);
+                        return (
+                          <Card key={depIdx} withBorder p="xs" radius="sm">
+                            <Group justify="space-between">
+                              <div>
+                                <Group gap={6}>
+                                  <Badge size="xs" color="indigo">{dep.kind}</Badge>
+                                  <Text size="xs" fw={600}>«{predTask?.name || dep.predecessor_id}»</Text>
+                                </Group>
+                                {dep.lag_minutes !== 0 && (
+                                  <Text size="xs" c="dimmed">
+                                    Лаг: {dep.lag_minutes / 60} ч ({dep.lag_mode === "working" ? "раб." : "календ."})
+                                  </Text>
+                                )}
+                              </div>
+                              <ActionIcon
+                                size="xs"
+                                color="red"
+                                variant="subtle"
+                                title="Удалить связь"
+                                onClick={() => {
+                                  change({
+                                    ...draft,
+                                    dependencies: draft.dependencies.filter((d) => d !== dep),
+                                  });
+                                  showNotification("Связь удалена");
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </ActionIcon>
+                            </Group>
+                          </Card>
+                        );
+                      })}
+                    </Stack>
+                  )}
+
+                  {/* Add predecessor inline */}
+                  <Card withBorder p="xs" radius="sm" style={{ background: "rgba(90, 117, 233, 0.03)" }}>
+                    <Text size="xs" fw={700} mb={6}>+ Привязать задачу-предшественника:</Text>
+                    <Stack gap="xs">
+                      <Select
+                        size="xs"
+                        placeholder="Выберите задачу-предшественник"
+                        data={draft.tasks
+                          .filter((t) => t.id !== task.id && !incomingDeps.some((d) => d.predecessor_id === t.id))
+                          .map((t) => ({ value: t.id, label: t.name }))}
+                        value={taskInlinePredId}
+                        onChange={(v) => setTaskInlinePredId(v || "")}
+                      />
+                      {taskInlinePredId && (
+                        <>
+                          <Group grow gap="xs">
+                            <Select
+                              size="xs"
+                              label="Тип"
+                              data={[
+                                { value: "FS", label: "FS (Окончание → Начало)" },
+                                { value: "SS", label: "SS (Начало → Начало)" },
+                                { value: "FF", label: "FF (Окончание → Окончание)" },
+                                { value: "SF", label: "SF (Начало → Окончание)" },
+                              ]}
+                              value={taskInlinePredKind}
+                              onChange={(v) => setTaskInlinePredKind((v as Dependency["kind"]) || "FS")}
+                            />
+                            <NumberInput
+                              size="xs"
+                              label="Лаг (ч)"
+                              value={taskInlinePredLagHours}
+                              onChange={(v) => setTaskInlinePredLagHours(Number(v || 0))}
+                            />
+                          </Group>
+                          {draft.tasks.some((t) => t.id === task.id) && (
+                            <Button
+                              size="xs"
+                              variant="light"
+                              onClick={() => {
+                                if (!taskInlinePredId) return;
+                                const newDep: Dependency = {
+                                  predecessor_id: taskInlinePredId,
+                                  successor_id: task.id,
+                                  kind: taskInlinePredKind,
+                                  lag_minutes: Math.round(taskInlinePredLagHours * 60),
+                                  lag_mode: taskInlinePredLagMode,
+                                };
+                                change({
+                                  ...draft,
+                                  dependencies: [...draft.dependencies, newDep],
+                                });
+                                setTaskInlinePredId("");
+                                showNotification("Связь добавлена");
+                              }}
+                            >
+                              Добавить связь сейчас
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </Stack>
+                  </Card>
+                </Stack>
+              );
+            })()}
+
             <Group justify="space-between" mt="md">
               {draft.tasks.some((t) => t.id === task.id) && (
                 <Button
@@ -2589,6 +2892,7 @@ export function App() {
                       ),
                     });
                     setTask(null);
+                    setTaskInlinePredId("");
                     showNotification(`Задача «${task.name}» удалена`);
                   }}
                 >
@@ -2598,13 +2902,26 @@ export function App() {
 
               <Button
                 onClick={() => {
+                  const isExisting = draft.tasks.some((t) => t.id === task.id);
+                  let newDeps = [...draft.dependencies];
+                  if (!isExisting && taskInlinePredId) {
+                    newDeps.push({
+                      predecessor_id: taskInlinePredId,
+                      successor_id: task.id,
+                      kind: taskInlinePredKind,
+                      lag_minutes: Math.round(taskInlinePredLagHours * 60),
+                      lag_mode: taskInlinePredLagMode,
+                    });
+                  }
                   change({
                     ...draft,
-                    tasks: draft.tasks.some((t) => t.id === task.id)
+                    tasks: isExisting
                       ? draft.tasks.map((t) => (t.id === task.id ? task : t))
                       : [...draft.tasks, task],
+                    dependencies: newDeps,
                   });
                   setTask(null);
+                  setTaskInlinePredId("");
                   showNotification(`Задача «${task.name}» сохранена`);
                 }}
               >
