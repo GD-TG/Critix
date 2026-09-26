@@ -315,6 +315,12 @@ export function App() {
   const [newSkillLevel, setNewSkillLevel] = useState<Skill["level"]>("expert");
   const [skillTargetAssigneeId, setSkillTargetAssigneeId] = useState<string | null>(null);
 
+  // Team Master-Detail view states
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
+  const [teamMemberSearch, setTeamMemberSearch] = useState<string>("");
+  const [inlineNewSkillName, setInlineNewSkillName] = useState("");
+  const [inlineNewSkillLevel, setInlineNewSkillLevel] = useState<Skill["level"]>("expert");
+
   // Simulation modal
   const [showScenarioModal, setShowScenarioModal] = useState(false);
   const [simTaskChoice, setSimTaskChoice] = useState<string>("");
@@ -803,23 +809,51 @@ export function App() {
                 key={person.id}
                 title={`${person.name} ${person.role ? `· ${person.role}` : ""} · ${(person.skills || []).map((s) => s.name).join(", ") || "Навыки не указаны"}`}
                 className={`avatar ${getAvatarClass(person.id)}`}
-                onClick={() => setSettings(true)}
+                onClick={() => {
+                  setSelectedAssigneeId(person.id);
+                  setActiveView("team");
+                }}
                 style={{ cursor: "pointer" }}
               >
                 {getInitials(person.name)}
               </span>
             ))}
-            <button className="avatar add-person" title="Настройка команды и графиков" onClick={() => setSettings(true)}>
+            <button
+              className="avatar add-person"
+              title="Добавить участника команды"
+              onClick={() => {
+                if (draft) {
+                  const newId = crypto.randomUUID();
+                  const newPerson: Person = {
+                    id: newId,
+                    name: `Сотрудник ${draft.assignees.length + 1}`,
+                    role: "Разработчик",
+                    skills: [],
+                    calendar: defaultCalendar(),
+                  };
+                  change({
+                    ...draft,
+                    assignees: [...draft.assignees, newPerson],
+                  });
+                  setSelectedAssigneeId(newId);
+                  setActiveView("team");
+                }
+              }}
+            >
               <Plus size={14} />
             </button>
           </div>
-          <div className="workspace-label team-caption">
+          <div
+            className="workspace-label team-caption"
+            style={{ cursor: "pointer" }}
+            onClick={() => setActiveView("team")}
+          >
             {draft?.assignees.length || 0} участников · роли и графики
           </div>
 
           <div className="sidebar-bottom">
             <button className="nav-item" onClick={() => setSettings(true)}>
-              <Settings size={16} /> Настройки
+              <Settings size={16} /> Настройки проекта
             </button>
 
             <Group justify="space-between" mt="xs" px="xs">
@@ -885,14 +919,6 @@ export function App() {
               </button>
             </div>
             <div className="top-actions">
-              <button
-                className="secondary-button"
-                style={{ height: 32, padding: "0 10px" }}
-                onClick={() => setSettings(true)}
-              >
-                <Settings size={14} /> Настройки
-              </button>
-
               {/* Notification Center Popover */}
               <Popover width={360} position="bottom-end" withArrow shadow="md">
                 <Popover.Target>
@@ -1025,34 +1051,43 @@ export function App() {
               </div>
 
               <div className="heading-actions">
-                <button className="secondary-button" disabled={!draft?.tasks.length} onClick={() => {setSimResult(null); setShowScenarioModal(true);}}>
-                  <Sparkles size={14} /> Проверить изменение
-                </button>
                 <button className="primary-button" disabled={!draft} onClick={() => setTask(defaultTask())}>
                   <Plus size={16} /> Новая задача
                 </button>
+                <button className="secondary-button" disabled={!draft?.tasks.length} onClick={() => {setSimResult(null); setShowScenarioModal(true);}}>
+                  <Sparkles size={14} /> Симуляция (What-If)
+                </button>
                 {draft && (
-                  <>
-                    <button
-                      className="secondary-button"
-                      onClick={() => setExecutiveReportModal(true)}
-                      title="Сформировать исполнительный отчет для руководства"
-                    >
-                      <FileText size={14} /> Отчет (PDF/MD)
-                    </button>
-                    <button className="secondary-button" onClick={() => exportProjectToJson(draft)} title="Экспорт полного проекта в JSON">
-                      <FileJson size={14} /> Экспорт JSON
-                    </button>
-                    <button className="secondary-button" onClick={() => setJsonImportModal(true)} title="Импорт полного проекта из JSON">
-                      <Upload size={14} /> Импорт JSON
-                    </button>
-                    <button className="secondary-button" onClick={() => exportTasksToCsv(draft)}>
-                      <Download size={14} /> CSV
-                    </button>
-                    <button className="secondary-button" onClick={handleSaveBaseline}>
-                      <Check size={14} /> Базовый план
-                    </button>
-                  </>
+                  <Menu shadow="md" width={240} position="bottom-end">
+                    <Menu.Target>
+                      <button className="secondary-button">
+                        <SlidersHorizontal size={14} /> Действия и экспорт <ChevronDown size={12} />
+                      </button>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Label>Отчеты и управление</Menu.Label>
+                      <Menu.Item leftSection={<FileText size={14} />} onClick={() => setExecutiveReportModal(true)}>
+                        Отчет для руководства (PDF/MD)
+                      </Menu.Item>
+                      <Menu.Item leftSection={<BookmarkCheck size={14} />} onClick={handleSaveAsBaseline}>
+                        {draft.baseline ? "Обновить базовый план" : "Зафиксировать базовый план"}
+                      </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Label>Экспорт и импорт</Menu.Label>
+                      <Menu.Item leftSection={<FileJson size={14} />} onClick={() => exportProjectToJson(draft)}>
+                        Экспорт проекта в JSON
+                      </Menu.Item>
+                      <Menu.Item leftSection={<Upload size={14} />} onClick={() => setJsonImportModal(true)}>
+                        Импорт проекта из JSON
+                      </Menu.Item>
+                      <Menu.Item leftSection={<Download size={14} />} onClick={() => exportTasksToCsv(draft)}>
+                        Экспорт задач в CSV
+                      </Menu.Item>
+                      <Menu.Item leftSection={<Upload size={14} />} onClick={() => setImportModal(true)}>
+                        Импорт задач из CSV
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
                 )}
               </div>
             </section>
@@ -1582,127 +1617,74 @@ export function App() {
                     <div className="panel-header">
                       <div>
                         <Group gap="xs" align="center">
-                          <h2>Результаты аналитического движка</h2>
+                          <h2>Параметры движка и расчёта</h2>
                           {preview ? (
                             <Badge color="yellow" variant="light" size="sm">
                               Черновик (What-If)
                             </Badge>
                           ) : (
                             <Badge color="teal" variant="light" size="sm">
-                              Сохранённый план
+                              Боевой план
                             </Badge>
                           )}
                         </Group>
-                        <p>Математический расчёт CPM/CCPM, риски и отклонения</p>
+                        <p>Дискретный расчёт CPM/CCPM, календари и ограничения</p>
                       </div>
-                      <Group gap="xs">
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<BookmarkCheck size={13} />}
-                          onClick={handleSaveAsBaseline}
-                          title="Зафиксировать текущие даты как исходный базовый план"
-                        >
-                          {draft?.baseline ? "Обновить базовый план" : "Зафиксировать базовый план"}
-                        </Button>
-                      </Group>
+                      <Button
+                        size="xs"
+                        variant="light"
+                        onClick={() => {
+                          setSettingsTab("calendar");
+                          setSettings(true);
+                        }}
+                      >
+                        Настроить календари
+                      </Button>
                     </div>
 
                     <div style={{ padding: "0 20px 20px 20px" }}>
                       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-                        {/* Card 1: Дедлайн и финиш */}
                         <Card withBorder p="xs" radius="md">
-                          <Group justify="space-between" mb={4}>
-                            <Text size="xs" fw={700} c="dimmed">ДЕДЛАЙН И ФИНИШ</Text>
-                            {view?.analysis.deadline_exceeded ? (
-                              <Badge color="red" size="xs">Превышен</Badge>
-                            ) : (
-                              <Badge color="teal" size="xs">В графике</Badge>
-                            )}
-                          </Group>
+                          <Text size="xs" fw={700} c="dimmed" mb={4}>ТОПОЛОГИЯ И СВЯЗИ</Text>
                           <Text size="sm" fw={600}>
-                            Финиш: {view ? date(view.analysis.finish) : "—"}
+                            {draft.tasks.length} задач · {draft.dependencies.length} связей
                           </Text>
                           <Text size="xs" c="dimmed">
-                            Дедлайн: {draft ? date(draft.deadline) : "—"}
-                          </Text>
-                          {view?.analysis.deadline_exceeded && (
-                            <Text size="xs" c="red" fw={600} mt={2}>
-                              Срыв на {Math.round((view.analysis.delay_minutes || 0) / 60)} ч.
-                            </Text>
-                          )}
-                        </Card>
-
-                        {/* Card 2: Базовый план */}
-                        <Card withBorder p="xs" radius="md">
-                          <Group justify="space-between" mb={4}>
-                            <Text size="xs" fw={700} c="dimmed">БАЗОВЫЙ ПЛАН (BASELINE)</Text>
-                            {draft?.baseline ? (
-                              <Badge color="blue" size="xs">Зафиксирован</Badge>
-                            ) : (
-                              <Badge color="gray" size="xs">Не задан</Badge>
-                            )}
-                          </Group>
-                          {draft?.baseline && view ? (
-                            (() => {
-                              const baseFinish = new Date(draft.baseline.finish).getTime();
-                              const curFinish = new Date(view.analysis.finish).getTime();
-                              const deltaMin = Math.round((curFinish - baseFinish) / 60000);
-                              const deltaHours = Math.round(deltaMin / 60);
-                              return (
-                                <>
-                                  <Text size="sm" fw={600}>
-                                    {deltaHours > 0 ? (
-                                      <span style={{ color: "var(--coral, #e5484d)" }}>Отклонение: +{deltaHours} ч.</span>
-                                    ) : deltaHours < 0 ? (
-                                      <span style={{ color: "var(--green, #30a46c)" }}>Опережение: {deltaHours} ч.</span>
-                                    ) : (
-                                      <span style={{ color: "var(--green, #30a46c)" }}>Точно по плану (0 ч.)</span>
-                                    )}
-                                  </Text>
-                                  <Text size="xs" c="dimmed">
-                                    Базовый финиш: {date(draft.baseline.finish)}
-                                  </Text>
-                                </>
-                              );
-                            })()
-                          ) : (
-                            <>
-                              <Text size="sm" c="dimmed">Базовый эталон не сохранён</Text>
-                              <Text size="xs" c="dimmed">Нажмите кнопку фиксации выше</Text>
-                            </>
-                          )}
-                        </Card>
-
-                        {/* Card 3: Критический путь */}
-                        <Card withBorder p="xs" radius="md">
-                          <Group justify="space-between" mb={4}>
-                            <Text size="xs" fw={700} c="dimmed">КРИТИЧЕСКИЙ ПУТЬ (CPM)</Text>
-                            <Badge color="indigo" size="xs">Резерв = 0</Badge>
-                          </Group>
-                          <Text size="sm" fw={600}>
-                            {view?.analysis.tasks.filter((t) => t.critical).length || 0} критических задач
-                          </Text>
-                          <Text size="xs" c="dimmed">
-                            {view?.analysis.critical_dependencies.length || 0} критических связей
+                            {view.analysis.tasks.filter((t) => t.risk_flags.includes("dependency_conflict")).length === 0
+                              ? "Конфликтов и циклов в графе нет"
+                              : "Есть конфликты связей"}
                           </Text>
                         </Card>
 
-                        {/* Card 4: Ресурсные риски */}
                         <Card withBorder p="xs" radius="md">
-                          <Group justify="space-between" mb={4}>
-                            <Text size="xs" fw={700} c="dimmed">РЕСУРСНЫЕ РИСКИ</Text>
-                            {(view?.analysis.overloads.length || 0) > 0 ? (
-                              <Badge color="orange" size="xs">Перегрузка</Badge>
-                            ) : (
-                              <Badge color="teal" size="xs">Норма</Badge>
-                            )}
-                          </Group>
+                          <Text size="xs" fw={700} c="dimmed" mb={4}>КАЛЕНДАРЬ И ЧАСОВОЙ ПОЯС</Text>
                           <Text size="sm" fw={600}>
-                            {view?.analysis.overloads.length || 0} перегрузок исполнителей
+                            {zone}
                           </Text>
                           <Text size="xs" c="dimmed">
-                            {view?.analysis.tasks.filter((t) => t.risk_flags.includes("blocked")).length || 0} заблокированных задач
+                            {Object.keys(draft.calendar.week).length} раб. дней · {Object.keys(draft.calendar.exceptions || {}).length} исключений/праздников
+                          </Text>
+                        </Card>
+
+                        <Card withBorder p="xs" radius="md">
+                          <Text size="xs" fw={700} c="dimmed" mb={4}>КОМАНДА И РЕСУРСЫ</Text>
+                          <Text size="sm" fw={600}>
+                            {draft.assignees.length} исполнителей в проекте
+                          </Text>
+                          <Text size="xs" c={view.analysis.overloads.length > 0 ? "orange" : "teal"}>
+                            {view.analysis.overloads.length > 0
+                              ? `${view.analysis.overloads.length} окон перегрузки (>100%)`
+                              : "Все сотрудники в пределах нормы"}
+                          </Text>
+                        </Card>
+
+                        <Card withBorder p="xs" radius="md">
+                          <Text size="xs" fw={700} c="dimmed" mb={4}>РЕЗЕРВЫ ВРЕМЕНИ (FLOAT)</Text>
+                          <Text size="sm" fw={600}>
+                            {view.analysis.tasks.filter((t) => !t.critical).length} некритических задач с запасом
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            Резервы рассчитаны до ближайшего преемника
                           </Text>
                         </Card>
                       </SimpleGrid>
@@ -1874,78 +1856,416 @@ export function App() {
               </Card>
             )}
 
-            {/* Team View with Skill Match and Roles */}
-            {activeView === "team" && (
-              <Card withBorder p="md">
+            {/* Full-featured Master-Detail Team & Resource Workspace */}
+            {activeView === "team" && draft && (
+              <Card withBorder p="md" radius="md">
                 <Group justify="space-between" mb="md">
                   <div>
-                    <Title order={3}>Матрица компетенций и команды</Title>
-                    <Text size="sm" c="dimmed">Исполнители, роли, навыки, процент соответствия задачам и персональные отпуска.</Text>
+                    <Title order={3}>Управление командой и ресурсами</Title>
+                    <Text size="sm" c="dimmed">
+                      Матрица компетенций, персональные рабочие графики, отпуска и загрузка сотрудников.
+                    </Text>
                   </div>
                   <Group gap="xs">
-                    <Button size="xs" variant="light" onClick={() => { setSettingsTab("team"); setSettings(true); }}>Управлять командой</Button>
-                    <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
+                    <Button
+                      size="xs"
+                      leftSection={<Plus size={14} />}
+                      onClick={() => {
+                        const newId = crypto.randomUUID();
+                        const newPerson: Person = {
+                          id: newId,
+                          name: `Сотрудник ${draft.assignees.length + 1}`,
+                          role: "Разработчик",
+                          skills: [],
+                          calendar: defaultCalendar(),
+                        };
+                        change({
+                          ...draft,
+                          assignees: [...draft.assignees, newPerson],
+                        });
+                        setSelectedAssigneeId(newId);
+                        showNotification(`Сотрудник «${newPerson.name}» добавлен`);
+                      }}
+                    >
+                      + Добавить сотрудника
+                    </Button>
+                    <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>
+                      ← На Главную
+                    </Button>
                   </Group>
                 </Group>
 
-                <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                  {(draft?.assignees || []).map((p) => {
-                    const isOverloaded = overloadedAssigneeIds.has(p.id);
-                    const assignedTasks = (draft?.tasks || []).filter((t) => t.assignee_id === p.id);
-                    
-                    // Average skill match across assigned tasks
-                    let avgSkillMatch = 100;
-                    if (assignedTasks.length > 0) {
-                      const totalMatch = assignedTasks.reduce((acc, t) => acc + calculateSkillMatch(t, p), 0);
-                      avgSkillMatch = Math.round(totalMatch / assignedTasks.length);
-                    }
+                {draft.assignees.length === 0 ? (
+                  <Card withBorder p="xl" style={{ textAlign: "center" }}>
+                    <Users size={32} color="var(--muted)" style={{ margin: "0 auto 8px" }} />
+                    <Text fw={600}>В проекте пока нет сотрудников</Text>
+                    <Text size="xs" c="dimmed" mb="md">Добавьте участников для распределения задач и учета рабочих календарей.</Text>
+                    <Button
+                      size="xs"
+                      onClick={() => {
+                        const newId = crypto.randomUUID();
+                        change({
+                          ...draft,
+                          assignees: [
+                            {
+                              id: newId,
+                              name: "Алексей Смирнов",
+                              role: "Project Manager",
+                              skills: [{ name: "PM", level: "expert" }],
+                              calendar: defaultCalendar(),
+                            },
+                          ],
+                        });
+                        setSelectedAssigneeId(newId);
+                      }}
+                    >
+                      Создать первого участника
+                    </Button>
+                  </Card>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, minHeight: 600 }}>
+                    {/* Left Column: Team Members List */}
+                    <div style={{ borderRight: "1px solid var(--line, #e2e8f0)", paddingRight: 16 }}>
+                      <TextInput
+                        placeholder="Поиск по имени или роли..."
+                        size="xs"
+                        mb="sm"
+                        value={teamMemberSearch}
+                        onChange={(e) => setTeamMemberSearch(e.target.value)}
+                      />
 
-                    return (
-                      <Card key={p.id} withBorder p="md">
-                        <Group justify="space-between" mb="xs">
-                          <Group gap="xs">
-                            <span className={`avatar ${getAvatarClass(p.id)}`}>{getInitials(p.name)}</span>
-                            <div>
-                              <Text fw={700} size="sm">{p.name}</Text>
-                              <Text size="xs" c="blue" fw={600}>{p.role || "Роль не указана"}</Text>
-                            </div>
-                          </Group>
-                          <Group gap="xs">
-                            <Badge color={avgSkillMatch >= 80 ? "teal" : avgSkillMatch >= 50 ? "yellow" : "red"} variant="light">
-                              Skill Match: {avgSkillMatch}%
-                            </Badge>
-                            {isOverloaded && <Badge color="red">Перегрузка &gt;100%</Badge>}
-                          </Group>
-                        </Group>
+                      <ScrollArea h={560}>
+                        <Stack gap={8}>
+                          {draft.assignees
+                            .filter((p) =>
+                              !teamMemberSearch ||
+                              p.name.toLowerCase().includes(teamMemberSearch.toLowerCase()) ||
+                              (p.role && p.role.toLowerCase().includes(teamMemberSearch.toLowerCase()))
+                            )
+                            .map((p) => {
+                              const isSelected = (selectedAssigneeId || draft.assignees[0]?.id) === p.id;
+                              const isOverloaded = overloadedAssigneeIds.has(p.id);
+                              const assignedTasks = (draft.tasks || []).filter((t) => t.assignee_id === p.id);
+                              const excCount = Object.keys(p.calendar?.exceptions || {}).length;
 
-                        <Group justify="space-between" mb={4}>
-                          <Text size="xs" c="dimmed">Задач назначено: {assignedTasks.length}</Text>
-                          <Badge size="xs" color={Object.keys(p.calendar?.exceptions || {}).length > 0 ? "orange" : "gray"} variant="outline">
-                            {Object.keys(p.calendar?.exceptions || {}).length} отпусков / исключений
-                          </Badge>
-                        </Group>
-                        <Text size="xs" fw={600} mb={4}>Компетенции:</Text>
-                        <Group gap={4} mb="xs">
-                          {(p.skills || []).map((s, idx) => (
-                            <Badge key={idx} size="xs" variant="light" color="indigo">
-                              {s.name} ({skillLevelLabels[s.level]})
-                            </Badge>
-                          ))}
-                          {(!p.skills || p.skills.length === 0) && (
-                            <Text size="xs" c="dimmed">Навыки не указаны</Text>
-                          )}
-                        </Group>
-                        <Button
-                          size="compact-xs"
-                          variant="light"
-                          onClick={() => { setSettingsTab("team"); setSettings(true); }}
-                        >
-                          Настроить график и отпуска
-                        </Button>
-                      </Card>
-                    );
-                  })}
-                </SimpleGrid>
+                              return (
+                                <Card
+                                  key={p.id}
+                                  withBorder
+                                  p="xs"
+                                  radius="sm"
+                                  onClick={() => setSelectedAssigneeId(p.id)}
+                                  style={{
+                                    cursor: "pointer",
+                                    borderColor: isSelected ? "var(--purple, #5a75e9)" : undefined,
+                                    background: isSelected
+                                      ? "rgba(90, 117, 233, 0.08)"
+                                      : isOverloaded
+                                      ? "rgba(238, 149, 100, 0.05)"
+                                      : undefined,
+                                  }}
+                                >
+                                  <Group justify="space-between" align="flex-start">
+                                    <Group gap={8} style={{ minWidth: 0, flex: 1 }}>
+                                      <span className={`avatar ${getAvatarClass(p.id)}`} style={{ width: 28, height: 28, fontSize: 10 }}>
+                                        {getInitials(p.name)}
+                                      </span>
+                                      <div style={{ minWidth: 0, flex: 1 }}>
+                                        <Text size="sm" fw={isSelected ? 700 : 600} lineClamp={1}>
+                                          {p.name}
+                                        </Text>
+                                        <Text size="11px" c="dimmed" lineClamp={1}>
+                                          {p.role || "Роль не указана"}
+                                        </Text>
+                                      </div>
+                                    </Group>
+                                  </Group>
+
+                                  <Group gap={4} mt={6} justify="space-between">
+                                    <Badge size="xs" color={isOverloaded ? "red" : "gray"} variant={isOverloaded ? "filled" : "light"}>
+                                      {isOverloaded ? "Перегрузка" : `${assignedTasks.length} задач`}
+                                    </Badge>
+                                    {excCount > 0 && (
+                                      <Badge size="xs" color="orange" variant="outline">
+                                        {excCount} отпусков
+                                      </Badge>
+                                    )}
+                                    <Text size="10px" c="dimmed">
+                                      {(p.skills || []).length} навыков
+                                    </Text>
+                                  </Group>
+                                </Card>
+                              );
+                            })}
+                        </Stack>
+                      </ScrollArea>
+                    </div>
+
+                    {/* Right Column: Selected Member Detailed Workspace */}
+                    <div>
+                      {(() => {
+                        const activePerson = draft.assignees.find((p) => p.id === (selectedAssigneeId || draft.assignees[0]?.id));
+                        if (!activePerson) {
+                          return (
+                            <Card withBorder p="xl" style={{ textAlign: "center" }}>
+                              <Text c="dimmed">Выберите сотрудника из списка слева</Text>
+                            </Card>
+                          );
+                        }
+
+                        const assignedTasks = (draft.tasks || []).filter((t) => t.assignee_id === activePerson.id);
+                        const isOverloaded = overloadedAssigneeIds.has(activePerson.id);
+
+                        return (
+                          <Stack gap="md">
+                            {/* Header Card */}
+                            <Card withBorder p="md" radius="sm">
+                              <Group justify="space-between" align="flex-start">
+                                <Group gap="md">
+                                  <span className={`avatar ${getAvatarClass(activePerson.id)}`} style={{ width: 44, height: 44, fontSize: 16 }}>
+                                    {getInitials(activePerson.name)}
+                                  </span>
+                                  <div>
+                                    <Group gap="xs">
+                                      <Text fw={700} size="lg">{activePerson.name}</Text>
+                                      {isOverloaded && <Badge color="red">Перегрузка &gt;100%</Badge>}
+                                    </Group>
+                                    <Text size="xs" c="dimmed">ID: {activePerson.id}</Text>
+                                  </div>
+                                </Group>
+
+                                <Button
+                                  color="red"
+                                  variant="subtle"
+                                  size="xs"
+                                  leftSection={<Trash2 size={13} />}
+                                  onClick={() => {
+                                    const newAssignees = draft.assignees.filter((a) => a.id !== activePerson.id);
+                                    change({
+                                      ...draft,
+                                      assignees: newAssignees,
+                                      tasks: draft.tasks.map((t) =>
+                                        t.assignee_id === activePerson.id ? { ...t, assignee_id: null } : t
+                                      ),
+                                    });
+                                    setSelectedAssigneeId(newAssignees[0]?.id || null);
+                                    showNotification(`Сотрудник «${activePerson.name}» удален`);
+                                  }}
+                                >
+                                  Удалить сотрудника
+                                </Button>
+                              </Group>
+
+                              <Divider my="sm" />
+
+                              <Group grow>
+                                <TextInput
+                                  label="Имя и фамилия"
+                                  value={activePerson.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    change({
+                                      ...draft,
+                                      assignees: draft.assignees.map((a) =>
+                                        a.id === activePerson.id ? { ...a, name: val } : a
+                                      ),
+                                    });
+                                  }}
+                                />
+                                <TextInput
+                                  label="Должность / Роль"
+                                  placeholder="Например: Lead Backend · Python"
+                                  value={activePerson.role || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    change({
+                                      ...draft,
+                                      assignees: draft.assignees.map((a) =>
+                                        a.id === activePerson.id ? { ...a, role: val } : a
+                                      ),
+                                    });
+                                  }}
+                                />
+                              </Group>
+                            </Card>
+
+                            {/* Skills & Tasks Grid */}
+                            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+                              {/* Skills Card */}
+                              <Card withBorder p="md" radius="sm">
+                                <Text fw={700} size="sm" mb="xs">Матрица навыков и компетенций</Text>
+                                
+                                <Group gap={6} mb="sm">
+                                  {(activePerson.skills || []).map((sk, skIdx) => (
+                                    <Badge
+                                      key={skIdx}
+                                      size="sm"
+                                      variant="light"
+                                      color="indigo"
+                                      rightSection={
+                                        <ActionIcon
+                                          size="xs"
+                                          color="blue"
+                                          radius="xl"
+                                          variant="transparent"
+                                          onClick={() => {
+                                            change({
+                                              ...draft,
+                                              assignees: draft.assignees.map((a) =>
+                                                a.id === activePerson.id
+                                                  ? { ...a, skills: a.skills?.filter((_, i) => i !== skIdx) || [] }
+                                                  : a
+                                              ),
+                                            });
+                                          }}
+                                        >
+                                          ✕
+                                        </ActionIcon>
+                                      }
+                                    >
+                                      {sk.name} ({skillLevelLabels[sk.level]})
+                                    </Badge>
+                                  ))}
+                                  {(!activePerson.skills || activePerson.skills.length === 0) && (
+                                    <Text size="xs" c="dimmed">Компетенции еще не добавлены</Text>
+                                  )}
+                                </Group>
+
+                                <Divider my="xs" />
+
+                                <Group gap="xs" align="flex-end">
+                                  <TextInput
+                                    label="Новый навык"
+                                    placeholder="React, SQL, Docker..."
+                                    size="xs"
+                                    style={{ flex: 1 }}
+                                    value={inlineNewSkillName}
+                                    onChange={(e) => setInlineNewSkillName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && inlineNewSkillName.trim()) {
+                                        e.preventDefault();
+                                        change({
+                                          ...draft,
+                                          assignees: draft.assignees.map((a) =>
+                                            a.id === activePerson.id
+                                              ? {
+                                                  ...a,
+                                                  skills: [
+                                                    ...(a.skills || []),
+                                                    { name: inlineNewSkillName.trim(), level: inlineNewSkillLevel },
+                                                  ],
+                                                }
+                                              : a
+                                          ),
+                                        });
+                                        setInlineNewSkillName("");
+                                      }
+                                    }}
+                                  />
+                                  <Select
+                                    label="Грейд"
+                                    size="xs"
+                                    w={130}
+                                    data={[
+                                      { value: "beginner", label: "Начинающий" },
+                                      { value: "intermediate", label: "Средний" },
+                                      { value: "advanced", label: "Продвинутый" },
+                                      { value: "expert", label: "Эксперт" },
+                                    ]}
+                                    value={inlineNewSkillLevel}
+                                    onChange={(v) => setInlineNewSkillLevel((v as Skill["level"]) || "expert")}
+                                  />
+                                  <Button
+                                    size="xs"
+                                    disabled={!inlineNewSkillName.trim()}
+                                    onClick={() => {
+                                      change({
+                                        ...draft,
+                                        assignees: draft.assignees.map((a) =>
+                                          a.id === activePerson.id
+                                            ? {
+                                                ...a,
+                                                skills: [
+                                                  ...(a.skills || []),
+                                                  { name: inlineNewSkillName.trim(), level: inlineNewSkillLevel },
+                                                ],
+                                              }
+                                            : a
+                                        ),
+                                      });
+                                      setInlineNewSkillName("");
+                                    }}
+                                  >
+                                    + Добавить
+                                  </Button>
+                                </Group>
+                              </Card>
+
+                              {/* Assigned Tasks Card */}
+                              <Card withBorder p="md" radius="sm">
+                                <Group justify="space-between" mb="xs">
+                                  <Text fw={700} size="sm">Назначенные задачи ({assignedTasks.length})</Text>
+                                  {isOverloaded && (
+                                    <Badge size="xs" color="red">
+                                      Перегрузка по графику
+                                    </Badge>
+                                  )}
+                                </Group>
+
+                                {assignedTasks.length === 0 ? (
+                                  <Text size="xs" c="dimmed">Нет назначенных задач в проекте</Text>
+                                ) : (
+                                  <ScrollArea h={140}>
+                                    <Stack gap={6}>
+                                      {assignedTasks.map((t) => {
+                                        const r = rows.get(t.id);
+                                        const match = calculateSkillMatch(t, activePerson);
+                                        return (
+                                          <Card key={t.id} withBorder p="xs" radius="xs" style={{ background: "rgba(0,0,0,0.01)" }}>
+                                            <Group justify="space-between">
+                                              <div style={{ minWidth: 0, flex: 1 }}>
+                                                <Text size="xs" fw={600} lineClamp={1}>«{t.name}»</Text>
+                                                <Text size="10px" c="dimmed">
+                                                  {t.duration_minutes / 60} ч. · {t.allocation_percent || 100}% занятость {r ? `· с ${shortDate(r.start)} по ${shortDate(r.finish)}` : ""}
+                                                </Text>
+                                              </div>
+                                              <Badge size="xs" color={match >= 80 ? "teal" : match >= 50 ? "yellow" : "red"} variant="light">
+                                                Match {match}%
+                                              </Badge>
+                                            </Group>
+                                          </Card>
+                                        );
+                                      })}
+                                    </Stack>
+                                  </ScrollArea>
+                                )}
+                              </Card>
+                            </SimpleGrid>
+
+                            {/* Calendar & Vacation Range Editor */}
+                            <Card withBorder p="md" radius="sm">
+                              <Text fw={700} size="sm" mb="xs">Персональный рабочий календарь и отпуска</Text>
+                              <Text size="xs" c="dimmed" mb="md">
+                                Настройте индивидуальные смены, обеденные перерывы или добавьте отпуск диапазоном дат.
+                              </Text>
+                              <CalendarEditor
+                                value={activePerson.calendar}
+                                onChange={(calendar) => {
+                                  change({
+                                    ...draft,
+                                    assignees: draft.assignees.map((a) =>
+                                      a.id === activePerson.id ? { ...a, calendar } : a
+                                    ),
+                                  });
+                                }}
+                              />
+                            </Card>
+                          </Stack>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
               </Card>
             )}
 
@@ -2957,11 +3277,11 @@ export function App() {
         )}
       </Drawer>
 
-      {/* FULL SETTINGS DRAWER — Организован по вкладкам (Параметры, Календарь, Команда и Отпуска) */}
+      {/* FULL SETTINGS DRAWER — Параметры проекта и общий рабочий календарь */}
       <Drawer
         opened={settings}
         onClose={() => setSettings(false)}
-        title="Настройки проекта и команды"
+        title="Настройки проекта"
         position="right"
         size="xl"
       >
@@ -2970,7 +3290,6 @@ export function App() {
             <Tabs.List mb="md">
               <Tabs.Tab value="project">Параметры проекта</Tabs.Tab>
               <Tabs.Tab value="calendar">Календарь проекта</Tabs.Tab>
-              <Tabs.Tab value="team">Команда и отпуска ({draft.assignees.length})</Tabs.Tab>
             </Tabs.List>
 
             <Tabs.Panel value="project">
@@ -3023,6 +3342,29 @@ export function App() {
                     </Button>
                   </Group>
                 </Card>
+
+                <Card withBorder p="sm" style={{ background: "var(--bg-subtle, rgba(0, 0, 0, 0.02))" }}>
+                  <Group justify="space-between" align="center">
+                    <div>
+                      <Text size="xs" fw={700}>
+                        Управление командой и ресурсами ({draft.assignees.length} чел.)
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Роли, матрица компетенций, персональные отпуска и загрузка сотрудников.
+                      </Text>
+                    </div>
+                    <Button
+                      variant="light"
+                      size="xs"
+                      onClick={() => {
+                        setSettings(false);
+                        setActiveView("team");
+                      }}
+                    >
+                      Перейти во вкладку «Команда» →
+                    </Button>
+                  </Group>
+                </Card>
               </Stack>
             </Tabs.Panel>
 
@@ -3035,210 +3377,6 @@ export function App() {
                   value={draft.calendar}
                   onChange={(calendar) => change({ ...draft, calendar })}
                 />
-              </Stack>
-            </Tabs.Panel>
-
-            <Tabs.Panel value="team">
-              <Stack gap="md">
-                <Group justify="space-between" align="center">
-                  <div>
-                    <Text fw={700} size="sm">Состав команды, роли и персональные отпуска</Text>
-                    <Text size="xs" c="dimmed">
-                      Настраивайте должности, компетенции и персональные графики отпусков каждому сотруднику.
-                    </Text>
-                  </div>
-                  <Button
-                    variant="light"
-                    size="xs"
-                    onClick={() =>
-                      change({
-                        ...draft,
-                        assignees: [
-                          ...draft.assignees,
-                          {
-                            id: crypto.randomUUID(),
-                            name: `Участник ${draft.assignees.length + 1}`,
-                            role: "Frontend-разработчик",
-                            skills: [],
-                            calendar: defaultCalendar(),
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    + Добавить сотрудника
-                  </Button>
-                </Group>
-
-                {draft.assignees.map((p, i) => (
-                  <Card key={p.id} withBorder p="md">
-                    <Stack gap="sm">
-                      <Group justify="space-between">
-                        <Group gap="xs">
-                          <span className={`avatar ${getAvatarClass(p.id)}`}>{getInitials(p.name)}</span>
-                          <TextInput
-                            label="Имя сотрудника"
-                            value={p.name}
-                            w={200}
-                            onChange={(e) =>
-                              change({
-                                ...draft,
-                                assignees: draft.assignees.map((a, j) =>
-                                  i === j ? { ...a, name: e.target.value } : a,
-                                ),
-                              })
-                            }
-                          />
-                          <TextInput
-                            label="Роль / Должность"
-                            placeholder="Например: Backend · Python"
-                            value={p.role || ""}
-                            w={200}
-                            onChange={(e) =>
-                              change({
-                                ...draft,
-                                assignees: draft.assignees.map((a, j) =>
-                                  i === j ? { ...a, role: e.target.value } : a,
-                                ),
-                              })
-                            }
-                          />
-                        </Group>
-
-                        <Button
-                          variant="subtle"
-                          color="red"
-                          size="xs"
-                          onClick={() =>
-                            change({
-                              ...draft,
-                              assignees: draft.assignees.filter((_, j) => i !== j),
-                              tasks: draft.tasks.map((t) =>
-                                t.assignee_id === p.id ? { ...t, assignee_id: null } : t,
-                              ),
-                            })
-                          }
-                        >
-                          Удалить
-                        </Button>
-                      </Group>
-
-                      <div>
-                        <Text size="xs" fw={600} mb={4}>
-                          Компетенции и навыки:
-                        </Text>
-                        <Group gap={4} mb={6}>
-                          {(p.skills || []).map((sk, skIdx) => (
-                            <Badge
-                              key={skIdx}
-                              size="sm"
-                              variant="light"
-                              color="indigo"
-                              rightSection={
-                                <ActionIcon
-                                  size="xs"
-                                  color="blue"
-                                  radius="xl"
-                                  variant="transparent"
-                                  onClick={() =>
-                                    change({
-                                      ...draft,
-                                      assignees: draft.assignees.map((a, j) =>
-                                        i === j
-                                          ? {
-                                              ...a,
-                                              skills: (a.skills || []).filter((_, idx) => idx !== skIdx),
-                                            }
-                                          : a,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  ✕
-                                </ActionIcon>
-                              }
-                            >
-                              {sk.name} ({skillLevelLabels[sk.level]})
-                            </Badge>
-                          ))}
-                        </Group>
-
-                        {skillTargetAssigneeId === p.id ? (
-                          <Group align="end" gap="xs" mt="xs">
-                            <TextInput
-                              placeholder="Например: Python, React, Figma"
-                              size="xs"
-                              value={newSkillName}
-                              onChange={(e) => setNewSkillName(e.target.value)}
-                            />
-                            <Select
-                              size="xs"
-                              w={130}
-                              data={[
-                                { value: "beginner", label: "Начинающий" },
-                                { value: "intermediate", label: "Средний" },
-                                { value: "advanced", label: "Продвинутый" },
-                                { value: "expert", label: "Эксперт" },
-                              ]}
-                              value={newSkillLevel}
-                              onChange={(v) => setNewSkillLevel((v as any) || "expert")}
-                            />
-                            <Button
-                              size="xs"
-                              variant="light"
-                              disabled={!newSkillName.trim()}
-                              onClick={() => {
-                                change({
-                                  ...draft,
-                                  assignees: draft.assignees.map((a, j) =>
-                                    i === j
-                                      ? {
-                                          ...a,
-                                          skills: [
-                                            ...(a.skills || []),
-                                            { name: newSkillName.trim(), level: newSkillLevel },
-                                          ],
-                                        }
-                                      : a,
-                                  ),
-                                });
-                                setNewSkillName("");
-                                setSkillTargetAssigneeId(null);
-                              }}
-                            >
-                              Сохранить навык
-                            </Button>
-                          </Group>
-                        ) : (
-                          <Button
-                            size="xs"
-                            variant="subtle"
-                            p={0}
-                            onClick={() => setSkillTargetAssigneeId(p.id)}
-                          >
-                            + Добавить навык сотруднику
-                          </Button>
-                        )}
-                      </div>
-
-                      <Text size="xs" fw={600} mt="xs">
-                        Персональный график работы и исключения / отпуска сотрудника:
-                      </Text>
-
-                      <CalendarEditor
-                        value={p.calendar}
-                        onChange={(calendar) =>
-                          change({
-                            ...draft,
-                            assignees: draft.assignees.map((a, j) =>
-                              i === j ? { ...a, calendar } : a,
-                            ),
-                          })
-                        }
-                      />
-                    </Stack>
-                  </Card>
-                ))}
               </Stack>
             </Tabs.Panel>
 
