@@ -226,6 +226,7 @@ interface ProjectGraphProps {
   colorScheme: "dark" | "light";
   onEditTask: (task: Task) => void;
   onAddDependency: (dep: Dependency) => void;
+  onEditDependency?: (index: number) => void;
 }
 
 export function ProjectGraph({
@@ -235,6 +236,7 @@ export function ProjectGraph({
   colorScheme,
   onEditTask,
   onAddDependency,
+  onEditDependency,
 }: ProjectGraphProps) {
   const [filterCriticalOnly, setFilterCriticalOnly] = useState(false);
 
@@ -438,6 +440,13 @@ export function ProjectGraph({
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onConnect={onConnect}
+        onEdgeClick={(_, edge) => {
+          const parts = edge.id.split("-");
+          const index = parseInt(parts[parts.length - 1], 10);
+          if (onEditDependency && !isNaN(index)) {
+            onEditDependency(index);
+          }
+        }}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.2}

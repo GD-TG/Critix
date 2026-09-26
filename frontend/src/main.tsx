@@ -13,9 +13,11 @@ import {
   FileInput,
   Group,
   MantineProvider,
+  Menu,
   Modal,
   NumberInput,
   PasswordInput,
+  Popover,
   Progress,
   ScrollArea,
   SegmentedControl,
@@ -57,11 +59,13 @@ import {
   Moon,
   LogOut,
   RefreshCw,
+  RotateCcw,
   Users,
   Trash2,
   Edit,
   Link as LinkIcon,
   FileText,
+  FileJson,
   ChevronRight,
 } from "lucide-react";
 import "@mantine/core/styles.css";
@@ -172,6 +176,43 @@ function exportTasksToCsv(project: Project) {
   document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
 }
 
+function exportProjectToJson(project: Project) {
+  const jsonContent = JSON.stringify(project, null, 2);
+  const blob = new Blob([jsonContent], { type: "application/json;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${project.name.replace(/\s+/g, "_")}_critix_export.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function parseJsonToProject(jsonStr: string): Project {
+  const obj = JSON.parse(jsonStr);
+  if (!obj || typeof obj !== "object") {
+    throw new Error("Некорректный JSON-файл");
+  }
+  if (!obj.name || typeof obj.name !== "string") {
+    throw new Error("В проекте отсутствует название (name)");
+  }
+  if (!obj.start || !obj.deadline) {
+    throw new Error("В проекте отсутствуют даты start или deadline");
+  }
+  return {
+    name: obj.name,
+    timezone: obj.timezone || "Asia/Yekaterinburg",
+    start: obj.start,
+    deadline: obj.deadline,
+    calendar: obj.calendar || defaultCalendar(),
+    baseline: obj.baseline || null,
+    assignees: Array.isArray(obj.assignees) ? obj.assignees : [],
+    tasks: Array.isArray(obj.tasks) ? obj.tasks : [],
+    dependencies: Array.isArray(obj.dependencies) ? obj.dependencies : [],
+  };
+}
+
 export function App() {
   const [colorScheme, setColorScheme] = useState<"dark" | "light">(() => {
     const savedTheme = localStorage.getItem("critix_theme");
@@ -216,6 +257,11 @@ export function App() {
   const [projectManageModal, setProjectManageModal] = useState(false);
   const [deleteConfirmProject, setDeleteConfirmProject] = useState<{ id: string; name: string } | null>(null);
 
+  // Full Project JSON Import modal
+  const [jsonImportModal, setJsonImportModal] = useState(false);
+  const [jsonInput, setJsonInput] = useState("");
+  const [jsonImportError, setJsonImportError] = useState("");
+
   // CSV Import modal
   const [importModal, setImportModal] = useState(false);
   const [csvInput, setCsvInput] = useState("");
@@ -227,6 +273,12 @@ export function App() {
   const [newDepKind, setNewDepKind] = useState<Dependency["kind"]>("FS");
   const [newDepLagHours, setNewDepLagHours] = useState<number>(0);
   const [newDepLagMode, setNewDepLagMode] = useState<Dependency["lag_mode"]>("working");
+
+  // Edit Dependency modal
+  const [editingDepIndex, setEditingDepIndex] = useState<number | null>(null);
+  const [editDepKind, setEditDepKind] = useState<Dependency["kind"]>("FS");
+  const [editDepLagHours, setEditDepLagHours] = useState<number>(0);
+  const [editDepLagMode, setEditDepLagMode] = useState<Dependency["lag_mode"]>("working");
 
   const [newProjName, setNewProjName] = useState("Новый проект");
   const [newProjTz, setNewProjTz] = useState("Asia/Yekaterinburg");
@@ -319,6 +371,16 @@ export function App() {
           setDraft(null);
         }
       }
+    });
+  };
+
+  const handleLoadDemoProject = async () => {
+    await run(async () => {
+      const created = await api<Result>("/demo", "POST");
+      await list();
+      accept(created);
+      setProjectManageModal(false);
+      showNotification("Демо-проект «Запуск клиентского портала» успешно загружен!");
     });
   };
 
@@ -781,10 +843,117 @@ export function App() {
               >
                 <Settings size={14} /> Настройки
               </button>
-              <button className="icon-button" aria-label="Уведомления" onClick={() => scrollToSection("risks")}>
-                <Bell size={17} />
-                {overdueTasks.length > 0 && <i />}
-              </button>
+
+              {/* Notification Center Popover */}
+              <Popover width={360} position="bottom-end" withArrow shadow="md">
+                <Popover.Target>
+                  <button className="icon-button" aria-label="Уведомления">
+                    <Bell size={17} />
+                    {(overdueTasks.length > 0 || overloadedAssigneeIds.size > 0 || view?.analysis.deadline_exceeded) && (
+                      <i />
+                    )}
+                  </button>
+                </Popover.Target>
+                <Popover.Dropdown p="sm">
+                  <Stack gap="xs">
+                    <Group justify="space-between" align="center">
+                      <Group gap={6}>
+                        <Text fw={700} size="sm">Центр рисков и инцидентов</Text>
+                        <Badge size="xs" color={overdueTasks.length > 0 || view?.analysis.deadline_exceeded ? "red" : "blue"}>
+                          {overdueTasks.length + overloadedAssigneeIds.size + (view?.analysis.deadline_exceeded ? 1 : 0)}
+                        </Badge>
+                      </Group>
+                      {overdueTasks.length > 0 && (
+                        <Button size="compact-xs" variant="subtle" color="red" onClick={handleRescheduleOverdue}>
+                          Сдвинуть все
+                        </Button>
+                      )}
+                    </Group>
+
+                    <Divider />
+
+                    <ScrollArea.Autosize mah={280} type="auto">
+                      <Stack gap="xs">
+                        {view?.analysis.deadline_exceeded && (
+                          <Card withBorder p="xs" style={{ background: "rgba(229, 116, 112, 0.08)", borderColor: "#e57470" }}>
+                            <Group gap={6} align="flex-start">
+                              <AlertTriangle size={15} color="#e57470" style={{ marginTop: 2 }} />
+                              <div style={{ flex: 1 }}>
+                                <Text size="xs" fw={700} c="red">Дедлайн проекта превышен</Text>
+                                <Text size="11px" c="dimmed">
+                                  Расчетный финиш позже дедлайна на {view.analysis.delay_minutes} мин.
+                                </Text>
+                              </div>
+                            </Group>
+                          </Card>
+                        )}
+
+                        {overdueTasks.map((ot) => {
+                          const taskObj = draft?.tasks.find((x) => x.id === ot.id);
+                          return (
+                            <Card key={ot.id} withBorder p="xs">
+                              <Group justify="space-between" align="flex-start">
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <Group gap={4} mb={2}>
+                                    <Badge size="xs" color="red">Просрочка</Badge>
+                                    <Text size="xs" fw={600} lineClamp={1}>{taskObj?.name}</Text>
+                                  </Group>
+                                  <Text size="10px" c="dimmed">
+                                    Плановый финиш: {shortDate(ot.finish)}
+                                  </Text>
+                                </div>
+                                <Button
+                                  size="compact-xs"
+                                  variant="light"
+                                  onClick={() => taskObj && setTask(copy(taskObj))}
+                                >
+                                  Открыть
+                                </Button>
+                              </Group>
+                            </Card>
+                          );
+                        })}
+
+                        {overloadedAssigneeIds.size > 0 && (
+                          <Card withBorder p="xs" style={{ background: "rgba(238, 149, 100, 0.08)" }}>
+                            <Group justify="space-between" align="center">
+                              <div>
+                                <Text size="xs" fw={700} c="orange">Перегрузка исполнителей</Text>
+                                <Text size="11px" c="dimmed">
+                                  {overloadedAssigneeIds.size} сотрудников имеют занятость &gt; 100%.
+                                </Text>
+                              </div>
+                              <Button size="compact-xs" variant="light" color="orange" onClick={() => setActiveView("team")}>
+                                Команда
+                              </Button>
+                            </Group>
+                          </Card>
+                        )}
+
+                        {overdueTasks.length === 0 && overloadedAssigneeIds.size === 0 && !view?.analysis.deadline_exceeded && (
+                          <Card withBorder p="sm" style={{ textAlign: "center" }}>
+                            <Check size={20} color="#3eac7d" style={{ margin: "0 auto 4px" }} />
+                            <Text size="xs" fw={700} c="teal">Критических рисков нет</Text>
+                            <Text size="10px" c="dimmed">Все задачи укладываются в график и дедлайн.</Text>
+                          </Card>
+                        )}
+                      </Stack>
+                    </ScrollArea.Autosize>
+
+                    <Divider />
+
+                    <Group justify="space-between">
+                      <Button size="xs" variant="subtle" onClick={() => setExecutiveReportModal(true)}>
+                        <FileText size={13} style={{ marginRight: 4 }} /> Отчет
+                      </Button>
+                      <Button size="xs" variant="light" onClick={() => setActiveView("ai")}>
+                        <Sparkles size={13} style={{ marginRight: 4 }} /> AI Copilot
+                      </Button>
+                    </Group>
+                  </Stack>
+                </Popover.Dropdown>
+              </Popover>
+
               <button className="help-button" aria-label="Помощь" onClick={() => setHelpModal(true)}>
                 <CircleHelp size={14} />
               </button>
@@ -792,7 +961,7 @@ export function App() {
           </header>
 
           <div className="content-wrap" id="overview">
-            {!draft && <Card withBorder><Stack><Title order={3}>Нет выбранного проекта</Title><Text>Создайте проект или откройте существующий.</Text><Button onClick={() => setProjectManageModal(true)}>Управление проектами</Button></Stack></Card>}
+            {!draft && <Card withBorder><Stack><Title order={3}>Нет выбранного проекта</Title><Text>Создайте проект, откройте существующий или загрузите демо.</Text><Group><Button onClick={() => setProjectManageModal(true)}>Управление проектами</Button><Button variant="light" onClick={handleLoadDemoProject}>Загрузить Демо-проект</Button></Group></Stack></Card>}
             <section className="page-heading">
               <div>
                 <div className="eyebrow">
@@ -822,11 +991,14 @@ export function App() {
                     >
                       <FileText size={14} /> Отчет (PDF/MD)
                     </button>
-                    <button className="secondary-button" onClick={() => exportTasksToCsv(draft)}>
-                      <Download size={14} /> Экспорт CSV
+                    <button className="secondary-button" onClick={() => exportProjectToJson(draft)} title="Экспорт полного проекта в JSON">
+                      <FileJson size={14} /> Экспорт JSON
                     </button>
-                    <button className="secondary-button" onClick={() => setImportModal(true)}>
-                      <Upload size={14} /> Импорт CSV
+                    <button className="secondary-button" onClick={() => setJsonImportModal(true)} title="Импорт полного проекта из JSON">
+                      <Upload size={14} /> Импорт JSON
+                    </button>
+                    <button className="secondary-button" onClick={() => exportTasksToCsv(draft)}>
+                      <Download size={14} /> CSV
                     </button>
                     <button className="secondary-button" onClick={handleSaveBaseline}>
                       <Check size={14} /> Базовый план
@@ -1388,6 +1560,15 @@ export function App() {
                     });
                     showNotification(`Добавлена связь: ${d.kind}`);
                   }}
+                  onEditDependency={(idx) => {
+                    if (draft.dependencies[idx]) {
+                      const d = draft.dependencies[idx];
+                      setEditingDepIndex(idx);
+                      setEditDepKind(d.kind);
+                      setEditDepLagHours(d.lag_minutes / 60);
+                      setEditDepLagMode(d.lag_mode);
+                    }
+                  }}
                 />
               </Card>
             )}
@@ -1491,7 +1672,7 @@ export function App() {
                     <Text size="sm" c="dimmed">Исполнители, роли, навыки, процент соответствия задачам и персональные отпуска.</Text>
                   </div>
                   <Group gap="xs">
-                    <Button size="xs" variant="light" onClick={() => setSettings(true)}>Управлять командой</Button>
+                    <Button size="xs" variant="light" onClick={() => { setSettingsTab("team"); setSettings(true); }}>Управлять командой</Button>
                     <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
                   </Group>
                 </Group>
@@ -1546,7 +1727,7 @@ export function App() {
                         <Button
                           size="compact-xs"
                           variant="light"
-                          onClick={() => setSettings(true)}
+                          onClick={() => { setSettingsTab("team"); setSettings(true); }}
                         >
                           Настроить график и отпуска
                         </Button>
@@ -1579,7 +1760,7 @@ export function App() {
                       <Table.Th>Последующая задача</Table.Th>
                       <Table.Th>Задержка (лаг)</Table.Th>
                       <Table.Th>Режим</Table.Th>
-                      <Table.Th style={{ width: 60 }}></Table.Th>
+                      <Table.Th style={{ width: 80, textAlign: "right" }}>Действия</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -1600,21 +1781,36 @@ export function App() {
                             </Badge>
                           </Table.Td>
                           <Table.Td>
-                            <ActionIcon
-                              color="red"
-                              variant="subtle"
-                              title="Удалить связь"
-                              onClick={() => {
-                                if (!draft) return;
-                                change({
-                                  ...draft,
-                                  dependencies: (draft.dependencies || []).filter((_, j) => j !== idx),
-                                });
-                                showNotification("Связь удалена");
-                              }}
-                            >
-                              <Trash2 size={16} />
-                            </ActionIcon>
+                            <Group gap={4} justify="flex-end">
+                              <ActionIcon
+                                color="blue"
+                                variant="subtle"
+                                title="Редактировать связь"
+                                onClick={() => {
+                                  setEditingDepIndex(idx);
+                                  setEditDepKind(d.kind);
+                                  setEditDepLagHours(d.lag_minutes / 60);
+                                  setEditDepLagMode(d.lag_mode);
+                                }}
+                              >
+                                <Edit size={16} />
+                              </ActionIcon>
+                              <ActionIcon
+                                color="red"
+                                variant="subtle"
+                                title="Удалить связь"
+                                onClick={() => {
+                                  if (!draft) return;
+                                  change({
+                                    ...draft,
+                                    dependencies: (draft.dependencies || []).filter((_, j) => j !== idx),
+                                  });
+                                  showNotification("Связь удалена");
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </ActionIcon>
+                            </Group>
                           </Table.Td>
                         </Table.Tr>
                       );
@@ -1764,6 +1960,86 @@ export function App() {
         </Modal>
       )}
 
+      {/* Edit Dependency Modal */}
+      {editingDepIndex !== null && draft?.dependencies[editingDepIndex] && (
+        <Modal
+          opened={editingDepIndex !== null}
+          onClose={() => setEditingDepIndex(null)}
+          title="Редактирование связи между задачами"
+          size="md"
+        >
+          {(() => {
+            const currentDep = draft.dependencies[editingDepIndex];
+            const pred = draft.tasks.find((t) => t.id === currentDep.predecessor_id);
+            const succ = draft.tasks.find((t) => t.id === currentDep.successor_id);
+            return (
+              <Stack gap="sm">
+                <Card withBorder p="xs" style={{ background: "rgba(90, 117, 233, 0.05)" }}>
+                  <Text size="xs" fw={700} c="dimmed">СВЯЗАННЫЕ ЗАДАЧИ:</Text>
+                  <Text size="sm" fw={600}>
+                    «{pred?.name || currentDep.predecessor_id}» → «{succ?.name || currentDep.successor_id}»
+                  </Text>
+                </Card>
+
+                <Select
+                  label="Тип связи"
+                  data={[
+                    { value: "FS", label: "Окончание → Начало (FS)" },
+                    { value: "SS", label: "Начало → Начало (SS)" },
+                    { value: "FF", label: "Окончание → Окончание (FF)" },
+                    { value: "SF", label: "Начало → Окончание (SF)" },
+                  ]}
+                  value={editDepKind}
+                  onChange={(v) => setEditDepKind((v as Dependency["kind"]) || "FS")}
+                />
+
+                <Group grow>
+                  <NumberInput
+                    label="Задержка / лаг (в часах)"
+                    value={editDepLagHours}
+                    onChange={(v) => setEditDepLagHours(Number(v || 0))}
+                  />
+                  <Select
+                    label="Режим задержки"
+                    data={[
+                      { value: "working", label: "Рабочее время" },
+                      { value: "elapsed", label: "Календарное время" },
+                    ]}
+                    value={editDepLagMode}
+                    onChange={(v) => setEditDepLagMode((v as Dependency["lag_mode"]) || "working")}
+                  />
+                </Group>
+
+                <Group justify="flex-end" mt="md">
+                  <Button variant="default" onClick={() => setEditingDepIndex(null)}>
+                    Отмена
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const updated = [...draft.dependencies];
+                      updated[editingDepIndex] = {
+                        ...updated[editingDepIndex],
+                        kind: editDepKind,
+                        lag_minutes: Math.round(editDepLagHours * 60),
+                        lag_mode: editDepLagMode,
+                      };
+                      change({
+                        ...draft,
+                        dependencies: updated,
+                      });
+                      setEditingDepIndex(null);
+                      showNotification("Параметры связи обновлены");
+                    }}
+                  >
+                    Сохранить изменения
+                  </Button>
+                </Group>
+              </Stack>
+            );
+          })()}
+        </Modal>
+      )}
+
       {/* CSV Import Modal */}
       {importModal && (
         <Modal
@@ -1809,6 +2085,103 @@ export function App() {
         </Modal>
       )}
 
+      {/* Full Project JSON Import Modal */}
+      {jsonImportModal && (
+        <Modal
+          opened={jsonImportModal}
+          onClose={() => {
+            setJsonImportModal(false);
+            setJsonInput("");
+            setJsonImportError("");
+          }}
+          title="Импорт полного проекта из JSON"
+          size="lg"
+        >
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              Загрузите файл .json или вставьте JSON-снимок проекта со всеми задачами, исполнителями, персональными календарями и зависимостями.
+            </Text>
+
+            {jsonImportError && <Alert color="red">{jsonImportError}</Alert>}
+
+            <FileInput
+              label="Загрузить файл .json"
+              placeholder="Выберите .json файл проекта"
+              accept=".json,application/json"
+              onChange={(file) => {
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    const content = (e.target?.result as string) || "";
+                    setJsonInput(content);
+                  };
+                  reader.readAsText(file, "UTF-8");
+                }
+              }}
+            />
+
+            <Textarea
+              label="Либо вставьте JSON проекта:"
+              rows={8}
+              placeholder='{ "name": "Мой проект", "start": "...", "deadline": "...", "tasks": [...], ... }'
+              value={jsonInput}
+              onChange={(e) => {
+                setJsonInput(e.target.value);
+                setJsonImportError("");
+              }}
+            />
+
+            <Group justify="space-between" mt="md">
+              <Button variant="default" onClick={() => setJsonImportModal(false)}>
+                Отмена
+              </Button>
+              <Group gap="xs">
+                {draft && (
+                  <Button
+                    variant="light"
+                    disabled={!jsonInput.trim()}
+                    onClick={() => {
+                      try {
+                        const parsed = parseJsonToProject(jsonInput);
+                        change(parsed);
+                        setJsonImportModal(false);
+                        setJsonInput("");
+                        showNotification(`Проект «${parsed.name}» загружен в текущий черновик`);
+                      } catch (err: any) {
+                        setJsonImportError(err?.message || "Ошибка структуры JSON");
+                      }
+                    }}
+                  >
+                    Заменить текущий черновик
+                  </Button>
+                )}
+                <Button
+                  loading={busy}
+                  disabled={!jsonInput.trim()}
+                  onClick={() =>
+                    void run(async () => {
+                      try {
+                        const parsed = parseJsonToProject(jsonInput);
+                        const created = await api<Result>("/projects", "POST", parsed);
+                        await list();
+                        accept(created);
+                        setJsonImportModal(false);
+                        setJsonInput("");
+                        showNotification(`Проект «${parsed.name}» создан и открыт`);
+                      } catch (err: any) {
+                        setJsonImportError(err?.message || "Ошибка создания проекта через API");
+                      }
+                    })
+                  }
+                >
+                  Создать как новый проект
+                </Button>
+              </Group>
+            </Group>
+          </Stack>
+        </Modal>
+      )}
+
       {/* Project Management & Delete Modal */}
       {projectManageModal && (
         <Modal
@@ -1820,11 +2193,27 @@ export function App() {
           <Stack gap="md">
             <Group justify="space-between">
               <Text size="sm" c="dimmed">
-                Выберите проект для переключения или удалите ненужные.
+                Выберите проект для переключения или создайте новый.
               </Text>
-              <Button size="xs" onClick={() => setNewProjectModal(true)}>
-                + Создать новый проект
+              <Group gap="xs">
+                <Button size="xs" variant="light" leftSection={<RotateCcw size={13} />} onClick={handleLoadDemoProject}>
+                  Загрузить Демо-проект
+                </Button>
+                <Button size="xs" onClick={() => setNewProjectModal(true)}>
+                  + Создать проект
+                </Button>
+              </Group>
+            </Group>
+
+            <Group gap="xs">
+              <Button size="xs" variant="default" leftSection={<Upload size={13} />} onClick={() => setJsonImportModal(true)}>
+                Импорт JSON
               </Button>
+              {draft && (
+                <Button size="xs" variant="default" leftSection={<FileJson size={13} />} onClick={() => exportProjectToJson(draft)}>
+                  Экспорт текущего в JSON
+                </Button>
+              )}
             </Group>
 
             <Divider />
