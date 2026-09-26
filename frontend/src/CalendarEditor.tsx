@@ -257,7 +257,7 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
       {activeTab === "exceptions" && (
         <Stack gap="md">
           {/* Range Vacation Form */}
-          <Card withBorder p="sm" style={{ background: "rgba(90, 117, 233, 0.03)" }}>
+          <Card withBorder p="sm" style={{ background: "rgba(210, 10, 46, 0.03)" }}>
             <Text size="xs" fw={700} mb="xs" c="blue">
               ПЕРИОД ОТПУСКА / ОТГУЛА (МАССОВОЕ ДОБАВЛЕНИЕ)
             </Text>

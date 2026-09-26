@@ -115,7 +115,7 @@ export function CustomTaskNode({ data }: NodeProps<Node<TaskNodeData>>) {
         style={{
           width: 10,
           height: 10,
-          background: isCritical ? "#e57470" : "#5a75e9",
+          background: isCritical ? "#e57470" : "var(--brand)",
           border: "2px solid #ffffff",
         }}
       />
@@ -150,7 +150,7 @@ export function CustomTaskNode({ data }: NodeProps<Node<TaskNodeData>>) {
               width: 22,
               height: 22,
               borderRadius: "50%",
-              background: "#5a75e9",
+              background: "var(--brand)",
               color: "#fff",
               fontSize: 9,
               fontWeight: 700,
@@ -207,7 +207,7 @@ export function CustomTaskNode({ data }: NodeProps<Node<TaskNodeData>>) {
         style={{
           width: 10,
           height: 10,
-          background: isCritical ? "#e57470" : "#5a75e9",
+          background: isCritical ? "#e57470" : "var(--brand)",
           border: "2px solid #ffffff",
         }}
       />
@@ -353,7 +353,7 @@ export function ProjectGraph({
         labelStyle: {
           fontSize: 10,
           fontWeight: 700,
-          fill: isCriticalEdge ? "#e57470" : "#5a75e9",
+          fill: isCriticalEdge ? "#e57470" : "var(--brand)",
         },
         labelBgStyle: {
           fill: colorScheme === "dark" ? "#1a2230" : "#ffffff",
@@ -365,10 +365,10 @@ export function ProjectGraph({
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isCriticalEdge ? "#e57470" : isAffected ? "#ee9564" : "#5a75e9",
+          color: isCriticalEdge ? "#e57470" : isAffected ? "#ee9564" : "var(--brand)",
         },
         style: {
-          stroke: isCriticalEdge ? "#e57470" : isAffected ? "#ee9564" : "#5a75e9",
+          stroke: isCriticalEdge ? "#e57470" : isAffected ? "#ee9564" : "var(--brand)",
           strokeWidth: isCriticalEdge ? 2.5 : 1.5,
         },
       };
@@ -467,7 +467,7 @@ export function ProjectGraph({
             const d = node.data;
             if (d?.analysisRow?.critical) return "#e57470";
             if (d?.isAffected) return "#ee9564";
-            return "#5a75e9";
+            return "var(--brand)";
           }}
           style={{
             background: "var(--surface, #ffffff)",

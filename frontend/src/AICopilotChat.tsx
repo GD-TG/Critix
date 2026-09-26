@@ -198,7 +198,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: "rgba(90, 117, 233, 0.15)",
+              background: "rgba(210, 10, 46, 0.12)",
               display: "grid",
               placeItems: "center",
               color: "var(--blue)",
@@ -249,7 +249,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
                       width: 28,
                       height: 28,
                       borderRadius: "50%",
-                      background: "var(--blue, #5a75e9)",
+                      background: "var(--blue, #d20a2e)",
                       color: "#fff",
                       display: "grid",
                       placeItems: "center",
@@ -266,8 +266,8 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
                     padding: "10px 14px",
                     borderRadius: isUser ? "14px 14px 2px 14px" : "14px 14px 14px 2px",
                     background: isUser
-                      ? "var(--blue, #5a75e9)"
-                      : "var(--bg, rgba(90, 117, 233, 0.05))",
+                      ? "var(--blue, #d20a2e)"
+                      : "var(--bg, rgba(210, 10, 46, 0.04))",
                     color: isUser ? "#ffffff" : "var(--ink, #1c2330)",
                     border: isUser ? "none" : "1px solid var(--line, #e2e8f0)",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
@@ -315,7 +315,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
                   width: 28,
                   height: 28,
                   borderRadius: "50%",
-                  background: "var(--blue, #5a75e9)",
+                  background: "var(--blue, #d20a2e)",
                   color: "#fff",
                   display: "grid",
                   placeItems: "center",
@@ -328,7 +328,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
                 style={{
                   padding: "8px 14px",
                   borderRadius: "14px 14px 14px 2px",
-                  background: "var(--bg, rgba(90, 117, 233, 0.05))",
+                  background: "var(--bg, rgba(210, 10, 46, 0.04))",
                   border: "1px solid var(--line, #e2e8f0)",
                 }}
               >

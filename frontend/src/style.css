@@ -1,14 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
 
 :root {
-  --bg: #f6f7f9;
+  --brand: #d20a2e;
+  --brand-hover: #ad0826;
+  --brand-soft: #fff0f2;
+  --bg: #f7f7f7;
   --surface: #ffffff;
-  --ink: #1c2330;
-  --muted: #8994a4;
-  --line: #e9ecf1;
-  --navy: #202a3a;
-  --blue: #5a75e9;
-  --purple: #8271dc;
+  --ink: #242424;
+  --muted: #858585;
+  --line: #e8e8e8;
+  --navy: #272727;
+  --blue: var(--brand);
+  --purple: #a91b35;
   --green: #3eac7d;
   --orange: #ee9564;
   --red: #e57470;
@@ -20,14 +23,14 @@
 }
 
 [data-mantine-color-scheme="dark"] {
-  --bg: #0f1716;
-  --surface: #152220;
-  --ink: #e1ece8;
-  --muted: #7b9990;
-  --line: #233532;
-  --navy: #192724;
-  --blue: #5a75e9;
-  --purple: #8271dc;
+  --bg: #181818;
+  --surface: #222222;
+  --ink: #eeeeee;
+  --muted: #a0a0a0;
+  --line: #383838;
+  --navy: #303030;
+  --blue: var(--brand);
+  --purple: #e1435f;
   --green: #3eac7d;
   --orange: #ee9564;
   --red: #e57470;
@@ -60,7 +63,7 @@ button {
 }
 
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid #a9b8ff;
+  outline: 3px solid rgba(210, 10, 46, 0.35);
   outline-offset: 2px;
 }
 
@@ -70,9 +73,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   width: 240px;
   flex: 0 0 240px;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   background: var(--surface);
   border-right: 1px solid var(--line);
   padding: 28px 16px 18px;
@@ -80,28 +90,217 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   flex-direction: column;
 }
 
+.sidebar::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--brand), #f0445d 68%, #ff8797);
+  content: "";
+}
+
 .brand {
   display: flex;
-  gap: 9px;
+  gap: 11px;
   align-items: center;
-  font: 800 24px Manrope, sans-serif;
-  letter-spacing: -0.8px;
-  padding: 0 12px 41px;
+  font: 800 23px Manrope, sans-serif;
+  letter-spacing: 0;
+  padding: 4px 12px 34px;
   color: var(--ink);
 }
 
 .brand-mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
   color: #fff;
-  background: var(--blue);
-  font: 800 20px Manrope, sans-serif;
-  transform: rotate(-7deg);
+  background: var(--brand);
+  font: 800 19px Manrope, sans-serif;
+  transform: scale(1);
 }
 
+.brand-logo {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  flex: 0 0 46px;
+}
+
+[data-mantine-color-scheme="dark"] .brand-logo {
+  filter: brightness(0) invert(1);
+}
+
+.login-lockup img {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  filter: none;
+}
+
+.login-screen {
+  display: grid;
+  grid-template-columns: minmax(340px, 0.92fr) minmax(480px, 1.08fr);
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+.login-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  padding: 48px 52px 28px;
+  color: #fff;
+  background: #c70a2b;
+}
+
+.login-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 42px;
+  color: #262626;
+  font: 700 24px 'IBM Plex Sans', sans-serif;
+}
+
+.login-lockup img {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  object-fit: contain;
+}
+
+.login-statement {
+  max-width: 470px;
+  margin: 72px 0;
+}
+
+.login-overline,
+.login-panel-footer,
+.login-form-heading > span,
+.login-copyright {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.25px;
+}
+
+.login-overline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.login-overline::before {
+  width: 22px;
+  height: 1px;
+  background: #fff;
+  content: "";
+}
+
+.login-statement h1 {
+  margin: 24px 0 18px;
+  color: #fff;
+  font: 600 54px/1.04 'IBM Plex Sans', sans-serif;
+}
+
+.login-statement h1 span {
+  color: #ffb5c1;
+}
+
+.login-statement p {
+  max-width: 330px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.login-panel-footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 9px;
+}
+
+.login-main {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 56px 40px 84px;
+  background: #fff;
+}
+
+.login-form {
+  width: min(100%, 390px);
+}
+
+.login-form-heading {
+  margin-bottom: 34px;
+}
+
+.login-form-heading > span {
+  color: var(--brand);
+}
+
+.login-form-heading h2 {
+  margin: 12px 0 7px;
+  color: #242424;
+  font: 600 30px/1.15 'IBM Plex Sans', sans-serif;
+}
+
+.login-form-heading p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.login-form .mantine-PasswordInput-label {
+  margin-bottom: 7px;
+  color: #444;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.login-form .mantine-PasswordInput-input {
+  min-height: 46px;
+  border-radius: 4px;
+}
+
+.login-submit {
+  min-height: 46px;
+  margin-top: 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-secure-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  color: #777;
+  font-size: 11px;
+}
+
+.login-secure-note span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4d9b6a;
+}
+
+.login-copyright {
+  position: absolute;
+  right: 40px;
+  bottom: 28px;
+  color: #999;
+  font-size: 9px;
+}
 .workspace-label {
   color: var(--muted);
   font-size: 9px;
@@ -153,7 +352,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   height: 8px;
   border-radius: 50%;
   background: var(--blue);
-  box-shadow: 0 0 0 4px rgba(90, 117, 233, 0.2);
+  box-shadow: 0 0 0 4px rgba(210, 10, 46, 0.14);
   flex: 0 0 auto;
 }
 
@@ -187,7 +386,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .nav-item.active {
-  background: rgba(90, 117, 233, 0.12);
+  background: var(--brand-soft);
   color: var(--blue);
   font-weight: 700;
 }
@@ -321,7 +520,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .breadcrumb-btn:hover {
-  background: rgba(90, 117, 233, 0.08);
+  background: rgba(210, 10, 46, 0.07);
   color: var(--blue);
 }
 
@@ -342,7 +541,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .breadcrumb-current:hover {
-  background: rgba(90, 117, 233, 0.08);
+  background: rgba(210, 10, 46, 0.07);
   color: var(--blue);
 }
 
@@ -446,18 +645,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .primary-button {
-  background: var(--navy);
+  background: var(--brand);
   color: #fff;
-  box-shadow: 0 5px 13px rgba(32, 42, 58, 0.15);
+  box-shadow: 0 5px 13px rgba(210, 10, 46, 0.16);
 }
 
 .primary-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(32, 42, 58, 0.2);
+  background: var(--brand-hover);
+  box-shadow: 0 8px 18px rgba(210, 10, 46, 0.22);
 }
 
 .primary-button svg {
-  color: #a9b8ff;
+  color: #ffd8de;
 }
 
 .secondary-button {
@@ -527,13 +727,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 7px;
 }
 
-.metric-icon.purple { color: var(--purple); background: #f0edff; }
-.metric-icon.blue { color: var(--blue); background: #eaf0ff; }
+.metric-icon.purple { color: var(--purple); background: #fff0f2; }
+.metric-icon.blue { color: var(--blue); background: #fff0f2; }
 .metric-icon.coral { color: var(--red); background: #fff0ef; }
 .metric-icon.green { color: var(--green); background: #e8f7f0; }
 
-[data-mantine-color-scheme="dark"] .metric-icon.purple { background: rgba(130, 113, 220, 0.2); }
-[data-mantine-color-scheme="dark"] .metric-icon.blue { background: rgba(90, 117, 233, 0.2); }
+[data-mantine-color-scheme="dark"] .metric-icon.purple { background: rgba(210, 10, 46, 0.2); }
+[data-mantine-color-scheme="dark"] .metric-icon.blue { background: rgba(210, 10, 46, 0.2); }
 [data-mantine-color-scheme="dark"] .metric-icon.coral { background: rgba(229, 116, 112, 0.2); }
 [data-mantine-color-scheme="dark"] .metric-icon.green { background: rgba(62, 172, 125, 0.2); }
 
@@ -894,7 +1094,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .priority-tag.medium {
-  background: rgba(90, 117, 233, 0.12);
+  background: rgba(210, 10, 46, 0.1);
   color: var(--blue);
 }
 
@@ -1305,7 +1505,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .decision-panel h2 em {
-  color: #a5b2fb;
+  color: #ff7a90;
 }
 
 [data-mantine-color-scheme="dark"] .decision-panel p {
@@ -1319,29 +1519,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .outline-button:hover {
-  border-color: #96a6ed;
+  border-color: #ff7a90;
 }
 
 [data-mantine-color-scheme="dark"] .outline-button svg {
-  color: #abb9fb;
+  color: #ff7a90;
 }
 
 /* Светлая тема */
 [data-mantine-color-scheme="light"] .decision-panel {
-  background: #f0f3ff;
-  border: 1px solid #d6e0ff;
-  color: #1c2330;
+  background: var(--brand-soft);
+  border: 1px solid #f5cbd2;
+  color: var(--ink);
 }
 
 [data-mantine-color-scheme="light"] .decision-badge {
-  color: #5a75e9;
-  font-size: 8px;
-  font-weight: 700;
+  color: var(--brand);
   letter-spacing: 1.2px;
 }
 
 [data-mantine-color-scheme="light"] .decision-panel h2 {
-  color: #1c2330;
+  color: var(--ink);
   margin: 12px 0 8px;
   font: 800 21px Manrope, sans-serif;
   line-height: 1.25;
@@ -1349,7 +1547,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="light"] .decision-panel h2 em {
-  color: #5a75e9;
+  color: var(--brand);
   font-style: normal;
 }
 
@@ -1363,9 +1561,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 [data-mantine-color-scheme="light"] .outline-button {
   height: 33px;
-  color: #5a75e9;
+  color: var(--brand);
   background: #ffffff;
-  border: 1px solid #5a75e9;
+  border: 1px solid var(--brand);
   border-radius: 7px;
   font-size: 11px;
   font-weight: 700;
@@ -1376,11 +1574,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="light"] .outline-button:hover {
-  background: #e8eeff;
+  background: #ffe3e7;
 }
 
 [data-mantine-color-scheme="light"] .outline-button svg {
-  color: #5a75e9;
+  color: var(--brand);
 }
 
 .decision-badge {
@@ -1559,6 +1757,72 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   overflow: hidden;
 }
 
+@media (max-width: 900px) {
+  .login-screen {
+    grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
+  }
+
+  .login-panel {
+    padding: 36px 32px 24px;
+  }
+
+  .login-statement h1 {
+    font-size: 46px;
+  }
+}
+
+@media (max-width: 640px) {
+  .login-screen {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .login-panel {
+    min-height: 0;
+    padding: 20px 22px 22px;
+  }
+
+  .login-lockup img {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .login-lockup { margin-bottom: 30px; }
+
+  .login-statement {
+    margin: 28px 0 24px;
+  }
+
+  .login-statement h1 {
+    margin: 12px 0 8px;
+    font-size: 34px;
+  }
+
+  .login-statement p {
+    font-size: 13px;
+  }
+
+  .login-panel-footer {
+    padding-top: 10px;
+  }
+
+  .login-main {
+    flex: 1;
+    min-height: 0;
+    padding: 38px 22px 72px;
+  }
+
+  .login-form-heading {
+    margin-bottom: 25px;
+  }
+
+  .login-copyright {
+    right: 22px;
+    bottom: 18px;
+  }
+}
+
 .react-flow__node {
   border-radius: 8px !important;
   text-align: left !important;
@@ -1598,7 +1862,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 @media (max-width: 760px) {
   .app-shell { flex-direction: column; }
-  .sidebar { width: 100%; min-height: auto; border-right: none; }
+  .sidebar { position: relative; top: auto; width: 100%; height: auto; min-height: auto; overflow: visible; border-right: none; }
   .metric-grid { grid-template-columns: 1fr 1fr; gap: 9px; }
   .content-wrap { padding: 27px 15px 40px; }
   .topbar { height: 58px; padding: 0 15px; }
@@ -1627,13 +1891,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .primary-button {
-  background: #5a75e9;
+  background: var(--brand);
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(90, 117, 233, 0.35);
+  box-shadow: 0 4px 14px rgba(210, 10, 46, 0.25);
 }
 
 [data-mantine-color-scheme="dark"] .primary-button:hover {
-  background: #4b68e0;
+  background: var(--brand-hover);
 }
 
 [data-mantine-color-scheme="dark"] .secondary-button {
