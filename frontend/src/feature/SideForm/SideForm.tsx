@@ -4,26 +4,22 @@ import {
   LayoutDashboard, Link as LinkIcon, LogOut, Plus,
   Settings, Users,
 } from "lucide-react";
-import { useApp } from "@/context/AppContext";
+import { actionLogo } from "@/theme";
+import { getInitials, getAvatarClass } from "@/shared";
+import { useSideForm } from "./useSideForm";
 
 type Props = {
-  actionLogo: string;
   onScrollTo: (id: string) => void;
 };
 
-export function SideForm({ actionLogo, onScrollTo }: Props) {
+export function SideForm({ onScrollTo }: Props) {
   const {
-    draft, saved, colorScheme, toggleTheme,
+    draft, colorScheme, toggleTheme,
     activeView, setActiveView,
     setProjectManageModal, setSettings,
     setSelectedAssigneeId, addPerson, logout,
-    preview,
-  } = useApp();
-
-  const view = preview || saved;
-  const totalTasksCount = draft?.tasks.length || 0;
-  const overdueTasks = (view?.analysis.tasks || []).filter((r) => r.risk_flags.includes("overdue"));
-  const overloadedAssigneeIds = new Set(view?.analysis.overloads.map((o) => o.assignee_id) || []);
+    totalTasksCount, overdueTasks, overloadedAssigneeIds,
+  } = useSideForm(onScrollTo);
 
   return (
     <aside className="sidebar">
@@ -128,17 +124,4 @@ export function SideForm({ actionLogo, onScrollTo }: Props) {
       </div>
     </aside>
   );
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-
-const AVATAR_COLORS = ["ink", "orange", "green", "blue", "lilac"];
-function getAvatarClass(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  return `avatar-${AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]}`;
 }

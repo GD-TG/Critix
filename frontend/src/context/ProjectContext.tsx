@@ -23,6 +23,9 @@ interface ProjectContextValue {
   change: (p: Project) => void;
   run: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
   clearProject: () => void;
+  setSaved: (v: Result | null) => void;
+  setDraft: (v: Project | null) => void;
+  setPreview: (v: Result | null) => void;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -102,6 +105,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const value: ProjectContextValue = {
     projects, saved, draft, preview, lastUpdated, dirty,
     list, accept, change, run, clearProject,
+    setSaved, setDraft, setPreview,
   };
 
   void busy;

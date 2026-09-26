@@ -1,29 +1,11 @@
 import { PasswordInput, Button, Alert, Title, Text, MantineProvider } from "@mantine/core";
-import { useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { api } from "@/api";
-import type { Result } from "@/types";
+import { actionLogo, actionTheme } from "@/theme";
+import { useAuthForm } from "./useAuthForm";
 
-type Props = {
-  colorScheme: "dark" | "light";
-  actionLogo: string;
-  actionTheme: any;
-};
-
-export function AuthForm({ colorScheme, actionLogo, actionTheme }: Props) {
-  const { login, busy, error, list, accept } = useApp();
-  const [password, setPassword] = useState("");
-
-  const handleLogin = async () => {
-    const ok = await login(password);
-    if (ok) {
-      const data = await list();
-      if (data.length > 0) {
-        const result = await api<Result>(`/projects/${data[0].id}`);
-        accept(result);
-      }
-    }
-  };
+export function AuthForm() {
+  const { colorScheme } = useApp();
+  const { password, setPassword, handleLogin, busy, error } = useAuthForm();
 
   return (
     <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>

@@ -230,29 +230,55 @@ function parseJsonToProject(jsonStr: string): Project {
 }
 
 export function App() {
-  const [colorScheme, setColorScheme] = useState<"dark" | "light">(() => {
-    const savedTheme = localStorage.getItem("critix_theme");
-    return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "light";
-  });
+  const {
+    // Auth
+    logged, busy, error, setError,
+    // Theme
+    colorScheme, toggleTheme,
+    // Projects
+    projects, saved, draft, preview, list, run, lastUpdated, dirty, clearProject,
+    setDraft, setPreview,
+    accept: acceptFromCtx, change: changeFromCtx,
+    // Navigation / UI
+    activeView, setActiveView,
+    toast, showNotification,
+    // Modals & drawers
+    newProjectModal, setNewProjectModal,
+    projectManageModal, setProjectManageModal,
+    jsonImportModal, setJsonImportModal,
+    importModal, setImportModal,
+    helpModal, setHelpModal,
+    executiveReportModal, setExecutiveReportModal,
+    settings, setSettings, settingsTab, setSettingsTab,
+    deleteConfirmProject, setDeleteConfirmProject,
+    showScenarioModal, setShowScenarioModal,
+    // Task drawer / dependency modals
+    task, setTask, newTaskSkill, setNewTaskSkill,
+    taskInlinePredId, setTaskInlinePredId,
+    taskInlinePredKind, setTaskInlinePredKind,
+    taskInlinePredLagHours, setTaskInlinePredLagHours,
+    taskInlinePredLagMode, setTaskInlinePredLagMode,
+    depModal, setDepModal,
+    newDepPred, setNewDepPred, newDepSucc, setNewDepSucc,
+    newDepKind, setNewDepKind, newDepLagHours, setNewDepLagHours, newDepLagMode, setNewDepLagMode,
+    editingDepIndex, setEditingDepIndex,
+    editDepKind, setEditDepKind, editDepLagHours, setEditDepLagHours, editDepLagMode, setEditDepLagMode,
+    // Scenario simulation
+    simTaskChoice, setSimTaskChoice, simDelayDays, setSimDelayDays,
+    simResult, setSimResult, simError, setSimError, simBusy, setSimBusy,
+    // Team
+    selectedAssigneeId, setSelectedAssigneeId,
+    teamMemberSearch, setTeamMemberSearch,
+    inlineNewSkillName, setInlineNewSkillName,
+    inlineNewSkillLevel, setInlineNewSkillLevel,
+    addPerson,
+  } = useApp();
 
-  const toggleTheme = (theme: "dark" | "light") => {
-    setColorScheme(theme);
-    localStorage.setItem("critix_theme", theme);
-    document.documentElement.setAttribute("data-mantine-color-scheme", theme);
-  };
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-mantine-color-scheme", colorScheme);
-  }, [colorScheme]);
-
-  const [logged, setLogged] = useState(false);
-  const [password, setPassword] = useState("");
-  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
-  const [saved, setSaved] = useState<Result | null>(null);
-  const [draft, setDraft] = useState<Project | null>(null);
   const zone = draft?.timezone || saved?.project.timezone || "UTC";
   const date = (iso: string) => new Date(iso).toLocaleString("ru-RU", {timeZone: zone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"});
   const shortDate = (iso: string) => new Date(iso).toLocaleDateString("ru-RU", {timeZone: zone, day: "numeric", month: "short"});
+
+  // Local-only state (not shared across features)
   const [history, setHistory] = useState<Array<{version: number; created_at: string; finish: string; task_count: number}>>([]);
   const [historyError, setHistoryError] = useState("");
   useEffect(() => {
@@ -263,90 +289,22 @@ export function App() {
     }).catch(() => { if (!cancelled) setHistoryError("Не удалось загрузить историю версий"); });
     return () => { cancelled = true; };
   }, [saved?.id, saved?.version]);
-  const [preview, setPreview] = useState<Result | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
 
-  // Modals & Drawers
-  const [newProjectModal, setNewProjectModal] = useState(false);
-  const [projectManageModal, setProjectManageModal] = useState(false);
-  const [deleteConfirmProject, setDeleteConfirmProject] = useState<{ id: string; name: string } | null>(null);
-
-  // Full Project JSON Import modal
-  const [jsonImportModal, setJsonImportModal] = useState(false);
   const [jsonInput, setJsonInput] = useState("");
   const [jsonImportError, setJsonImportError] = useState("");
-
-  // CSV Import modal
-  const [importModal, setImportModal] = useState(false);
   const [csvInput, setCsvInput] = useState("");
-
-  // Dependencies management modal
-  const [depModal, setDepModal] = useState(false);
-  const [newDepPred, setNewDepPred] = useState("");
-  const [newDepSucc, setNewDepSucc] = useState("");
-  const [newDepKind, setNewDepKind] = useState<Dependency["kind"]>("FS");
-  const [newDepLagHours, setNewDepLagHours] = useState<number>(0);
-  const [newDepLagMode, setNewDepLagMode] = useState<Dependency["lag_mode"]>("working");
-
-  // Edit Dependency modal
-  const [editingDepIndex, setEditingDepIndex] = useState<number | null>(null);
-  const [editDepKind, setEditDepKind] = useState<Dependency["kind"]>("FS");
-  const [editDepLagHours, setEditDepLagHours] = useState<number>(0);
-  const [editDepLagMode, setEditDepLagMode] = useState<Dependency["lag_mode"]>("working");
-
   const [newProjName, setNewProjName] = useState("Новый проект");
   const [newProjTz, setNewProjTz] = useState("Asia/Yekaterinburg");
   const [newProjStart, setNewProjStart] = useState(() => new Date(Math.ceil(Date.now() / 60000) * 60000).toISOString());
   const [newProjDeadline, setNewProjDeadline] = useState(() => new Date(Math.ceil(Date.now() / 60000) * 60000 + 14 * 86400000).toISOString());
-
-  const [task, setTask] = useState<Task | null>(null);
-  const [newTaskSkill, setNewTaskSkill] = useState("");
-  const [settings, setSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<string | null>("project");
-  const [helpModal, setHelpModal] = useState(false);
   const [aiText, setAiText] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
-  const [executiveReportModal, setExecutiveReportModal] = useState(false);
-
-  // Active view section
-  const [activeView, setActiveView] = useState<"dashboard" | "graph" | "tasks_table" | "team" | "links" | "ai">("dashboard");
-
-  // Skill management in Settings Drawer
-  const [newSkillName, setNewSkillName] = useState("");
-  const [newSkillLevel, setNewSkillLevel] = useState<Skill["level"]>("expert");
-  const [skillTargetAssigneeId, setSkillTargetAssigneeId] = useState<string | null>(null);
-
-  // Team Master-Detail view states
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
-  const [teamMemberSearch, setTeamMemberSearch] = useState<string>("");
-  const [inlineNewSkillName, setInlineNewSkillName] = useState("");
-  const [inlineNewSkillLevel, setInlineNewSkillLevel] = useState<Skill["level"]>("expert");
-
-  // Simulation modal
-  const [showScenarioModal, setShowScenarioModal] = useState(false);
-  const [simTaskChoice, setSimTaskChoice] = useState<string>("");
-  const [simDelayDays, setSimDelayDays] = useState<number>(2);
-  const [simResult, setSimResult] = useState<Result | null>(null);
-  const [simError, setSimError] = useState("");
-  const [simBusy, setSimBusy] = useState(false);
-
-  const [taskInlinePredId, setTaskInlinePredId] = useState("");
-  const [taskInlinePredKind, setTaskInlinePredKind] = useState<Dependency["kind"]>("FS");
-  const [taskInlinePredLagHours, setTaskInlinePredLagHours] = useState<number>(0);
-  const [taskInlinePredLagMode, setTaskInlinePredLagMode] = useState<Dependency["lag_mode"]>("working");
-
   const [timelineMode, setTimelineMode] = useState<"timeline" | "list">("timeline");
   const [dependencyVisible, setDependencyVisible] = useState(true);
 
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(""), 2600);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  const showNotification = (msg: string) => setToast(msg);
+  // accept/change wrappers that also reset the AI audit text
+  const accept = (result: Result) => { acceptFromCtx(result); setAiText(""); };
+  const change = (p: Project) => { changeFromCtx(p); setAiText(""); };
 
   const handleSaveAsBaseline = () => {
     if (!draft || !view) return;
@@ -366,41 +324,7 @@ export function App() {
     showNotification("Текущий график зафиксирован как Базовый план (Baseline)");
   };
 
-  const run = async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
-    setBusy(true);
-    setError("");
-    try {
-      return await fn();
-    } catch (e: any) {
-      setError(e.message || "Ошибка сервера");
-      return undefined;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const list = async () => {
-    const data = await api<Array<{ id: string; name: string }>>("/projects");
-    setProjects(data);
-    return data;
-  };
-
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-
-  const accept = (result: Result) => {
-    setSaved(result);
-    setDraft(copy(result.project));
-    setPreview(null);
-    setAiText("");
-    setLastUpdated(new Date());
-  };
-
-  const change = (p: Project) => {
-    setDraft(p);
-    setPreview(null);
-    setAiText("");
-    setLastUpdated(new Date());
-  };
+  // run, list, lastUpdated, accept, change now come from AppContext
 
   const handleDeleteProject = async (id: string) => {
     await run(async () => {
@@ -412,8 +336,7 @@ export function App() {
         if (updatedList.length > 0) {
           accept(await api<Result>(`/projects/${updatedList[0].id}`));
         } else {
-          setSaved(null);
-          setDraft(null);
+          clearProject();
         }
       }
     });
@@ -506,20 +429,7 @@ export function App() {
     }, 50);
   };
 
-  useEffect(() => {
-    void run(async () => {
-      const data = await list();
-      if (data.length > 0) {
-        accept(await api<Result>(`/projects/${data[0].id}`));
-      }
-      setLogged(true);
-    });
-  }, []);
-
   const view = preview || saved;
-  const dirty = Boolean(
-    saved && draft && JSON.stringify(saved.project) !== JSON.stringify(draft),
-  );
 
   const rows = new Map((view?.analysis.tasks || []).map((r) => [r.id, r]));
   const affected = new Set(preview?.changes?.changed_task_ids || []);
@@ -671,7 +581,7 @@ export function App() {
 
   // Login View
   if (!logged) {
-    return <AuthForm colorScheme={colorScheme} actionLogo={actionLogo} actionTheme={actionTheme} />;
+    return <AuthForm />;
   }
 
 
@@ -679,7 +589,7 @@ export function App() {
     <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
       <div className="app-shell">
         {/* Designer Sidebar */}
-        <SideForm actionLogo={actionLogo} onScrollTo={() => {}} />
+        <SideForm onScrollTo={scrollToSection} />
 
         {/* Designer Main Content */}
         <main className="main-content">
