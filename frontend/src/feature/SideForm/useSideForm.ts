@@ -1,4 +1,4 @@
-import type { Person, Project, Result, Skill } from "../../types";
+import type { Person, Project, Result, Skill } from "@/types";
 
 type UseSidebarOptions = {
   draft: Project | null;

@@ -6,9 +6,9 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { api } from "../api";
-import type { Person, Project, Result } from "../types";
-import { defaultCalendar } from "../types";
+import { api } from "@/api";
+import type { Person, Project, Result } from "@/types";
+import { defaultCalendar } from "@/types";
 
 type View = "dashboard" | "graph" | "tasks_table" | "team" | "links" | "ai";
 

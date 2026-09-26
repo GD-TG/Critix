@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Link as LinkIcon, LogOut, Plus,
   Settings, Users,
 } from "lucide-react";
-import { useApp } from "../../context/AppContext";
+import { useApp } from "@/context/AppContext";
 
 type Props = {
   actionLogo: string;

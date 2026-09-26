@@ -1,8 +1,8 @@
 import { PasswordInput, Button, Alert, Title, Text, MantineProvider } from "@mantine/core";
 import { useState } from "react";
-import { useApp } from "../../context/AppContext";
-import { api } from "../../api";
-import type { Result } from "../../types";
+import { useApp } from "@/context/AppContext";
+import { api } from "@/api";
+import type { Result } from "@/types";
 
 type Props = {
   colorScheme: "dark" | "light";
