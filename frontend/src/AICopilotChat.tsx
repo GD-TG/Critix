@@ -147,7 +147,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
       const res = await api<{ available: boolean; reply: string }>(
         `/projects/${projectId}/chat`,
         "POST",
-        { messages: payloadMessages },
+        { messages: payloadMessages, project: project },
       );
 
       const assistantMessage: ChatMessageItem = {

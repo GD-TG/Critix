@@ -3,7 +3,7 @@ import hmac
 import os
 import secrets
 import time
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -160,11 +160,15 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=10)
+    project: Optional[ProjectInput] = None
 
 
 @app.post("/api/projects/{project_id}/chat", dependencies=auth)
 async def chat_copilot(project_id: UUID, body: ChatRequest, db=Depends(session)):
-    data = service.snapshot(db, service.load(db, project_id))
+    if body.project:
+        data = body.project
+    else:
+        data = service.snapshot(db, service.load(db, project_id))
     return await chat(data, analyze(data), [m.model_dump() for m in body.messages])
 
 

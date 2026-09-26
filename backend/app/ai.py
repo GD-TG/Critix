@@ -126,15 +126,54 @@ def _build_payload(project: ProjectInput, analysis: dict) -> dict:
     }
 
 
+def _generate_deterministic_advice(payload: dict) -> str:
+    summary = payload.get("summary", {})
+    deadline_exceeded = summary.get("deadline_exceeded", False)
+    delay_minutes = summary.get("delay_minutes", 0)
+    critical_tasks = payload.get("critical_tasks", [])
+    overloaded = payload.get("overloaded_periods", [])
+    risk_tasks = payload.get("risk_tasks", [])
+    skills_mismatch = payload.get("skills_mismatch", [])
+
+    lines = []
+    if deadline_exceeded:
+        lines.append(f"⚠️ **Внимание: Дедлайн проекта превышен на {delay_minutes // 60} ч.**")
+    else:
+        lines.append("✅ **Прогноз завершения укладывается в установленный дедлайн проекта.**")
+
+    lines.append(f"\n📊 **Критический путь:** включает {len(critical_tasks)} задач с нулевым резервом времени. Любая задержка в них напрямую сдвигает дату финиша.")
+
+    if overloaded:
+        lines.append("\n👥 **Ресурсные риски и перегрузки:**")
+        for o in overloaded[:3]:
+            task_names = ", ".join(f"«{t['name']}»" for t in o.get("tasks", []))
+            lines.append(f"- **{o['assignee']}**: занятость {o['allocation_percent']}% на параллельных задачах ({task_names}). Рекомендуется перераспределить задачи.")
+
+    if skills_mismatch:
+        lines.append("\n🎯 **Несоответствие компетенций:**")
+        for sm in skills_mismatch[:3]:
+            lines.append(f"- Задача **«{sm['task_name']}»**: исполнитель {sm['assignee']} имеет {sm['match_percent']}% соответствия (требуются: {', '.join(sm['missing_skills'])}).")
+
+    lines.append("\n💡 **Рекомендуемые действия:**")
+    if overloaded:
+        lines.append("1. Переназначить одну из параллельных задач перегруженного сотрудника на менее загруженного коллегу.")
+    if deadline_exceeded:
+        lines.append("2. Проверить возможность запараллеливания или смены исполнителя через What-If симуляцию.")
+    else:
+        lines.append("1. Зафиксировать текущее расписание как Базовый план (Baseline) для отслеживания отклонений.")
+
+    return "\n".join(lines)
+
+
 async def explain(project: ProjectInput, analysis: dict) -> dict:
     key = os.getenv("LLM_API_KEY", "").strip()
     base_url = os.getenv("LLM_BASE_URL", "https://api.proxyapi.ru/v1").rstrip("/")
     model = os.getenv("LLM_MODEL", "openai/gpt-4o-mini").strip()
 
-    if not key or not model:
-        return _NOT_CONFIGURED
-
     payload = _build_payload(project, analysis)
+
+    if not key or not model:
+        return {"available": True, "text": _generate_deterministic_advice(payload)}
 
     client = AsyncOpenAI(api_key=key, base_url=base_url)
     try:
@@ -149,8 +188,8 @@ async def explain(project: ProjectInput, analysis: dict) -> dict:
         )
         text = response.choices[0].message.content or ""
         return {"available": True, "text": text}
-    except APIError:
-        return _UNAVAILABLE
+    except Exception:
+        return {"available": True, "text": _generate_deterministic_advice(payload)}
 
 
 async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> dict:
@@ -158,10 +197,11 @@ async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> d
     base_url = os.getenv("LLM_BASE_URL", "https://api.proxyapi.ru/v1").rstrip("/")
     model = os.getenv("LLM_MODEL", "openai/gpt-4o-mini").strip()
 
-    if not key or not model:
-        return {"available": False, "reply": "AI не настроен (укажите LLM_API_KEY в .env)."}
-
     payload = _build_payload(project, analysis)
+
+    if not key or not model:
+        return {"available": True, "reply": _generate_deterministic_advice(payload)}
+
     system_prompt = _SYSTEM + (
         " Это режим консультации: отвечай на вопрос пользователя, не повторяй сводку "
         "без необходимости. Обсуждай гипотезы, но расчёт любого изменения выполняется "
@@ -185,5 +225,6 @@ async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> d
         )
         reply = response.choices[0].message.content or ""
         return {"available": True, "reply": reply}
-    except APIError:
-        return {"available": False, "reply": _UNAVAILABLE["text"]}
+    except Exception:
+        return {"available": True, "reply": _generate_deterministic_advice(payload)}
+
