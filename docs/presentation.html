@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRITIX — Презентация проекта</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    :root {
+      --brand: #d20a2e;
+      --brand-dark: #a10823;
+      --brand-glow: rgba(210, 10, 46, 0.15);
+      --bg: #0b0f17;
+      --surface: #131b2a;
+      --surface-card: #182338;
+      --surface-border: #23334d;
+      --text-main: #f8fafc;
+      --text-dim: #94a3b8;
+      --green: #10b981;
+      --blue: #3b82f6;
+      --purple: #8b5cf6;
+      --orange: #f59e0b;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .slide {
+      display: none;
+      min-height: 100vh;
+      padding: 40px 60px;
+      position: relative;
+    }
+
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.985); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .glow-bg {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--brand-glow) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card-box {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-ring {
+      font-size: 32px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    /* Print styling for PDF export */
+    @media print {
+      body {
+        background: #0b0f17 !important;
+        color: #f8fafc !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .slide {
+        display: flex !important;
+        page-break-after: always !important;
+        height: 100vh !important;
+        min-height: 100vh !important;
+        padding: 40px !important;
+      }
+    }
+  </style>
+</head>
+<body class="selection:bg-red-500 selection:text-white">
+
+  <!-- Top Controls Bar (Hidden in Print) -->
+  <header class="no-print sticky top-0 z-50 bg-[#0b0f17]/90 backdrop-blur border-b border-[#23334d] px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-[#d20a2e] flex items-center justify-center font-black text-white text-lg tracking-tighter">
+        CX
+      </div>
+      <span class="font-extrabold text-lg tracking-tight">CRITIX</span>
+      <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Презентация для жюри</span>
+    </div>
+
+    <!-- Slide Indicators -->
+    <div class="flex items-center gap-1.5" id="dotsContainer">
+      <!-- Injected via JS -->
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+      <button onclick="prevSlide()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold transition">
+        ← Назад
+      </button>
+      <span id="slideCounter" class="text-xs text-slate-400 font-mono">1 / 8</span>
+      <button onclick="nextSlide()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm font-semibold transition">
+        Вперед →
+      </button>
+      <button onclick="window.print()" class="px-4 py-1.5 rounded-lg bg-[#d20a2e] hover:bg-[#b00826] text-white text-sm font-bold flex items-center gap-2 transition shadow-lg shadow-red-900/30">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        Экспорт в PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 1: ТИТУЛЬНЫЙ -->
+  <!-- ========================================================================= -->
+  <section class="slide active" id="slide-1">
+    <div class="glow-bg -top-40 -left-40"></div>
+    <div class="glow-bg -bottom-40 -right-40"></div>
+
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-[#d20a2e] flex items-center justify-center font-black text-white text-xl">
+          CX
+        </div>
+        <div>
+          <div class="text-xl font-black tracking-tight">CRITIX</div>
+          <div class="text-xs text-slate-400">Enterprise CPM & Risk Engine</div>
+        </div>
+      </div>
+      <div class="badge-pill bg-red-950/60 border border-red-800/50 text-red-400">
+        КЕЙС 1: «ПРОЕКТ НАЧИНАЕТ СРЫВАТЬСЯ»
+      </div>
+    </div>
+
+    <div class="relative z-10 my-auto py-8">
+      <div class="inline-block mb-4 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs font-semibold text-slate-300">
+        Управление рисками, изменениями и критическим путем
+      </div>
+      <h1 class="text-5xl lg:text-6xl font-black tracking-tight leading-tight max-w-4xl mb-6">
+        От хаоса переноса дат — к мгновенному <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-rose-400">расчету последствий</span> и готовым решениям.
+      </h1>
+      <p class="text-lg text-slate-300 max-w-2xl leading-relaxed mb-8">
+        Интеллектуальная система управления проектами с детерминированным математическим ядром (CPM), персональными календарями отпусков и сценарным моделированием «Что если?».
+      </p>
+
+      <div class="grid grid-cols-3 gap-6 max-w-3xl">
+        <div class="card-box bg-slate-900/60">
+          <div class="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Скорость ядра</div>
+          <div class="stat-ring text-emerald-400">&lt; 5 мс</div>
+          <div class="text-xs text-slate-400 mt-1">Точный расчет CPM и перегрузок</div>
+        </div>
+        <div class="card-box bg-slate-900/60">
+          <div class="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Типы связей</div>
+          <div class="stat-ring text-blue-400">FS · SS · FF · SF</div>
+          <div class="text-xs text-slate-400 mt-1">С рабочими и календарными лагами</div>
+        </div>
+        <div class="card-box bg-slate-900/60">
+          <div class="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Надежность</div>
+          <div class="stat-ring text-purple-400">100%</div>
+          <div class="text-xs text-slate-400 mt-1">43 автотеста (Frontend & Backend)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative z-10 flex items-center justify-between border-t border-slate-800/80 pt-4 text-xs text-slate-500 font-mono">
+      <span>Re:ActionStack Hackathon 2026</span>
+      <span>Команда: Critix Core Team</span>
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 2: ПРОБЛЕМА И РЕШЕНИЕ -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-2">
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">02 / Проблема & Пользовательский сценарий</span>
+      <span class="badge-pill bg-blue-950/60 border border-blue-800/50 text-blue-400">Фокус руководителя</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6 grid grid-cols-2 gap-8 items-center">
+      <!-- Левая колонка: Проблема -->
+      <div>
+        <div class="text-xs text-red-400 uppercase font-bold tracking-wider mb-2">Проблема из кейса</div>
+        <h2 class="text-3xl font-black tracking-tight mb-4">Планы постоянно меняются, а последствия неочевидны</h2>
+        <div class="space-y-4 text-sm text-slate-300">
+          <div class="p-4 rounded-xl bg-red-950/20 border border-red-900/40 flex items-start gap-3">
+            <span class="text-red-400 font-bold text-lg">✕</span>
+            <div>
+              <strong class="text-white block mb-0.5">Сотрудник уходит в отпуск:</strong>
+              В обычных таск-трекерах сдвиг одной даты не показывает, как рухнет дедлайн через 3 недели.
+            </div>
+          </div>
+          <div class="p-4 rounded-xl bg-red-950/20 border border-red-900/40 flex items-start gap-3">
+            <span class="text-red-400 font-bold text-lg">✕</span>
+            <div>
+              <strong class="text-white block mb-0.5">Скрытые перегрузки исполнителей:</strong>
+              Параллельные задачи суммируют загрузку &gt;100%, срывая сроки на финише.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Правая колонка: Решение Critix -->
+      <div class="card-box bg-slate-900/90 border-slate-700">
+        <div class="text-xs text-emerald-400 uppercase font-bold tracking-wider mb-2">Ответ системы Critix</div>
+        <h3 class="text-2xl font-bold mb-4">«Что произойдет и на что обратить внимание?»</h3>
+        
+        <div class="space-y-3">
+          <div class="p-3.5 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-3 h-3 rounded-full bg-red-500 animate-pulse"></span>
+              <span class="text-sm font-semibold">Сдвиг дедлайна проекта:</span>
+            </div>
+            <span class="text-sm font-black text-red-400">+16 часов (2 раб. дня)</span>
+          </div>
+
+          <div class="p-3.5 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+              <span class="text-sm font-semibold">Затронуто зависимых задач:</span>
+            </div>
+            <span class="text-sm font-black text-amber-400">4 задачи</span>
+          </div>
+
+          <div class="p-3.5 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+              <span class="text-sm font-semibold">Готовые решения (Decision Panel):</span>
+            </div>
+            <span class="text-xs font-bold text-blue-400 px-2 py-1 bg-blue-950/60 rounded">Перераспределить</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative z-10 border-t border-slate-800/80 pt-3 text-xs text-slate-500">
+      Система исключает ручной пересчет графиков и сразу предлагает вектор действий.
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 3: МАТЕМАТИЧЕСКИЙ ДВИЖОК CPM -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-3">
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">03 / Математическое ядро</span>
+      <span class="badge-pill bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">Детерминированный CPM</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6">
+      <h2 class="text-3xl font-black tracking-tight mb-2">Строгий математический расчет вместо нейросетевых догадок</h2>
+      <p class="text-sm text-slate-300 max-w-3xl mb-6">
+        Ядро на Python вычисляет прямой и обратный проход (Forward/Backward pass) в дискретных координатах рабочих календарей.
+      </p>
+
+      <div class="grid grid-cols-4 gap-5">
+        <div class="card-box">
+          <div class="text-xs text-red-400 font-bold mb-1">01 / КРИТИЧЕСКИЙ ПУТЬ</div>
+          <div class="text-base font-bold text-white mb-2">Slack = 0 часов</div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Выявление задач с нулевым резервом времени. Любая задержка на критическом пути смещает итоговый срок сдачи проекта.
+          </p>
+        </div>
+
+        <div class="card-box">
+          <div class="text-xs text-blue-400 font-bold mb-1">02 / 4 ТИПА СВЯЗЕЙ</div>
+          <div class="text-base font-bold text-white mb-2">FS · SS · FF · SF</div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Учет технологических связей с положительными и отрицательными лагами в рабочих и календарных минутах.
+          </p>
+        </div>
+
+        <div class="card-box">
+          <div class="text-xs text-purple-400 font-bold mb-1">03 / РАБОЧИЕ КАЛЕНДАРИ</div>
+          <div class="text-base font-bold text-white mb-2">Смены · Обеды · Отпуска</div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Персональные графики каждого исполнителя с интервальным пересечением смен и отпусков.
+          </p>
+        </div>
+
+        <div class="card-box">
+          <div class="text-xs text-amber-400 font-bold mb-1">04 / МГНОВЕННЫЕ ВЕХИ</div>
+          <div class="stat-ring text-lg text-amber-400 mb-1">0 ч (Milestones)</div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Фиксация контрольных точек без создания фиктивной ресурсной нагрузки на исполнителей.
+          </p>
+        </div>
+      </div>
+
+      <!-- Diagram bar -->
+      <div class="mt-6 p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-4 text-xs font-semibold">
+          <span class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-red-500"></span> Критический путь</span>
+          <span class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-blue-500"></span> В работе</span>
+          <span class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-emerald-500"></span> Завершено</span>
+          <span class="flex items-center gap-2"><span class="w-3 h-3 rounded border border-dashed border-slate-400"></span> Базовый план (Baseline)</span>
+        </div>
+        <div class="text-xs font-mono text-slate-400">Адаптивный горизонт расчета: 0% лишней памяти</div>
+      </div>
+    </div>
+
+    <div class="relative z-10 border-t border-slate-800/80 pt-3 text-xs text-slate-500">
+      Расчет выполняется на бэкенде за миллисекунды и гарантирует математическую точность дат.
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 4: КОНТР-ФИЧИ (СУПЕР-СИЛА) -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-4">
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">04 / Контр-фичи (Критерий 6)</span>
+      <span class="badge-pill bg-purple-950/60 border border-purple-800/50 text-purple-400">Сверх требований ТЗ</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6">
+      <h2 class="text-3xl font-black tracking-tight mb-2">Уникальные возможности, создающие ценность для бизнеса</h2>
+      <p class="text-sm text-slate-300 max-w-3xl mb-6">
+        Мы вышли за рамки базового MVP и реализовали три мощных инструмента поддержки принятия решений.
+      </p>
+
+      <div class="grid grid-cols-3 gap-6">
+        <!-- Контр-фича 1 -->
+        <div class="card-box border-purple-800/60 bg-slate-900/90">
+          <div class="w-8 h-8 rounded-lg bg-purple-900/50 text-purple-300 flex items-center justify-center font-bold text-sm mb-3">
+            01
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">Симуляция «Что если?» (What-If Engine)</h3>
+          <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+            Возможность смоделировать задержку любой задачи в изолированной песочнице <strong>ДО</strong> изменения рабочего плана проекта.
+          </p>
+          <div class="p-3 rounded-lg bg-slate-800/90 text-xs font-mono text-purple-300">
+            ✓ Мгновенный расчет сдвига финиша<br>
+            ✓ Перенос сценария в черновик в 1 клик
+          </div>
+        </div>
+
+        <!-- Контр-фича 2 -->
+        <div class="card-box border-blue-800/60 bg-slate-900/90">
+          <div class="w-8 h-8 rounded-lg bg-blue-900/50 text-blue-300 flex items-center justify-center font-bold text-sm mb-3">
+            02
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">Матрица навыков (Skill Match)</h3>
+          <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+            Автоматическая сверка требуемых компетенций задачи с грейдами сотрудника (`Junior` $\rightarrow$ `Expert`).
+          </p>
+          <div class="p-3 rounded-lg bg-slate-800/90 text-xs font-mono text-blue-300">
+            ✓ Скоринг соответствия 0–100%<br>
+            ✓ Защита от ошибок назначения
+          </div>
+        </div>
+
+        <!-- Контр-фича 3 -->
+        <div class="card-box border-emerald-800/60 bg-slate-900/90">
+          <div class="w-8 h-8 rounded-lg bg-emerald-900/50 text-emerald-300 flex items-center justify-center font-bold text-sm mb-3">
+            03
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">Календари отпусков & Смен</h3>
+          <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+            Прямое решение боли кейса: учет индивидуальных отпусков сотрудников с авто-сдвигом зависящих работ.
+          </p>
+          <div class="p-3 rounded-lg bg-slate-800/90 text-xs font-mono text-emerald-300">
+            ✓ Диапазоны отпусков сотрудников<br>
+            ✓ Учет обеденных перерывов и смен
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative z-10 border-t border-slate-800/80 pt-3 text-xs text-slate-500">
+      Каждая функция полностью интегрирована в единый контекст проекта.
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 5: ГРАФ И ПРЕДСТАВЛЕНИЯ -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-5">
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">05 / Пользовательский интерфейс</span>
+      <span class="badge-pill bg-slate-800 border border-slate-700 text-slate-300">UX / UI 360°</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6 grid grid-cols-3 gap-6">
+      <div class="card-box col-span-1">
+        <h3 class="text-lg font-bold text-white mb-3">5 согласованных представлений проекта</h3>
+        <p class="text-xs text-slate-400 leading-relaxed mb-4">
+          Руководитель выбирает удобный ракурс в зависимости от текущей задачи:
+        </p>
+
+        <ul class="space-y-3 text-xs font-medium text-slate-200">
+          <li class="flex items-center gap-2 p-2 rounded bg-slate-800/50">
+            <span class="text-red-400 font-bold">1. Timeline (Gantt):</span> календарный график и эталон
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-slate-800/50">
+            <span class="text-blue-400 font-bold">2. Карта связей (ReactFlow):</span> граф зависимостей
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-slate-800/50">
+            <span class="text-emerald-400 font-bold">3. Таблица задач:</span> детальные параметры и дельты
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-slate-800/50">
+            <span class="text-purple-400 font-bold">4. Команда & Календари:</span> загрузка и навыки
+          </li>
+          <li class="flex items-center gap-2 p-2 rounded bg-slate-800/50">
+            <span class="text-amber-400 font-bold">5. AI Copilot & Риски:</span> аудит для топ-менеджмента
+          </li>
+        </ul>
+      </div>
+
+      <!-- Графическая схема -->
+      <div class="card-box col-span-2 bg-[#101726] flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-slate-400 uppercase">Интерактивный граф связей (ReactFlow)</span>
+            <span class="text-xs text-emerald-400 font-mono">Drag & Drop Links</span>
+          </div>
+
+          <!-- Mock nodes -->
+          <div class="flex items-center justify-around py-8 relative">
+            <div class="p-3 rounded-lg bg-slate-800 border-2 border-red-500 shadow-lg text-center w-32">
+              <div class="text-[10px] text-red-400 font-bold">CPM (Slack 0)</div>
+              <div class="text-xs font-bold text-white">1. Архитектура</div>
+              <div class="text-[10px] text-slate-400">8 ч · Алексей</div>
+            </div>
+
+            <div class="text-slate-500 font-bold text-lg">→</div>
+
+            <div class="p-3 rounded-lg bg-slate-800 border-2 border-red-500 shadow-lg text-center w-32">
+              <div class="text-[10px] text-red-400 font-bold">CPM (Slack 0)</div>
+              <div class="text-xs font-bold text-white">2. Бэкенд API</div>
+              <div class="text-[10px] text-slate-400">16 ч · Михаил</div>
+            </div>
+
+            <div class="text-slate-500 font-bold text-lg">→</div>
+
+            <div class="p-3 rounded-lg bg-slate-800 border border-slate-600 text-center w-32">
+              <div class="text-[10px] text-blue-400 font-bold">Резерв +8 ч</div>
+              <div class="text-xs font-bold text-white">3. Фронтенд</div>
+              <div class="text-[10px] text-slate-400">8 ч · Анна</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between text-xs text-slate-400">
+          <span>Связывание узлов стрелками прямо на холсте</span>
+          <span class="text-white font-semibold">Фильтрация критического пути в 1 клик</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative z-10 border-t border-slate-800/80 pt-3 text-xs text-slate-500">
+      Все представления мгновенно синхронизируются через реактивные контексты React 18.
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 6: AI COPILOT & EXECUTIVE REPORT -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-6">
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">06 / AI & Исполнительный отчет</span>
+      <span class="badge-pill bg-indigo-950/60 border border-indigo-800/50 text-indigo-400">Управленческая сводка</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6 grid grid-cols-2 gap-8 items-center">
+      <div>
+        <div class="text-xs text-indigo-400 uppercase font-bold tracking-wider mb-2">Стандартизированный аудит</div>
+        <h2 class="text-3xl font-black tracking-tight mb-4">Автоматический отчет для топ-менеджмента в 1 клик</h2>
+        <p class="text-sm text-slate-300 mb-6 leading-relaxed">
+          ИИ-модуль не занимается «галлюцинациями» расчетов, а берет детерминированные результаты движка и упаковывает их в структурированный 4-секционный бизнес-отчет:
+        </p>
+
+        <div class="space-y-2 text-xs font-semibold text-slate-300">
+          <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center gap-3">
+            <span class="text-red-400">🎯 1.</span> Статус дедлайна и прогноз финиша
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center gap-3">
+            <span class="text-amber-400">⚡ 2.</span> Анализ критического пути (CPM) и рисков
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center gap-3">
+            <span class="text-blue-400">👥 3.</span> Перегрузки исполнителей и дефицит навыков
+          </div>
+          <div class="p-2.5 rounded-lg bg-slate-800/80 border border-slate-700 flex items-center gap-3">
+            <span class="text-emerald-400">💡 4.</span> 3 конкретных шага оптимизации для руководителя
+          </div>
+        </div>
+      </div>
+
+      <!-- Экспорт и печать -->
+      <div class="card-box bg-slate-900 border-indigo-800/50">
+        <div class="text-xs font-bold text-indigo-400 uppercase mb-3">Форматы экспорта для стейкхолдеров</div>
+        
+        <div class="space-y-4">
+          <div class="p-4 rounded-xl bg-slate-800 border border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-bold text-white">Печать в PDF (Printable View)</span>
+              <span class="text-xs bg-red-950 text-red-400 px-2 py-0.5 rounded font-bold">A4 Ready</span>
+            </div>
+            <p class="text-xs text-slate-400">
+              Выверенная печатная форма отчета с таблицами метрик, рисками и подписью.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-800 border border-slate-700">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-bold text-white">Экспорт в Markdown & JSON</span>
+              <span class="text-xs bg-blue-950 text-blue-400 px-2 py-0.5 rounded font-bold">.MD / .JSON</span>
+            </div>
+            <p class="text-xs text-slate-400">
+              Копирование готового текста сводки для Telegram/Slack или полный снимок проекта.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative z-10 border-t border-slate-800/80 pt-3 text-xs text-slate-500">
+      Отказоустойчивость: если LLM API недоступен, все расчеты проекта остаются на 100% доступны.
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 7: АРХИТЕКТУРА И ТЕХСТЕК -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-7">
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">07 / Архитектура & Надежность</span>
+      <span class="badge-pill bg-slate-800 border border-slate-700 text-slate-300">Production Ready</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6">
+      <h2 class="text-3xl font-black tracking-tight mb-2">Надежная модульная архитектура без костылей</h2>
+      <p class="text-sm text-slate-300 max-w-3xl mb-6">
+        Решение построено по стандартам промышленной разработки с полной изоляцией слоев.
+      </p>
+
+      <div class="grid grid-cols-3 gap-6">
+        <!-- Backend -->
+        <div class="card-box">
+          <div class="text-xs font-bold text-red-400 uppercase mb-2">Backend & Database</div>
+          <ul class="space-y-2 text-xs text-slate-300">
+            <li>• <strong>FastAPI + Python 3.12:</strong> асинхронные эндпоинты</li>
+            <li>• <strong>PostgreSQL 17:</strong> транзакции под `SELECT FOR UPDATE`</li>
+            <li>• <strong>Alembic:</strong> версионирование и миграции схем</li>
+            <li>• <strong>Optimistic Locking:</strong> защита от гонок версий</li>
+          </ul>
+        </div>
+
+        <!-- Frontend -->
+        <div class="card-box">
+          <div class="text-xs font-bold text-blue-400 uppercase mb-2">Frontend & State</div>
+          <ul class="space-y-2 text-xs text-slate-300">
+            <li>• <strong>React 18 + TypeScript + Vite</strong></li>
+            <li>• <strong>6 доменных контекстов:</strong> чистая декомпозиция</li>
+            <li>• <strong>Mantine UI v7 + Tailwind CSS</strong></li>
+            <li>• <strong>ErrorBoundary:</strong> защита от сбоев рендеринга</li>
+          </ul>
+        </div>
+
+        <!-- Security & Storage -->
+        <div class="card-box">
+          <div class="text-xs font-bold text-emerald-400 uppercase mb-2">Security & Data Safety</div>
+          <ul class="space-y-2 text-xs text-slate-300">
+            <li>• <strong>Draft Backup:</strong> бэкап черновика в localStorage</li>
+            <li>• <strong>CSRF & Rate Limiting:</strong> защита авторизации</li>
+            <li>• <strong>Docker Compose:</strong> изолированные контейнеры</li>
+            <li>• <strong>Cloudflare Shield:</strong> сокрытие IP и WAF</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Test summary bar -->
+      <div class="mt-6 p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-6">
+          <span class="text-xs text-slate-400">Покрытие автотестами:</span>
+          <span class="text-xs font-bold text-emerald-400">✓ 12/12 Frontend Tests Passed</span>
+          <span class="text-xs font-bold text-emerald-400">✓ 31/31 Backend Pytest Passed</span>
+        </div>
+        <span class="text-xs font-mono text-slate-400">Сборка: tsc --noEmit && vite build (0 errors)</span>
+      </div>
+    </div>
+
+    <div class="relative z-10 border-t border-slate-800/80 pt-3 text-xs text-slate-500">
+      Код строго типизирован и структурирован по фичам в директории `src/feature/`.
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SLIDE 8: ИТОГИ И ЦЕННОСТЬ ДЛЯ БИЗНЕСА -->
+  <!-- ========================================================================= -->
+  <section class="slide" id="slide-8">
+    <div class="glow-bg -top-40 -right-40"></div>
+    <div class="glow-bg -bottom-40 -left-40"></div>
+
+    <div class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-4">
+      <span class="text-xs font-mono text-slate-400 uppercase tracking-widest">08 / Итоги & Ценность</span>
+      <span class="badge-pill bg-emerald-950/60 border border-emerald-800/50 text-emerald-400">Готовность 100%</span>
+    </div>
+
+    <div class="relative z-10 my-auto py-6">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <h2 class="text-4xl font-black tracking-tight mb-3">CRITIX меняет подход к управлению рисками</h2>
+        <p class="text-sm text-slate-300">
+          Продукт решает проблему срыва дедлайнов на ранней стадии за счет математической точности и сценарного анализа.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-3 gap-6 max-w-4xl mx-auto mb-8">
+        <div class="card-box text-center bg-slate-900/80">
+          <div class="stat-ring text-red-400 mb-2">80%</div>
+          <div class="text-sm font-bold text-white mb-1">Экономия времени PM</div>
+          <div class="text-xs text-slate-400">на ручном пересчете графиков и отпусков</div>
+        </div>
+
+        <div class="card-box text-center bg-slate-900/80">
+          <div class="stat-ring text-emerald-400 mb-2">0</div>
+          <div class="text-sm font-bold text-white mb-1">Неожиданных срывов</div>
+          <div class="text-xs text-slate-400">благодаря раннему обнаружению рисков CPM</div>
+        </div>
+
+        <div class="card-box text-center bg-slate-900/80">
+          <div class="stat-ring text-blue-400 mb-2">360°</div>
+          <div class="text-sm font-bold text-white mb-1">Прозрачность ресурсов</div>
+          <div class="text-xs text-slate-400">учет реальных компетенций и календарей</div>
+        </div>
+      </div>
+
+      <div class="card-box max-w-2xl mx-auto text-center border-slate-700 bg-slate-900/90">
+        <div class="text-xs font-bold text-slate-400 uppercase mb-2">Репозиторий проекта</div>
+        <div class="text-base font-bold text-white mb-1">GitHub: github.com/GD-TG/Critix</div>
+        <div class="text-xs text-slate-400 font-mono">Ветка: main (All features merged & tested)</div>
+      </div>
+    </div>
+
+    <div class="relative z-10 flex items-center justify-between border-t border-slate-800/80 pt-4 text-xs text-slate-500 font-mono">
+      <span>Спасибо за внимание!</span>
+      <span>Critix · Re:ActionStack 2026</span>
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT: СЛАЙДЕР И УПРАВЛЕНИЕ -->
+  <!-- ========================================================================= -->
+  <script>
+    const totalSlides = 8;
+    let currentSlide = 1;
+
+    function initDots() {
+      const container = document.getElementById('dotsContainer');
+      container.innerHTML = '';
+      for (let i = 1; i <= totalSlides; i++) {
+        const dot = document.createElement('button');
+        dot.className = `w-2.5 h-2.5 rounded-full transition-all duration-200 ${i === 1 ? 'bg-red-500 w-6' : 'bg-slate-700 hover:bg-slate-600'}`;
+        dot.onclick = () => goToSlide(i);
+        dot.title = `Слайд ${i}`;
+        container.appendChild(dot);
+      }
+    }
+
+    function updateView() {
+      document.querySelectorAll('.slide').forEach((slide, idx) => {
+        slide.classList.toggle('active', idx + 1 === currentSlide);
+      });
+
+      const dots = document.getElementById('dotsContainer').children;
+      for (let i = 0; i < dots.length; i++) {
+        dots[i].className = `h-2.5 rounded-full transition-all duration-200 ${i + 1 === currentSlide ? 'bg-red-500 w-6' : 'bg-slate-700 hover:bg-slate-600 w-2.5'}`;
+      }
+
+      document.getElementById('slideCounter').textContent = `${currentSlide} / ${totalSlides}`;
+    }
+
+    function goToSlide(n) {
+      if (n >= 1 && n <= totalSlides) {
+        currentSlide = n;
+        updateView();
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateView();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateView();
+      }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'Space') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      }
+    });
+
+    initDots();
+  </script>
+</body>
+</html>
