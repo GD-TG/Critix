@@ -133,8 +133,9 @@ uvicorn app.main:app --reload --port 8000
 - Документация Swagger/OpenAPI: `http://localhost:8000/docs`
 
 #### 3. Запуск Frontend (React 19)
-Во втором терминале в корне проекта:
+Во втором терминале:
 ```powershell
+cd frontend
 npm install
 npm run dev
 ```
@@ -187,11 +188,12 @@ Critix/
 │   │   ├── service.py        # Сервисный слой и версионирование
 │   │   └── main.py           # Маршруты API и middleware
 │   ├── migrations/           # Миграции Alembic
-│   └── tests/                # Набор автотестов
-├── src/                      # Frontend (React 19 + TypeScript)
-│   ├── components/           # UI-компоненты (Gantt, What-If, Modals)
-│   ├── context/              # Zustand стейт-менеджмент
-│   └── types/                # TypeScript интерфейсы
+├── frontend/                 # Frontend (React 19 + TypeScript)
+│   ├── src/                  # Исходный код интерфейса (Gantt, What-If, Modals)
+│   │   ├── feature/          # Модульные компоненты и экраны
+│   │   ├── context/          # Управление состоянием (Zustand / React)
+│   │   └── types.ts          # TypeScript интерфейсы
+│   └── package.json          # Зависимости и скрипты
 ├── docs/                     # Документация и презентация
-└── docker-compose.yml        # Конфигурация Docker
+└── compose.yaml              # Конфигурация Docker
 ```
