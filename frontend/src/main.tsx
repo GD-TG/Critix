@@ -59,6 +59,7 @@ export function App() {
     setProjectManageModal,
     executiveReportModal,
     setExecutiveReportModal,
+    aiText,
     run,
     list,
     accept,
@@ -180,7 +181,7 @@ export function App() {
           onClose={() => setExecutiveReportModal(false)}
           project={view?.project || draft}
           result={view}
-          aiSummary=""
+          aiSummary={aiText}
         />
       )}
     </MantineProvider>

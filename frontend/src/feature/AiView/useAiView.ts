@@ -4,10 +4,9 @@ import { useUi } from "@/context/UiContext";
 import { api } from "@/api";
 
 export function useAiView() {
-  const { saved, draft, run } = useProjects();
+  const { saved, draft, run, aiText, setAiText } = useProjects();
   const { activeView, setActiveView } = useUi();
 
-  const [aiText, setAiText] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
 
   const generateAudit = () => {

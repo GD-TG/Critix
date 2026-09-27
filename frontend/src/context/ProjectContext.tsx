@@ -23,6 +23,8 @@ interface ProjectContextValue {
   overloadedAssigneeIds: Set<string>;
   lastUpdated: Date;
   dirty: boolean;
+  aiText: string;
+  setAiText: (v: string) => void;
   list: () => Promise<Array<{ id: string; name: string }>>;
   accept: (result: Result) => void;
   change: (p: Project) => void;
@@ -43,6 +45,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<Project | null>(null);
   const [preview, setPreview] = useState<Result | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [aiText, setAiText] = useState("");
 
   const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true);
@@ -67,12 +70,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setSaved(result);
     setDraft(copy(result.project));
     setPreview(null);
+    setAiText("");
     setLastUpdated(new Date());
   }, []);
 
   const change = useCallback((p: Project) => {
     setDraft(p);
     setPreview(null);
+    setAiText("");
     setLastUpdated(new Date());
   }, []);
 
@@ -80,6 +85,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setSaved(null);
     setDraft(null);
     setPreview(null);
+    setAiText("");
   }, []);
 
   // Clear the working project on logout
@@ -88,6 +94,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setSaved(null);
       setDraft(null);
       setPreview(null);
+      setAiText("");
     }
   }, [logged]);
 
@@ -124,6 +131,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const value: ProjectContextValue = {
     projects, saved, draft, preview, view, rows, affected, overloadedAssigneeIds,
     lastUpdated, dirty,
+    aiText, setAiText,
     list, accept, change, run, clearProject,
     setSaved, setDraft, setPreview,
   };
