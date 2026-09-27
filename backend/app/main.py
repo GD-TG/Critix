@@ -70,7 +70,10 @@ async def security(request: Request, call_next):
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         origin = request.headers.get("origin")
         expected = os.environ.get("APP_ORIGIN", "http://localhost:5173")
-        if origin and origin != expected:
+        allowed = {e.strip() for e in expected.split(",") if e.strip()}
+        if any("localhost" in e or "127.0.0.1" in e for e in allowed):
+            allowed.update({"http://localhost", "http://127.0.0.1", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:80", "http://127.0.0.1:80"})
+        if origin and origin not in allowed:
             return JSONResponse(status_code=403, content={"detail": "Недопустимый источник запроса"})
         if request.headers.get("x-critix-request") != "1":
             return JSONResponse(status_code=403, content={"detail": "Отсутствует заголовок защиты запроса"})
