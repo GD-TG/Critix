@@ -31,8 +31,8 @@ export function TasksTableView() {
           <Text size="sm" c="dimmed">Кликните по задаче для детального редактирования дат, навыков и исполнителя.</Text>
         </div>
         <Group gap="xs">
-          <Button size="xs" variant="default" onClick={() => setImportModal(true)}>Импорт CSV</Button>
           <Button size="xs" onClick={addTask}>+ Добавить задачу</Button>
+          <Button size="xs" variant="light" onClick={() => setImportModal(true)}>Импорт CSV</Button>
           <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
         </Group>
       </Group>
@@ -58,6 +58,7 @@ export function TasksTableView() {
             const r = rows.get(t.id);
             const person = draft.assignees.find((a) => a.id === t.assignee_id);
             const match = person ? calculateSkillMatch(t, person) : 0;
+            const isOverdue = r?.risk_flags.includes("overdue");
             const baseTask = draft.baseline?.tasks[t.id];
             let deltaMinutes = 0;
             if (baseTask && r) {
@@ -79,8 +80,18 @@ export function TasksTableView() {
                         CPM
                       </Badge>
                     ) : null}
+                    {isOverdue && <Badge size="xs" color="red">Просрочена</Badge>}
                     <span>{t.name}</span>
                   </Group>
+                  {t.required_skills && t.required_skills.length > 0 && (
+                    <Group gap={4} mt={2}>
+                      {t.required_skills.map((s, idx) => (
+                        <Badge key={idx} size="xs" variant="outline" color="gray">
+                          {s}
+                        </Badge>
+                      ))}
+                    </Group>
+                  )}
                 </Table.Td>
                 <Table.Td>
                   <Badge size="xs" color={priorityColors[t.priority || "medium"]}>
@@ -96,7 +107,7 @@ export function TasksTableView() {
                       <div>
                         <Text size="sm" fw={500}>{person.name}</Text>
                         {t.required_skills && t.required_skills.length > 0 && (
-                          <Badge size="xs" color={match === 100 ? "teal" : match > 0 ? "yellow" : "red"}>
+                          <Badge size="xs" color={match >= 80 ? "teal" : match >= 50 ? "yellow" : "red"}>
                             {match}% навыков
                           </Badge>
                         )}

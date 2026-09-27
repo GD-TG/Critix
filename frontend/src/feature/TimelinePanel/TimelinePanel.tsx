@@ -4,6 +4,7 @@ import { useTimelinePanel } from "./useTimelinePanel";
 export function TimelinePanel() {
   const {
     draft,
+    zone,
     date,
     shortDate,
     formatMinutes,
@@ -273,7 +274,7 @@ export function TimelinePanel() {
       )}
 
       <div className="timeline-footer">
-        <span>Сегодня</span>
+        <span>Сегодня, {new Date().toLocaleDateString("ru-RU", { timeZone: zone, day: "numeric", month: "long", year: "numeric" })}</span>
         <span className="today-line" />
         <span>
           Показать зависимости{" "}

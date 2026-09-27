@@ -23,7 +23,7 @@ export function MetricsGrid() {
         <div className="metric-top">
           <span className="metric-label">Прогресс проекта</span>
           <span className="metric-icon purple">
-            <Gauge size={15} />
+            <Gauge size={17} />
           </span>
         </div>
         <div className="metric-value">{progressPercent}%</div>
@@ -40,7 +40,7 @@ export function MetricsGrid() {
         <div className="metric-top">
           <span className="metric-label">До завершения</span>
           <span className="metric-icon blue">
-            <CalendarDays size={15} />
+            <CalendarDays size={17} />
           </span>
         </div>
         <div className="metric-value">
@@ -61,7 +61,7 @@ export function MetricsGrid() {
         <div className="metric-top">
           <span className="metric-label">Просроченные задачи</span>
           <span className="metric-icon coral">
-            <AlertTriangle size={15} />
+            <AlertTriangle size={17} />
           </span>
         </div>
         <div className={`metric-value ${overdueTasks.length > 0 ? "coral-text" : ""}`}>
@@ -71,7 +71,7 @@ export function MetricsGrid() {
           <span>
             {overdueTasks.length > 0 ? (
               <button
-                style={{ border: 0, background: "none", color: "var(--red)", cursor: "pointer", padding: 0, font: "inherit" }}
+                style={{ border: 0, background: "none", color: "var(--icon-strong)", cursor: "pointer", padding: 0, font: "inherit" }}
                 onClick={rescheduleOverdue}
                 disabled={!overdueTasks.some(r => !draft?.tasks.find(t => t.id === r.id)?.actual_start)}
               >
@@ -89,7 +89,7 @@ export function MetricsGrid() {
         <div className="metric-top">
           <span className="metric-label">Критический путь</span>
           <span className="metric-icon green">
-            <Target size={15} />
+            <Target size={17} />
           </span>
         </div>
         <div className="metric-value">
