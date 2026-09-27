@@ -197,9 +197,9 @@ def simulate(project_id: UUID, body: SaveProject, db=Depends(session)):
 
 
 @app.post("/api/projects/{project_id}/ai", dependencies=calculated)
-def ai(project_id: UUID, db=Depends(session)):
+async def ai(project_id: UUID, db=Depends(session)):
     _, data = service.read(db, project_id)
-    return asyncio.run(explain(data, analyze(data)))
+    return await explain(data, analyze(data))
 
 
 class ChatMessage(BaseModel):
@@ -213,10 +213,10 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/projects/{project_id}/chat", dependencies=calculated)
-def chat_copilot(project_id: UUID, body: ChatRequest, db=Depends(session)):
+async def chat_copilot(project_id: UUID, body: ChatRequest, db=Depends(session)):
     _, saved_data = service.read(db, project_id)
     data = body.project or saved_data
-    return asyncio.run(chat(data, analyze(data), [m.model_dump() for m in body.messages]))
+    return await chat(data, analyze(data), [m.model_dump() for m in body.messages])
 
 
 

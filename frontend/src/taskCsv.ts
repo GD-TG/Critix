@@ -77,13 +77,16 @@ export function parseCsvToTasks(
 ): Task[] {
   const rows = readRows(csv);
   if (!rows.length) throw new Error("CSV пуст");
+  if (rows.length > 300) {
+    throw new Error("Превышен лимит импорта CSV (максимум 300 задач в одном файле)");
+  }
   const heading = rows.shift()!.map((cell) => cell.trim());
   if (
     heading.length < 8 ||
     headers.slice(0, 8).some((h, i) => heading[i] !== h)
   )
     throw new Error(
-      "Нужны заголовки из экспорта Актион. Длительность указывается в минутах.",
+      "Нужны заголовки из экспорта Critix. Длительность указывается в минутах.",
     );
   const ids = new Set(existingIds);
   const priorities: Record<string, Task["priority"]> = {

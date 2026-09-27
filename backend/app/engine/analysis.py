@@ -40,8 +40,13 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
                     as_of=as_of, forecast_stale=False, baseline_delta_minutes=baseline_delta(project.start))
     tasks = {t.id: t for t in project.tasks}
     people = {a.id: a for a in project.assignees}
-    lower = project.start.astimezone(timezone.utc) - timedelta(days=370)
-    upper = project.start.astimezone(timezone.utc) + timedelta(days=740)
+    all_starts = [project.start] + [t.actual_start for t in project.tasks if t.actual_start] + [t.not_before for t in project.tasks if t.not_before]
+    all_finishes = [project.deadline] + [t.actual_finish for t in project.tasks if t.actual_finish]
+    min_start = min(all_starts).astimezone(timezone.utc)
+    max_target = max(all_finishes).astimezone(timezone.utc)
+    total_dur_days = max(30, sum(t.duration_minutes for t in project.tasks) // 480 + 90)
+    lower = min_start - timedelta(days=60)
+    upper = max(max_target + timedelta(days=90), min_start + timedelta(days=total_dur_days + 180))
     calendars = {}
     definitions_cache = calendar_cache if calendar_cache is not None else {}
     # Share precomputed calendars across tasks assigned to the same person.
