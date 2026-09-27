@@ -15,7 +15,7 @@ class Shift(StrictModel):
 
     @model_validator(mode="after")
     def ordered(self):
-        if self.start >= self.end or self.start.second or self.end.second:
+        if self.start >= self.end or self.start.second or self.end.second or self.start.microsecond or self.end.microsecond:
             raise ValueError("Смена должна заканчиваться позже начала, с точностью до минуты")
         if self.start.tzinfo or self.end.tzinfo:
             raise ValueError("Время смены задаётся в часовом поясе проекта")
@@ -56,7 +56,7 @@ class Assignee(StrictModel):
 class Task(StrictModel):
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=200)
-    duration_minutes: int = Field(gt=0, le=525600)
+    duration_minutes: int = Field(ge=0, le=525600)
     priority: Literal["low", "medium", "high", "urgent"] = "medium"
     required_skills: list[str] = Field(default_factory=list)
     not_before: datetime | None = None
@@ -79,8 +79,8 @@ class Task(StrictModel):
             raise ValueError("Фактическое окончание допустимо только для завершённой задачи")
         if self.actual_start and self.status not in ("done", "in_progress", "blocked"):
             raise ValueError("Фактическое начало несовместимо со статусом")
-        if self.actual_start and self.actual_finish and self.actual_finish <= self.actual_start:
-            raise ValueError("Фактическое окончание должно быть позже начала")
+        if self.actual_start and self.actual_finish and (self.actual_finish < self.actual_start or (self.actual_finish == self.actual_start and self.duration_minutes > 0)):
+            raise ValueError("Окончание должно быть позже начала; равенство допустимо только для вехи")
         return self
 
 
@@ -164,3 +164,7 @@ class ProjectInput(StrictModel):
 class SaveProject(StrictModel):
     version: int = Field(ge=1)
     project: ProjectInput
+
+
+class LevelProject(SaveProject):
+    assignee_id: str | None = None

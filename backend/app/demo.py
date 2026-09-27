@@ -21,9 +21,9 @@ def demo():
         "Аудит безопасности и прав доступа",
         "Комплексное QA тестирование",
         "Нагрузочное тестирование",
-        "Релиз и сдача проекта заказчику"
+        "Веха: Релиз в прод и сдача заказчику"
     ]
-    durations = [8, 8, 16, 8, 24, 24, 16, 16, 8, 16, 8, 4]
+    durations = [8, 8, 16, 8, 24, 24, 16, 16, 8, 16, 8, 0]
     people = ["pm", "be", "ux", "be", "be", "fe", "fe", "devops", "be", "qa", "qa", "pm"]
     priorities = ["high", "high", "medium", "medium", "urgent", "high", "high", "medium", "urgent", "high", "medium", "urgent"]
     req_skills = [

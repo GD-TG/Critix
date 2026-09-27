@@ -27,6 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "./api";
+import { AiMarkdown } from "./AiMarkdown";
 import type { Project, Result } from "./types";
 
 export interface ChatMessageItem {
@@ -273,9 +274,13 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
                     boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
                   }}
                 >
-                  <Text size="sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                    {m.content}
-                  </Text>
+                  {isUser ? (
+                    <Text size="sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                      {m.content}
+                    </Text>
+                  ) : (
+                    <AiMarkdown content={m.content} />
+                  )}
                   <Text
                     size="10px"
                     style={{

@@ -54,10 +54,13 @@ def test_upgrade_old_project_repairs_nulls_preserves_skills_and_is_idempotent():
             connection.commit()
             command.upgrade(config, "head")
             command.upgrade(config, "head")
+            connection.execute(text("UPDATE tasks SET duration_minutes = 0 WHERE id = 'task'"))
+            connection.commit()
             with Session(bind=connection) as db:
                 project = service.snapshot(db, service.load(db, project_id))
                 assert project.tasks[0].required_skills == []
                 assert project.tasks[0].name == "Existing task"
+                assert project.tasks[0].duration_minutes == 0
                 people = {p.id: p for p in project.assignees}
                 assert people["person"].skills == []
                 assert people["skilled"].skills[0].name == "Python"

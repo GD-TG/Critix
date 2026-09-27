@@ -26,6 +26,7 @@ import {
   Target,
 } from "lucide-react";
 import type { Dependency, Person, Priority, Project, Result, Task } from "./types";
+import { formatMinutes } from "./shared";
 
 const priorityColors: Record<Priority, string> = {
   low: "gray",
@@ -172,7 +173,7 @@ export function CustomTaskNode({ data }: NodeProps<Node<TaskNodeData>>) {
           </div>
         </Group>
         <Text size="xs" fw={600} c="dimmed">
-          {task.duration_minutes / 60} ч.
+          {formatMinutes(task.duration_minutes)}
         </Text>
       </Group>
 
@@ -195,7 +196,7 @@ export function CustomTaskNode({ data }: NodeProps<Node<TaskNodeData>>) {
           {isCritical
             ? "Резерв 0 ч"
             : analysisRow?.slack_minutes !== null && analysisRow?.slack_minutes !== undefined
-            ? `Резерв ${analysisRow.slack_minutes / 60} ч`
+            ? `Резерв ${formatMinutes(analysisRow.slack_minutes)}`
             : "—"}
         </span>
       </div>

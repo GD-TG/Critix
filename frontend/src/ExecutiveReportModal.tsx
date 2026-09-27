@@ -24,6 +24,8 @@ import {
   Target,
   Users,
 } from "lucide-react";
+import { AiMarkdown } from "./AiMarkdown";
+import { formatDeltaText, formatMinutes } from "./shared";
 import type { Project, Result } from "./types";
 
 interface ExecutiveReportModalProps {
@@ -41,8 +43,26 @@ export function ExecutiveReportModal({
   result,
   aiSummary,
 }: ExecutiveReportModalProps) {
-  const formatDate = (iso?: string | null) => iso ? new Date(iso).toLocaleDateString("ru-RU", {timeZone: project.timezone, day: "numeric", month: "short", year: "numeric"}) : "—";
-  const formatTime = (iso?: string | null) => iso ? new Date(iso).toLocaleString("ru-RU", {timeZone: project.timezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"}) : "—";
+  const formatDate = (iso?: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString("ru-RU", {
+          timeZone: project.timezone,
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+  const formatTime = (iso?: string | null) =>
+    iso
+      ? new Date(iso).toLocaleString("ru-RU", {
+          timeZone: project.timezone,
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "—";
   const [copyStatus, setCopyStatus] = useState("");
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -57,21 +77,24 @@ export function ExecutiveReportModal({
   const overloads = result?.analysis.overloads || [];
   const deadlineExceeded = result?.analysis.deadline_exceeded;
   const finishDate = result?.analysis.finish;
+  const baselineDelta = result?.analysis.baseline_delta_minutes;
+  const deltaInfo = formatDeltaText(baselineDelta);
 
   // Generate Markdown text for export / copy
   const generateMarkdown = (): string => {
     const lines: string[] = [
       `# Исполнительный отчет по проекту: ${project.name}`,
       `**Дата формирования**: ${formatTime(new Date().toISOString())}`,
-      `**Статус проекта**: ${deadlineExceeded ? "⚠️ Превышение дедлайна" : "✅ В графике"}`,
+      `**Статус дедлайна**: ${deadlineExceeded ? "⚠️ Превышение дедлайна" : "✅ В плановом графике"}`,
+      `**Базовый план (Baseline)**: ${deltaInfo.text}`,
       `**Часовой пояс**: ${project.timezone}`,
       `**Плановый старт**: ${formatDate(project.start)} | **Целевой дедлайн**: ${formatDate(project.deadline)}`,
       `**Расчетный финиш**: ${formatTime(finishDate)}`,
       "",
       "---",
       "## 1. Сводные метрики (Executive KPIs)",
-      `- **Прогресс**: ${progressPercent}% (${completedTasks.length} из ${project.tasks.length} задач завершено, ${inProgressTasks.length} в работе)`,
-      `- **Критический путь**: ${criticalTasks.length} задач (0 часов резерва)`,
+      `- **Прогресс проекта**: ${progressPercent}% (${completedTasks.length} из ${project.tasks.length} задач завершено, ${inProgressTasks.length} в работе)`,
+      `- **Критический путь (CPM)**: ${criticalTasks.length} задач (0 часов резерва)`,
       `- **Перегрузки команды**: ${overloads.length > 0 ? `Обнаружено ${overloads.length} периодов перегрузки` : "Отсутствуют (баланс в норме)"}`,
       "",
       "---",
@@ -84,7 +107,7 @@ export function ExecutiveReportModal({
       const p = project.assignees.find((a) => a.id === t.assignee_id);
       const r = rows.get(t.id);
       lines.push(
-        `| ${t.id} | ${t.name} | ${p?.name || "—"} | ${t.duration_minutes / 60} ч | ${r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"} |`,
+        `| ${t.id} | ${t.name} | ${p?.name || "—"} | ${formatMinutes(t.duration_minutes)} | ${r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"} |`,
       );
     });
 
@@ -93,23 +116,27 @@ export function ExecutiveReportModal({
     lines.push("|---|---|---|---|");
     project.assignees.forEach((a) => {
       const skills = (a.skills || []).map((s) => `${s.name} (${s.level})`).join(", ") || "—";
-      const exceptionsCount = Object.values(a.calendar?.exceptions || {}).filter(shifts => shifts.length === 0).length;
+      const exceptionsCount = Object.values(a.calendar?.exceptions || {}).filter((shifts) => shifts.length === 0).length;
       lines.push(`| ${a.name} | ${a.role || "—"} | ${skills} | ${exceptionsCount} дней |`);
     });
 
     if (aiSummary) {
-      lines.push("", "---", "## 4. Стратегические рекомендации AI", aiSummary);
+      lines.push("", "---", "## 4. Стратегические рекомендации AI Copilot", aiSummary);
     }
 
     lines.push("", "---", "## 5. Полный реестр задач проекта");
-    lines.push("| ID | Задача | Статус | Приоритет | Исполнитель | Часы | Резерв (Slack) |");
+    lines.push("| ID | Задача | Статус | Приоритет | Исполнитель | Длительность | Резерв (Slack) |");
     lines.push("|---|---|---|---|---|---|---|");
     project.tasks.forEach((t) => {
       const p = project.assignees.find((a) => a.id === t.assignee_id);
       const r = rows.get(t.id);
-      const slack = r?.critical ? "0 ч (Критический)" : r?.slack_minutes ? `${r.slack_minutes / 60} ч` : "—";
+      const slack = r?.critical
+        ? "Критический (0 ч)"
+        : r?.slack_minutes != null
+        ? formatMinutes(r.slack_minutes)
+        : "—";
       lines.push(
-        `| ${t.id} | ${t.name} | ${t.status} | ${t.priority || "medium"} | ${p?.name || "—"} | ${t.duration_minutes / 60} | ${slack} |`,
+        `| ${t.id} | ${t.name} | ${t.status} | ${t.priority || "medium"} | ${p?.name || "—"} | ${formatMinutes(t.duration_minutes)} | ${slack} |`,
       );
     });
 
@@ -130,8 +157,13 @@ export function ExecutiveReportModal({
   };
 
   const handleCopyMarkdown = async () => {
-    try { await navigator.clipboard.writeText(generateMarkdown()); setCopyStatus("Отчёт скопирован"); }
-    catch { setCopyStatus("Копирование недоступно. Скачайте Markdown-файл."); }
+    try {
+      await navigator.clipboard.writeText(generateMarkdown());
+      setCopyStatus("Отчёт скопирован в буфер обмена");
+      setTimeout(() => setCopyStatus(""), 3000);
+    } catch {
+      setCopyStatus("Копирование недоступно. Скачайте Markdown-файл.");
+    }
   };
 
   const handlePrint = () => {
@@ -147,7 +179,11 @@ export function ExecutiveReportModal({
     >
       <Stack gap="md">
         {/* Action Header */}
-        {copyStatus && <Text role="status">{copyStatus}</Text>}
+        {copyStatus && (
+          <Badge color="teal" variant="light" size="sm">
+            {copyStatus}
+          </Badge>
+        )}
         <Group justify="space-between" align="center" className="no-print">
           <Text size="xs" c="dimmed">
             Сформирован автоматический отчет со всеми метриками CPM, анализом рисков и выводами.
@@ -171,7 +207,7 @@ export function ExecutiveReportModal({
             </Button>
             <Button
               size="xs"
-              color="blue"
+              color="red"
               leftSection={<Printer size={14} />}
               onClick={handlePrint}
             >
@@ -192,12 +228,25 @@ export function ExecutiveReportModal({
           }}
         >
           {/* Report Header */}
-          <div style={{ borderBottom: "2px solid var(--line, #e2e8f0)", paddingBottom: 16, marginBottom: 16 }}>
+          <div
+            style={{
+              borderBottom: "2px solid var(--line, #e2e8f0)",
+              paddingBottom: 16,
+              marginBottom: 16,
+            }}
+          >
             <Group justify="space-between" align="flex-start">
               <div>
-                <Badge size="sm" color={deadlineExceeded ? "red" : "teal"} mb={6}>
-                  {deadlineExceeded ? "Превышение дедлайна" : "В плановом графике"}
-                </Badge>
+                <Group gap="xs" mb={6}>
+                  <Badge size="sm" color={deadlineExceeded ? "red" : "teal"}>
+                    {deadlineExceeded ? "Превышение дедлайна" : "В плановом графике"}
+                  </Badge>
+                  {baselineDelta != null && (
+                    <Badge size="sm" color={deltaInfo.status === "advance" ? "teal" : deltaInfo.status === "delay" ? "red" : "blue"} variant="light">
+                      {deltaInfo.text}
+                    </Badge>
+                  )}
+                </Group>
                 <Title order={2} style={{ fontSize: 22 }}>
                   {project.name}
                 </Title>
@@ -206,8 +255,8 @@ export function ExecutiveReportModal({
                 </Text>
               </div>
               <div style={{ textAlign: "right" }}>
-                <Text size="xs" fw={700} c="blue">
-                  АКТИОН · ОТЧЁТ РУКОВОДИТЕЛЯ
+                <Text size="xs" fw={700} c="red">
+                  CRITIX · ОТЧЁТ РУКОВОДИТЕЛЯ
                 </Text>
                 <Text size="xs" c="dimmed">
                   Метод критического пути (CPM)
@@ -220,7 +269,7 @@ export function ExecutiveReportModal({
           <SimpleGrid cols={{ base: 2, sm: 4 }} mb="md">
             <Card withBorder p="xs">
               <Text size="xs" c="dimmed">Прогресс проекта</Text>
-                <Text size="lg" fw={800} c="red">{progressPercent}%</Text>
+              <Text size="lg" fw={800} c="red">{progressPercent}%</Text>
               <Text size="10px" c="dimmed">{completedTasks.length} из {project.tasks.length} задач</Text>
             </Card>
 
@@ -250,15 +299,13 @@ export function ExecutiveReportModal({
           {/* AI Strategic Analysis */}
           {aiSummary && (
             <Card withBorder p="sm" mb="md" style={{ background: "rgba(210, 10, 46, 0.04)" }}>
-              <Group gap="xs" mb={4}>
-                <Sparkles size={16} color="var(--brand)" />
-                <Text size="xs" fw={700} c="blue">
+              <Group gap="xs" mb={8}>
+                <Sparkles size={16} color="var(--brand, #d20a2e)" />
+                <Text size="xs" fw={700} c="red">
                   СТРАТЕГИЧЕСКИЙ АНАЛИЗ И РЕКОМЕНДАЦИИ AI
                 </Text>
               </Group>
-              <Text size="xs" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                {aiSummary}
-              </Text>
+              <AiMarkdown content={aiSummary} />
             </Card>
           )}
 
@@ -272,7 +319,7 @@ export function ExecutiveReportModal({
                 <Table.Th style={{ width: 60 }}>ID</Table.Th>
                 <Table.Th>Задача</Table.Th>
                 <Table.Th>Исполнитель / Роль</Table.Th>
-                <Table.Th>Часы</Table.Th>
+                <Table.Th>Длительность</Table.Th>
                 <Table.Th>Плановые даты</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -280,21 +327,28 @@ export function ExecutiveReportModal({
               {criticalTasks.map((t) => {
                 const p = project.assignees.find((a) => a.id === t.assignee_id);
                 const r = rows.get(t.id);
+                const isMilestone = t.duration_minutes === 0;
                 return (
                   <Table.Tr key={t.id}>
                     <Table.Td>{t.id}</Table.Td>
                     <Table.Td fw={600}>
                       <Group gap={6}>
-                        <Badge size="xs" color="red" variant="filled">
-                          CPM
-                        </Badge>
+                        {isMilestone ? (
+                          <Badge size="xs" color="violet" variant="filled">
+                            Веха
+                          </Badge>
+                        ) : (
+                          <Badge size="xs" color="red" variant="filled">
+                            CPM
+                          </Badge>
+                        )}
                         <span>{t.name}</span>
                       </Group>
                     </Table.Td>
                     <Table.Td>
                       {p ? `${p.name} (${p.role || "Роль не указана"})` : "—"}
                     </Table.Td>
-                    <Table.Td>{t.duration_minutes / 60} ч</Table.Td>
+                    <Table.Td>{formatMinutes(t.duration_minutes)}</Table.Td>
                     <Table.Td>{r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"}</Table.Td>
                   </Table.Tr>
                 );
@@ -319,7 +373,9 @@ export function ExecutiveReportModal({
             <Table.Tbody>
               {project.assignees.map((a) => {
                 const count = project.tasks.filter((t) => t.assignee_id === a.id).length;
-                const excCount = Object.values(a.calendar?.exceptions || {}).filter(shifts => shifts.length === 0).length;
+                const excCount = Object.values(a.calendar?.exceptions || {}).filter(
+                  (shifts) => shifts.length === 0,
+                ).length;
                 return (
                   <Table.Tr key={a.id}>
                     <Table.Td fw={600}>{a.name}</Table.Td>

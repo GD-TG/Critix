@@ -27,7 +27,7 @@ def topology(project: ProjectInput):
     return order, incoming, outgoing
 
 
-def analyze(project: ProjectInput, as_of=None):
+def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
     # Time-dependent flags are deterministic for an explicitly supplied instant.
     as_of = as_of or datetime.now(timezone.utc)
     def baseline_delta(finish):
@@ -37,19 +37,19 @@ def analyze(project: ProjectInput, as_of=None):
     if not order:
         return dict(tasks=[], finish=project.start, deadline=project.deadline,
                     deadline_exceeded=False, delay_minutes=0, overloads=[], critical_dependencies=[],
-                    as_of=as_of, baseline_delta_minutes=baseline_delta(project.start))
+                    as_of=as_of, forecast_stale=False, baseline_delta_minutes=baseline_delta(project.start))
     tasks = {t.id: t for t in project.tasks}
     people = {a.id: a for a in project.assignees}
     lower = project.start.astimezone(timezone.utc) - timedelta(days=370)
     upper = project.start.astimezone(timezone.utc) + timedelta(days=740)
     calendars = {}
-    definitions_cache = {}
+    definitions_cache = calendar_cache if calendar_cache is not None else {}
     # Share precomputed calendars across tasks assigned to the same person.
     for person in {t.assignee_id for t in project.tasks}:
         definitions = [project.calendar]
         if person is not None:
             definitions.append(people[person].calendar)
-        key = tuple(sorted({c.model_dump_json() for c in definitions}))
+        key = (project.timezone, lower, upper, tuple(sorted({c.model_dump_json() for c in definitions})))
         if key not in definitions_cache:
             definitions_cache[key] = WorkCalendar(definitions, project.timezone, lower, upper)
         calendars[person] = definitions_cache[key]
@@ -63,7 +63,7 @@ def analyze(project: ProjectInput, as_of=None):
         return calendar[dep.successor_id].shift(anchor, dep.lag_minutes)
 
     def earliest_index(cal, duration, start_bound, finish_bound):
-        lo, hi = cal.index(start_bound), len(cal.slots) - duration
+        lo, hi = cal.index(start_bound), len(cal.slots) - max(1, duration)
         if lo > hi or (finish_bound and cal.finish(hi, duration) < finish_bound):
             raise PlanningError("Недостаточно рабочего времени в горизонте расчёта")
         while lo < hi:
@@ -124,7 +124,7 @@ def analyze(project: ProjectInput, as_of=None):
             return True
 
         lo = indices[task_id]
-        hi = min(cal.index(finish), len(cal.slots) - task.duration_minutes)
+        hi = min(cal.index(finish), len(cal.slots) - max(1, task.duration_minutes))
         if not feasible(lo):
             flags[task_id].add("dependency_conflict")
         while lo < hi:
@@ -190,6 +190,7 @@ def analyze(project: ProjectInput, as_of=None):
         if shifted(dep, moved) > early[dep.successor_id][0 if dep.kind[1] == "S" else 1]:
             critical_dependencies.append(dep.model_dump())
     return dict(tasks=rows, finish=finish, deadline=project.deadline,
+                forecast_stale=any("overdue" in row["risk_flags"] for row in rows),
                 as_of=as_of, baseline_delta_minutes=baseline_delta(finish),
                 deadline_exceeded=finish > project.deadline,
                 delay_minutes=max(0, int((finish-project.deadline).total_seconds()/60)),

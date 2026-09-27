@@ -11,8 +11,7 @@ from app.schemas import ProjectInput
 
 def load(db, project_id, lock=False):
     query = select(models.Project).where(models.Project.id == project_id)
-    if lock:
-        query = query.with_for_update()
+    query = query.with_for_update(read=not lock).execution_options(populate_existing=True)
     row = db.scalar(query)
     if row is None:
         raise HTTPException(404, "Проект не найден")
@@ -70,15 +69,46 @@ def create(db, data):
     return write(db, models.Project(version=1), data, result)
 
 
-def update(db, project_id, request, simulate=False):
-    row = load(db, project_id, lock=True)
-    if row.version != request.version:
+def read(db, project_id):
+    row = load(db, project_id)
+    version = row.version
+    data = snapshot(db, row)
+    db.rollback()  # Release the aggregate read lock before CPU or external API work.
+    return version, data
+
+
+def require_version(db, project_id, version, lock=False):
+    row = load(db, project_id, lock=lock)
+    if row.version != version:
         raise HTTPException(409, "Проект изменён в другой вкладке. Обновите данные")
-    old_project = snapshot(db, row)
+    return row
+
+
+def update(db, project_id, request, simulate=False):
+    version, old_project = read(db, project_id)
+    if version != request.version:
+        raise HTTPException(409, "Проект изменён в другой вкладке. Обновите данные")
     before = analyze(old_project)
     after = analyze(request.project)
     delta = compare(before, after, old_project, request.project)
+    row = require_version(db, project_id, request.version, lock=not simulate)
     if simulate:
-        return dict(id=row.id, version=row.version, project=request.project, analysis=after, changes=delta)
+        result = dict(id=row.id, version=row.version, project=request.project, analysis=after, changes=delta)
+        db.rollback()
+        return result
     row.version += 1
     return {**write(db, row, request.project, after), "changes": delta}
+
+
+def level(db, project_id, request):
+    from app.engine.leveling import level_resources
+    version, old = read(db, project_id)
+    if version != request.version:
+        raise HTTPException(409, "Проект изменён. Обновите данные перед выравниванием")
+    proposal, result, report = level_resources(request.project, request.assignee_id)
+    delta = compare(analyze(old), result, old, proposal)
+    row = require_version(db, project_id, version)
+    response = dict(id=row.id, version=row.version, project=proposal, analysis=result,
+                    changes=delta, leveling=report)
+    db.rollback()
+    return response

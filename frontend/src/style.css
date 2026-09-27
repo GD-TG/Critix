@@ -417,17 +417,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .avatar {
-  width: 27px;
-  height: 27px;
-  flex: 0 0 27px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 28px;
+  flex-shrink: 0;
   border-radius: 50%;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 2px solid var(--surface);
   color: #fff;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   margin-left: -5px;
+  box-sizing: border-box;
 }
 
 .team-stack .avatar:first-child {
@@ -1278,12 +1286,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .task-status-dot.planned { background: #cdd3dc; }
 
 .mini-avatar {
-  width: 19px;
-  height: 19px;
-  flex: 0 0 19px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  max-width: 20px;
+  max-height: 20px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
   border: 0;
-  font-size: 6px;
+  font-size: 8px;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .task-chart {
@@ -1994,3 +2013,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .mantine-Modal-content, .mantine-Modal-body, .mantine-Modal-inner { overflow: visible !important; height: auto !important; max-height: none !important; position: static !important; transform: none !important; }
   .no-print { display: none !important; }
 }
+
+.task-milestone-marker { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 16px; line-height: 1; color: var(--brand); z-index: 3; }
+.task-milestone-marker.done { color: var(--green); }
+.task-milestone-marker.progress { color: var(--blue); }
+.task-milestone-marker.critical { filter: drop-shadow(0 0 4px var(--red)); }
+

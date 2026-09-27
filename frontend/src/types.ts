@@ -52,6 +52,7 @@ export type Project = {
 export type Analysis = {
   critical_dependencies: Dependency[];
   as_of?: string;
+  is_stale?: boolean;
   baseline_delta_minutes?: number | null;
   finish: string;
   deadline_exceeded: boolean;

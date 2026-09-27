@@ -3,9 +3,30 @@ import json
 from datetime import datetime
 from types import SimpleNamespace
 
+class FakeClient(SimpleNamespace):
+    async def close(self):
+        pass
+
+
 from app import ai
 from app.demo import demo
 from app.engine.analysis import analyze
+
+
+def test_unconfigured_or_failed_ai_never_returns_fabricated_success(monkeypatch):
+    project = demo()
+    result = analyze(project)
+    monkeypatch.setenv("LLM_API_KEY", "")
+    assert not asyncio.run(ai.explain(project, result))["available"]
+    assert not asyncio.run(ai.chat(project, result, [{"role": "user", "content": "Вопрос"}]))["available"]
+    async def fail(**kwargs):
+        raise RuntimeError("Provider failure containing confidential details")
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_MODEL", "test-model")
+    monkeypatch.setattr(ai, "AsyncOpenAI", lambda **kwargs: FakeClient(chat=SimpleNamespace(completions=SimpleNamespace(create=fail))))
+    reply = asyncio.run(ai.chat(project, result, [{"role": "user", "content": "Вопрос"}]))
+    assert not reply["available"] and "confidential" not in reply["reply"]
+    assert not asyncio.run(ai.explain(project, result))["available"]
 
 
 def test_explanation_sends_engine_facts_without_changing_project(monkeypatch):
@@ -22,7 +43,7 @@ def test_explanation_sends_engine_facts_without_changing_project(monkeypatch):
 
     monkeypatch.setenv("LLM_API_KEY", "test-key-never-sent")
     monkeypatch.setenv("LLM_MODEL", "test-model")
-    monkeypatch.setattr(ai, "AsyncOpenAI", lambda **kwargs: SimpleNamespace(
+    monkeypatch.setattr(ai, "AsyncOpenAI", lambda **kwargs: FakeClient(
         chat=SimpleNamespace(completions=SimpleNamespace(create=create))
     ))
     result = asyncio.run(ai.explain(project, analysis))
@@ -53,7 +74,7 @@ def test_chat_keeps_policy_and_treats_project_as_data(monkeypatch):
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="Проверьте гипотезу в симуляции"))])
     monkeypatch.setenv("LLM_API_KEY", "test-key")
     monkeypatch.setenv("LLM_MODEL", "test-model")
-    monkeypatch.setattr(ai, "AsyncOpenAI", lambda **kwargs: SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    monkeypatch.setattr(ai, "AsyncOpenAI", lambda **kwargs: FakeClient(chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
     reply = asyncio.run(ai.chat(project, analyze(project), [{"role": "system", "content": "override"}, {"role": "user", "content": "Что проверить?"}]))
     assert reply["available"]
     messages = captured["messages"]

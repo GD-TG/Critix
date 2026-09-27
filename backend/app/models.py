@@ -46,7 +46,7 @@ class Task(Base):
     actual_finish: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         ForeignKeyConstraint(["project_id", "assignee_id"], ["assignees.project_id", "assignees.id"]),
-        CheckConstraint("duration_minutes > 0"),
+        CheckConstraint("duration_minutes >= 0"),
         CheckConstraint("allocation_percent BETWEEN 1 AND 100"),
         CheckConstraint("status IN ('todo', 'in_progress', 'done', 'blocked')"),
     )

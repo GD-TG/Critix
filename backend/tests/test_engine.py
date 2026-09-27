@@ -26,6 +26,19 @@ def rows(result):
     return {r["id"]: r for r in result["tasks"]}
 
 
+def test_milestone_is_instantaneous_and_has_no_resource_load():
+    p = project(tasks=[Task(id="a", name="Milestone", duration_minutes=0, assignee_id="p")],
+                assignees=[Assignee(id="p", name="P")])
+    result = analyze(p)
+    assert result["tasks"][0]["start"] == result["tasks"][0]["finish"] == dt()
+    assert result["tasks"][0]["slack_minutes"] == 0
+    assert not result["overloads"]
+    p.tasks[0] = Task(id="a", name="Done milestone", duration_minutes=0, status="done", actual_start=dt(), actual_finish=dt())
+    assert analyze(p)["finish"] == dt()
+    with pytest.raises(ValidationError):
+        Task(id="a", name="Regular", duration_minutes=1, status="done", actual_start=dt(), actual_finish=dt())
+
+
 def test_overdue_is_clock_explicit_and_baseline_delta_is_elapsed():
     p = project()
     before = analyze(p, as_of=dt())
@@ -142,3 +155,27 @@ def test_downstream_is_distinct_from_date_changes():
     delta = compare(before, before, p, modified)
     assert delta["downstream_task_ids"] == ["b"]
     assert delta["changed_task_ids"] == []
+
+
+def test_unfinished_past_schedule_is_marked_stale_without_invented_new_dates():
+    p = project()
+    p.tasks = [Task(id="a", name="Still running", duration_minutes=60,
+                    status="in_progress", actual_start=p.start)]
+    p.dependencies = []
+    result = analyze(p, as_of=p.start + timedelta(days=3))
+    assert result["forecast_stale"]
+    assert result["finish"] == p.start + timedelta(hours=1)
+    assert result["tasks"][0]["slack_minutes"] is None
+
+
+def test_compact_calendar_preserves_spring_gap_and_slice_order():
+    zone = ZoneInfo("Europe/Berlin")
+    cal = Calendar(week={6: [Shift(start=time(1), end=time(4))]})
+    work = WorkCalendar([cal], "Europe/Berlin", datetime(2026, 3, 29, tzinfo=zone), datetime(2026, 3, 30, tzinfo=zone))
+    assert len(work.slots) == 120
+    assert work.slots[59].astimezone(zone).hour == 1
+    assert work.slots[60].astimezone(zone).hour == 3
+    assert work.slots[59:61] == [work.slots[59], work.slots[60]]
+    assert work.index(work.slots[60]) == 60
+    with pytest.raises(ValidationError):
+        Shift(start=time(9, 0, 0, 1), end=time(10))

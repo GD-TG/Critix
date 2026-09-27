@@ -1,0 +1,38 @@
+import { useState } from "react";
+import { useProjects } from "@/context/ProjectContext";
+import { useUi } from "@/context/UiContext";
+import { api } from "@/api";
+
+export function useAiView() {
+  const { saved, draft, run } = useProjects();
+  const { activeView, setActiveView } = useUi();
+
+  const [aiText, setAiText] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+
+  const generateAudit = () => {
+    if (!saved) return;
+    void run(async () => {
+      setAiBusy(true);
+      try {
+        const res = await api<{ available: boolean; text: string }>(
+          `/projects/${saved.id}/ai`,
+          "POST",
+        );
+        setAiText(res.text);
+      } finally {
+        setAiBusy(false);
+      }
+    });
+  };
+
+  return {
+    saved,
+    draft,
+    aiText,
+    aiBusy,
+    activeView,
+    setActiveView,
+    generateAudit,
+  };
+}

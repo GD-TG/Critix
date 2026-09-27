@@ -17,3 +17,4 @@ dist
 **/*.p12
 tmp
 coverage
+uv.lock
