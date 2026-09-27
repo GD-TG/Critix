@@ -6,7 +6,7 @@ import { changeTaskStatus } from "@/taskEditing";
 import type { Dependency, Priority, Task } from "@/types";
 
 export function useTaskDrawer() {
-  const { draft, change } = useProjects();
+  const { draft, change, rows } = useProjects();
   const { showNotification } = useUi();
   const {
     task,
@@ -32,7 +32,8 @@ export function useTaskDrawer() {
   const setPriority = (v: string | null) => updateTask({ priority: (v as Priority) || "medium" });
   const setStatus = (v: string | null) => {
     if (!task) return;
-    setTask(changeTaskStatus(task, v as Task["status"]));
+    const taskRow = rows?.get(task.id);
+    setTask(changeTaskStatus(task, v as Task["status"], taskRow?.start, taskRow?.finish));
   };
 
   const addRequiredSkill = () => {

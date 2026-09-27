@@ -145,15 +145,26 @@ npm run dev
 
 ## ⚙️ Конфигурация окружения (.env)
 
-| Переменная | Описание | Пример значения |
+> ⚠️ **Важно перед запуском:**
+> - **Не копируйте `.env.example` вслепую!** Обязательно задайте свои параметры безопасности:
+>   - `ADMIN_PASSWORD`: пароль руководителя (не менее 12 символов, используется для входа).
+>   - `SESSION_SECRET`: криптостойкая случайная строка (не менее 32 символов).
+> - **Локальный доступ (localhost и 127.0.0.1):**
+>   - При локальном запуске (Docker или Dev-режим) используйте `SITE_ADDRESS=http://localhost` и `APP_ORIGIN=http://localhost`.
+>   - Система автоматически разрешает запросы как с `http://localhost`, так и с `http://127.0.0.1` на 80 порту без SSL-ошибок и без 403 `Forbidden`.
+
+| Переменная | Описание | Пример для локального запуска |
 |---|---|---|
-| `DATABASE_URL` | Строка подключения к PostgreSQL | `postgresql+psycopg://critix:critix@localhost:5432/critix` |
+| `POSTGRES_PASSWORD` | Пароль базы данных PostgreSQL | `critix_secure_pass_2026` |
+| `DATABASE_URL` | Строка подключения к PostgreSQL | `postgresql+psycopg://critix:critix_secure_pass_2026@db:5432/critix` |
 | `SESSION_SECRET` | Ключ подписи сессий (от 32 символов) | `super_secret_session_key_critix_2026_production_12345` |
 | `ADMIN_PASSWORD` | Пароль руководителя (от 12 символов) | `adminpassword123` |
-| `APP_ORIGIN` | Разрешенный origin для фронтенда | `http://localhost:5173` |
-| `COOKIE_SECURE` | Флаг Secure для куки (`false` для локального HTTP) | `false` |
-| `LLM_BASE_URL` | URL OpenAI-совместимого провайдера (опционально) | `https://api.openai.com/v1` |
+| `SITE_ADDRESS` | Домен/адрес веб-сервера Caddy | `http://localhost` |
+| `APP_ORIGIN` | Разрешенный origin для фронтенда | `http://localhost` |
+| `COOKIE_SECURE` | Флаг Secure для cookie (`false` для локального HTTP) | `false` |
+| `LLM_BASE_URL` | URL OpenAI-совместимого провайдера (опционально) | `https://api.proxyapi.ru/v1` |
 | `LLM_API_KEY` | API-ключ для LLM (опционально) | `sk-...` |
+| `LLM_MODEL` | Модель для AI-консультанта (опционально) | `openai/gpt-4o-mini` |
 
 ---
 
