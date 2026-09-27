@@ -364,9 +364,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--blue);
-  box-shadow: 0 0 0 4px rgba(210, 10, 46, 0.14);
+  background: #555555;
+  box-shadow: 0 0 0 4px rgba(85, 85, 85, 0.14);
   flex: 0 0 auto;
+}
+
+[data-mantine-color-scheme="dark"] .project-dot {
+  background: #b0b0b0;
+  box-shadow: 0 0 0 4px rgba(176, 176, 176, 0.18);
 }
 
 .main-nav {
@@ -2097,4 +2102,44 @@ h1, h2, h3 {
 
 .project-manage-card:hover {
   box-shadow: var(--shadow-card-hover);
+}
+
+/* ==========================================================================
+   Batch 3: neutral (light-gray) secondary buttons & neutral icons
+   ========================================================================== */
+/* Pink (Mantine variant="light") buttons → light gray, both themes */
+[data-mantine-color-scheme="light"] .mantine-Button-root[data-variant="light"] {
+  background: #f0f0f0;
+  color: #333333;
+}
+
+[data-mantine-color-scheme="light"] .mantine-Button-root[data-variant="light"]:hover {
+  background: #ededed;
+}
+
+[data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="light"] {
+  background: #3a3a3a;
+  color: #e0e0e0;
+}
+
+[data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="light"]:hover {
+  background: #444444;
+}
+
+/* Icons inside light-gray buttons follow the button text color */
+[data-mantine-color-scheme="light"] .mantine-Button-root[data-variant="light"] svg {
+  color: #333333;
+}
+
+[data-mantine-color-scheme="dark"] .mantine-Button-root[data-variant="light"] svg {
+  color: #e0e0e0;
+}
+
+/* Neutralize subtle ActionIcons (blue/red edit/delete) to dark gray */
+[data-mantine-color-scheme="light"] .mantine-ActionIcon-root[data-variant="subtle"] {
+  color: #4a4a4a;
+}
+
+[data-mantine-color-scheme="dark"] .mantine-ActionIcon-root[data-variant="subtle"] {
+  color: #b0b0b0;
 }
