@@ -1,10 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
-
 :root {
   --brand: #d20a2e;
   --brand-hover: #ad0826;
   --brand-soft: #fff0f2;
-  --bg: #f7f7f7;
+  --bg: #f8f9fa;
   --surface: #ffffff;
   --ink: #242424;
   --muted: #858585;
@@ -16,14 +14,24 @@
   --orange: #ee9564;
   --red: #e57470;
   --yellow: #e5ad5b;
-  --shadow: 0 7px 24px rgba(39, 51, 76, 0.05);
-  font-family: 'DM Sans', sans-serif;
+  --icon: #4a4a4a;
+  --icon-strong: #333333;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.10);
+  --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --font-sans: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
   color: var(--ink);
   background: var(--bg);
 }
 
 [data-mantine-color-scheme="dark"] {
-  --bg: #181818;
+  --bg: #1a1a1a;
   --surface: #222222;
   --ink: #eeeeee;
   --muted: #a0a0a0;
@@ -35,7 +43,12 @@
   --orange: #ee9564;
   --red: #e57470;
   --yellow: #e5ad5b;
-  --shadow: 0 7px 24px rgba(0, 0, 0, 0.25);
+  --icon: #b0b0b0;
+  --icon-strong: #e0e0e0;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -102,7 +115,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: flex;
   gap: 11px;
   align-items: center;
-  font: 800 23px Manrope, sans-serif;
+  font: 800 23px var(--font-sans);
   letter-spacing: 0;
   padding: 4px 12px 34px;
   color: var(--ink);
@@ -116,7 +129,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-radius: 5px;
   color: #fff;
   background: var(--brand);
-  font: 800 19px Manrope, sans-serif;
+  font: 800 19px var(--font-sans);
   transform: scale(1);
 }
 
@@ -161,7 +174,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 14px;
   margin-bottom: 42px;
   color: #262626;
-  font: 700 24px 'IBM Plex Sans', sans-serif;
+  font: 700 24px var(--font-sans);
 }
 
 .login-lockup img {
@@ -202,7 +215,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .login-statement h1 {
   margin: 24px 0 18px;
   color: #fff;
-  font: 600 54px/1.04 'IBM Plex Sans', sans-serif;
+  font: 600 54px/1.04 var(--font-sans);
 }
 
 .login-statement h1 span {
@@ -250,7 +263,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .login-form-heading h2 {
   margin: 12px 0 7px;
   color: #242424;
-  font: 600 30px/1.15 'IBM Plex Sans', sans-serif;
+  font: 600 30px/1.15 var(--font-sans);
 }
 
 .login-form-heading p {
@@ -267,13 +280,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .login-form .mantine-PasswordInput-input {
   min-height: 46px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .login-submit {
   min-height: 46px;
   margin-top: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 600;
 }
@@ -312,8 +325,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .project-switcher {
   width: 100%;
   border: 0;
-  background: var(--bg);
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   text-align: left;
@@ -370,7 +383,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 0 12px;
   color: var(--muted);
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   transition: 0.2s;
@@ -382,7 +395,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .nav-item:hover {
   color: var(--ink);
-  background: var(--line);
+  background: var(--bg);
 }
 
 .nav-item.active {
@@ -520,8 +533,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .breadcrumb-btn:hover {
-  background: rgba(210, 10, 46, 0.07);
-  color: var(--blue);
+  background: var(--bg);
+  color: var(--ink);
 }
 
 .breadcrumb-current {
@@ -541,8 +554,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .breadcrumb-current:hover {
-  background: rgba(210, 10, 46, 0.07);
-  color: var(--blue);
+  background: var(--bg);
+  color: var(--ink);
 }
 
 .top-actions {
@@ -613,8 +626,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .page-heading h1 {
-  font: 800 30px Manrope, sans-serif;
-  letter-spacing: -1px;
+  font: 700 30px var(--font-sans);
+  letter-spacing: -0.01em;
   margin: 0 0 7px;
   color: var(--ink);
 }
@@ -630,9 +643,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 10px;
 }
 
+.heading-actions .primary-button,
+.heading-actions .secondary-button {
+  font-size: 10px;
+  padding: 0 12px;
+  gap: 6px;
+}
+
+.heading-actions .primary-button svg,
+.heading-actions .secondary-button svg {
+  width: 13px;
+  height: 13px;
+}
+
 .primary-button, .secondary-button, .outline-button, .filter-button {
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   height: 36px;
   padding: 0 14px;
   font-size: 11px;
@@ -657,7 +683,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .primary-button svg {
-  color: #ffd8de;
+  color: #ffffff;
 }
 
 .secondary-button {
@@ -672,7 +698,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .secondary-button svg {
-  color: var(--purple);
+  color: var(--icon);
 }
 
 .api-note {
@@ -682,7 +708,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: #8b6e31;
   background: #fff9e7;
   border: 1px solid #f5e4ae;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   padding: 9px 12px;
   margin: -13px 0 14px;
   font-size: 10px;
@@ -698,13 +724,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .metric-card, .panel {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 9px;
-  box-shadow: var(--shadow);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .metric-card {
   min-height: 131px;
   padding: 18px 19px 15px;
+  background: var(--surface);
+}
+
+.metric-card:hover {
+  box-shadow: var(--shadow-card-hover);
 }
 
 .metric-top {
@@ -715,7 +747,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .metric-label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -724,21 +756,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   height: 25px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
 }
 
-.metric-icon.purple { color: var(--purple); background: #fff0f2; }
-.metric-icon.blue { color: var(--blue); background: #fff0f2; }
-.metric-icon.coral { color: var(--red); background: #fff0ef; }
-.metric-icon.green { color: var(--green); background: #e8f7f0; }
+.metric-icon.purple { color: var(--icon); background: var(--bg); }
+.metric-icon.blue { color: var(--icon); background: var(--bg); }
+.metric-icon.coral { color: var(--icon); background: var(--bg); }
+.metric-icon.green { color: var(--icon); background: var(--bg); }
 
-[data-mantine-color-scheme="dark"] .metric-icon.purple { background: rgba(210, 10, 46, 0.2); }
-[data-mantine-color-scheme="dark"] .metric-icon.blue { background: rgba(210, 10, 46, 0.2); }
-[data-mantine-color-scheme="dark"] .metric-icon.coral { background: rgba(229, 116, 112, 0.2); }
-[data-mantine-color-scheme="dark"] .metric-icon.green { background: rgba(62, 172, 125, 0.2); }
+[data-mantine-color-scheme="dark"] .metric-icon.purple { background: var(--bg); }
+[data-mantine-color-scheme="dark"] .metric-icon.blue { background: var(--bg); }
+[data-mantine-color-scheme="dark"] .metric-icon.coral { background: var(--bg); }
+[data-mantine-color-scheme="dark"] .metric-icon.green { background: var(--bg); }
 
 .metric-value {
-  font: 800 24px Manrope, sans-serif;
+  font: 700 24px var(--font-sans);
   letter-spacing: -0.7px;
   margin-top: 12px;
   color: var(--ink);
@@ -746,7 +778,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .metric-value small {
   color: var(--muted);
-  font: 600 12px 'DM Sans', sans-serif;
+  font: 600 12px var(--font-sans);
   letter-spacing: 0;
 }
 
@@ -774,7 +806,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   justify-content: space-between;
   align-items: center;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   margin-top: 8px;
 }
 
@@ -808,7 +840,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .panel-header h2 {
   margin: 0;
-  font: 700 15px Manrope, sans-serif;
+  font: 700 17px var(--font-sans);
   letter-spacing: -0.35px;
   color: var(--ink);
 }
@@ -824,14 +856,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 2px;
   background: var(--bg);
   padding: 3px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .view-tab {
   border: 0;
   color: var(--muted);
   background: transparent;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 9px;
   padding: 5px 9px;
   display: flex;
@@ -961,7 +993,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: #fff;
   background: var(--red);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: 8px;
   letter-spacing: 0.5px;
 }
 
@@ -971,7 +1003,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--red);
   background: rgba(229, 116, 112, 0.15);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .list-task-skills {
@@ -983,7 +1015,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .skill-chip {
   font-size: 8px;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: 8px;
   background: var(--bg);
   border: 1px solid var(--line);
   color: var(--muted);
@@ -1080,7 +1112,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 9px;
   font-weight: 700;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .priority-tag.urgent {
@@ -1094,8 +1126,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .priority-tag.medium {
-  background: rgba(210, 10, 46, 0.1);
-  color: var(--blue);
+  background: var(--line);
+  color: var(--icon);
 }
 
 .priority-tag.low {
@@ -1147,7 +1179,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 9px;
   font-weight: 700;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: 8px;
   white-space: nowrap;
 }
 
@@ -1179,7 +1211,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border: 0;
   background: transparent;
   color: var(--muted);
-  border-radius: 4px;
+  border-radius: 8px;
   transition: all 0.15s ease;
 }
 
@@ -1336,7 +1368,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   top: 0;
   bottom: 0;
   left: 50%;
-  border-left: 1px solid rgba(229, 116, 112, 0.7);
+  border-left: 1px solid var(--line);
   z-index: 3;
 }
 
@@ -1362,7 +1394,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .today-line {
   width: 18px;
-  border-top: 1px solid var(--red);
+  border-top: 1px solid var(--icon);
 }
 
 .timeline-footer > span:last-child {
@@ -1440,16 +1472,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: grid;
   place-items: center;
   flex: 0 0 23px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
 }
 
-.high .attention-icon { color: var(--red); background: #fff0ef; }
-.medium .attention-icon { color: var(--yellow); background: #fff7e8; }
-.neutral .attention-icon { color: var(--green); background: #eaf8f2; }
+.high .attention-icon { color: var(--icon); background: var(--bg); }
+.medium .attention-icon { color: var(--icon); background: var(--bg); }
+.neutral .attention-icon { color: var(--icon); background: var(--bg); }
 
-[data-mantine-color-scheme="dark"] .high .attention-icon { background: rgba(229, 116, 112, 0.2); }
-[data-mantine-color-scheme="dark"] .medium .attention-icon { background: rgba(229, 173, 91, 0.2); }
-[data-mantine-color-scheme="dark"] .neutral .attention-icon { background: rgba(62, 172, 125, 0.2); }
+[data-mantine-color-scheme="dark"] .high .attention-icon { background: var(--bg); }
+[data-mantine-color-scheme="dark"] .medium .attention-icon { background: var(--bg); }
+[data-mantine-color-scheme="dark"] .neutral .attention-icon { background: var(--bg); }
 
 .attention-item strong {
   display: block;
@@ -1468,7 +1500,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--blue);
+  color: var(--icon);
   font-size: 9px;
   font-weight: 700;
   display: flex;
@@ -1486,7 +1518,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Decision Panel (Контрольная точка) — Адаптивная поддержка Light и Dark темы */
 .decision-panel {
   padding: 24px 24px 22px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
 }
 
 /* Тёмная тема */
@@ -1519,35 +1551,35 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .outline-button:hover {
-  border-color: #ff7a90;
+  border-color: var(--icon);
 }
 
 [data-mantine-color-scheme="dark"] .outline-button svg {
-  color: #ff7a90;
+  color: var(--icon);
 }
 
 /* Светлая тема */
 [data-mantine-color-scheme="light"] .decision-panel {
-  background: var(--brand-soft);
-  border: 1px solid #f5cbd2;
+  background: var(--surface);
+  border: 1px solid var(--line);
   color: var(--ink);
 }
 
 [data-mantine-color-scheme="light"] .decision-badge {
-  color: var(--brand);
+  color: var(--icon);
   letter-spacing: 1.2px;
 }
 
 [data-mantine-color-scheme="light"] .decision-panel h2 {
   color: var(--ink);
   margin: 12px 0 8px;
-  font: 800 21px Manrope, sans-serif;
+  font: 700 22px var(--font-sans);
   line-height: 1.25;
   letter-spacing: -0.7px;
 }
 
 [data-mantine-color-scheme="light"] .decision-panel h2 em {
-  color: var(--brand);
+  color: var(--ink);
   font-style: normal;
 }
 
@@ -1561,10 +1593,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 [data-mantine-color-scheme="light"] .outline-button {
   height: 33px;
-  color: var(--brand);
+  color: var(--icon-strong);
   background: #ffffff;
-  border: 1px solid var(--brand);
-  border-radius: 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
@@ -1574,11 +1606,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="light"] .outline-button:hover {
-  background: #ffe3e7;
+  background: var(--bg);
 }
 
 [data-mantine-color-scheme="light"] .outline-button svg {
-  color: var(--brand);
+  color: var(--icon);
 }
 
 .decision-badge {
@@ -1589,7 +1621,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .decision-panel h2 {
   margin: 12px 0 8px;
-  font: 800 21px Manrope, sans-serif;
+  font: 700 22px var(--font-sans);
   line-height: 1.25;
   letter-spacing: -0.7px;
 }
@@ -1650,7 +1682,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .activity-change {
-  color: var(--blue);
+  color: var(--icon);
   font-size: 9px;
   white-space: nowrap;
 }
@@ -1694,7 +1726,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .score-ring span {
-  font: 800 17px Manrope, sans-serif;
+  font: 700 17px var(--font-sans);
   color: var(--ink);
 }
 
@@ -1753,7 +1785,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .graph {
   height: 520px;
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -1824,7 +1856,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .react-flow__node {
-  border-radius: 8px !important;
+  border-radius: 12px !important;
   text-align: left !important;
   box-shadow: var(--shadow);
   padding: 10px;
@@ -1882,12 +1914,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] ::-webkit-scrollbar-thumb {
-  background: #233532;
+  background: #3a3a3a;
   border-radius: 3px;
 }
 
 [data-mantine-color-scheme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: #314844;
+  background: #4a4a4a;
 }
 
 [data-mantine-color-scheme="dark"] .primary-button {
@@ -1907,8 +1939,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .secondary-button:hover {
-  background: #1a2a26;
-  border-color: #314944;
+  background: var(--bg);
+  border-color: var(--line);
 }
 
 [data-mantine-color-scheme="dark"] .filter-button {
@@ -1918,11 +1950,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .filter-button:hover {
-  background: #1a2a26;
+  background: var(--bg);
 }
 
 [data-mantine-color-scheme="dark"] .view-tabs {
-  background: #0d1514;
+  background: var(--bg);
 }
 
 [data-mantine-color-scheme="dark"] .view-tab.active {
@@ -1938,42 +1970,42 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 [data-mantine-color-scheme="dark"] .timeline-head {
-  background: #0e1615;
+  background: var(--bg);
 }
 
 [data-mantine-color-scheme="dark"] .list-view-header {
-  background: #0e1615;
+  background: var(--bg);
 }
 
 [data-mantine-color-scheme="dark"] .skill-chip {
-  background: #101c1a;
-  border-color: #233532;
-  color: #92b0a7;
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--muted);
 }
 
 [data-mantine-color-scheme="dark"] .priority-tag.low {
-  background: #1b2a27;
-  color: #8daaa1;
+  background: var(--line);
+  color: var(--muted);
 }
 
 [data-mantine-color-scheme="dark"] .status-pill.planned {
-  background: #1b2a27;
-  color: #8daaa1;
+  background: var(--line);
+  color: var(--muted);
 }
 
 [data-mantine-color-scheme="dark"] .project-switcher {
-  background: #121d1b;
+  background: var(--surface);
   border-color: var(--line);
 }
 
 [data-mantine-color-scheme="dark"] .nav-count {
-  background: #1e2e2a;
-  color: #8daaa1;
+  background: var(--line);
+  color: var(--muted);
 }
 
 [data-mantine-color-scheme="dark"] .add-person {
-  background: #1e2e2a;
-  color: #8daaa1;
+  background: var(--line);
+  color: var(--muted);
 }
 
 [data-mantine-color-scheme="dark"] .react-flow__controls button {
@@ -1993,4 +2025,76 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .executive-print-report { position: absolute; inset: 0; width: 100%; color: black; background: white; }
   .mantine-Modal-content, .mantine-Modal-body, .mantine-Modal-inner { overflow: visible !important; height: auto !important; max-height: none !important; position: static !important; transform: none !important; }
   .no-print { display: none !important; }
+}
+
+/* ==========================================================================
+   Typography refinements
+   ========================================================================== */
+h1, h2, h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   Mantine component refinements (radius, shadows, fonts)
+   ========================================================================== */
+.mantine-Modal-content {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+
+.mantine-Modal-title {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.mantine-Drawer-content {
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+
+.mantine-Popover-dropdown {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+}
+
+.mantine-Card-root {
+  border-radius: var(--radius-md);
+}
+
+.mantine-Button-root,
+.mantine-ActionIcon-root {
+  border-radius: var(--radius-sm);
+}
+
+.mantine-Input-input,
+.mantine-TextInput-input,
+.mantine-PasswordInput-input,
+.mantine-NumberInput-input,
+.mantine-Select-input,
+.mantine-Textarea-input {
+  border-radius: var(--radius-sm);
+}
+
+.mantine-Badge-root {
+  border-radius: var(--radius-sm);
+}
+
+/* ==========================================================================
+   Project Manage Modal
+   ========================================================================== */
+.project-manage-modal {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+
+.project-manage-card {
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease;
+}
+
+.project-manage-card:hover {
+  box-shadow: var(--shadow-card-hover);
 }

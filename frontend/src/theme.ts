@@ -8,7 +8,24 @@ export const actionRed: MantineColorsTuple = [
 ];
 
 export const actionTheme = {
-  fontFamily: "'IBM Plex Sans', sans-serif",
+  fontFamily:
+    '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif',
   primaryColor: "red",
   colors: { red: actionRed, blue: actionRed },
+  defaultRadius: "md",
+  radius: {
+    xs: "6px",
+    sm: "10px",
+    md: "16px",
+    lg: "20px",
+    xl: "24px",
+  },
+  headings: {
+    fontWeight: "700",
+    sizes: {
+      h1: { fontSize: "30px", lineHeight: "1.15" },
+      h2: { fontSize: "21px", lineHeight: "1.25" },
+      h3: { fontSize: "17px", lineHeight: "1.3" },
+    },
+  },
 };

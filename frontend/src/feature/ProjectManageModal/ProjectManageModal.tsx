@@ -33,6 +33,7 @@ export function ProjectManageModal() {
           onClose={() => setProjectManageModal(false)}
           title="Управление проектами"
           size="lg"
+          classNames={{ content: "project-manage-modal" }}
         >
           <Stack gap="md">
             <Group justify="space-between">
@@ -66,7 +67,7 @@ export function ProjectManageModal() {
               {projects.map((p) => {
                 const isCurrent = saved?.id === p.id;
                 return (
-                  <Card key={p.id} withBorder p="xs" style={{ background: isCurrent ? "rgba(210, 10, 46, 0.07)" : undefined }}>
+                  <Card key={p.id} withBorder p="xs" className="project-manage-card" style={{ background: isCurrent ? "rgba(210, 10, 46, 0.07)" : undefined }}>
                     <Group justify="space-between">
                       <Group gap="xs">
                         <span className="project-dot" />
