@@ -53,6 +53,8 @@ export type Analysis = {
   critical_dependencies: Dependency[];
   as_of?: string;
   is_stale?: boolean;
+  forecast_stale?: boolean;
+  stale_task_ids?: string[];
   baseline_delta_minutes?: number | null;
   finish: string;
   deadline_exceeded: boolean;
@@ -65,6 +67,22 @@ export type Analysis = {
     slack_minutes: number | null;
     critical: boolean;
     risk_flags: string[];
+    explanation?: {
+      mode: "actual" | "calculated";
+      actual_finish: string | null;
+      duration_minutes: number;
+      assignee_id: string | null;
+      constraints: {
+        source: "project_start" | "not_before" | "dependency";
+        target: "start" | "finish";
+        bound: string;
+        dependency?: Dependency;
+        candidate_start?: string;
+        driving: boolean;
+        violated: boolean;
+        calendar_adjusted?: boolean;
+      }[];
+    };
   }[];
   overloads: {
     assignee_id: string;
@@ -110,3 +128,31 @@ export const defaultTask = (): Task => ({
   actual_start: null,
   actual_finish: null,
 });
+
+export type Scenario = {
+  id: string;
+  project_id: string;
+  name: string;
+  description?: string | null;
+  base_version: number;
+  is_stale: boolean;
+  created_at: string;
+  project: Project;
+  analysis?: Analysis;
+  changes?: {
+    changed_task_ids: string[];
+    removed_task_ids: string[];
+    finish_delta_minutes: number;
+  };
+};
+
+export type HistoryEntry = {
+  version: number;
+  created_at: string;
+  finish?: string;
+  comment?: string | null;
+  task_count: number;
+  changed_tasks?: string[];
+  finish_delta_minutes?: number;
+};
+

@@ -60,6 +60,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
         calendars[person] = definitions_cache[key]
     calendar = {t.id: calendars[t.assignee_id] for t in project.tasks}
     early, indices, flags = {}, {}, defaultdict(set)
+    explanations = {}
 
     def shifted(dep, predecessor):
         anchor = predecessor[0 if dep.kind[0] == "S" else 1]
@@ -83,8 +84,13 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
         task, cal = tasks[task_id], calendar[task_id]
         start_bound = max(project.start, task.not_before or project.start)
         finish_bound = None
+        constraints = [dict(source="project_start", target="start", bound=project.start)]
+        if task.not_before is not None:
+            constraints.append(dict(source="not_before", target="start", bound=task.not_before))
         for dep in incoming[task_id]:
             bound = shifted(dep, early[dep.predecessor_id])
+            constraints.append(dict(source="dependency", target="start" if dep.kind[1] == "S" else "finish",
+                                    bound=bound, dependency=dep.model_dump()))
             if dep.kind[1] == "S":
                 start_bound = max(start_bound, bound)
             else:
@@ -100,6 +106,31 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
             pair = (cal.start(index), cal.finish(index, task.duration_minutes))
         if pair[0] < start_bound or (finish_bound and pair[1] < finish_bound):
             flags[task_id].add("dependency_conflict")
+        reasons = []
+        for constraint in constraints:
+            target = 0 if constraint["target"] == "start" else 1
+            if task.actual_start:
+                # Facts remain authoritative; constraints are only conflict evidence.
+                constraint["violated"] = pair[target] < constraint["bound"]
+                constraint["driving"] = False
+            else:
+                candidate = earliest_index(cal, task.duration_minutes,
+                                           constraint["bound"] if target == 0 else project.start,
+                                           constraint["bound"] if target == 1 else None)
+                constraint["candidate_start"] = cal.start(candidate)
+                constraint["driving"] = candidate == index and (
+                    target == 0 or index == 0 or cal.finish(index - 1, task.duration_minutes) < constraint["bound"])
+                constraint["violated"] = False
+                constraint["calendar_adjusted"] = (
+                    target == 0 and cal.start(candidate) > constraint["bound"])
+            reasons.append(constraint)
+        explanations[task_id] = dict(
+            mode="actual" if task.actual_start else "calculated",
+            actual_finish=task.actual_finish,
+            duration_minutes=task.duration_minutes,
+            assignee_id=task.assignee_id,
+            constraints=reasons,
+        )
         if task.status == "blocked":
             flags[task_id].add("blocked")
         early[task_id], indices[task_id] = pair, index
@@ -174,15 +205,18 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
                 for task_id in active:
                     flags[task_id].add("overload")
     rows = []
+    stale_task_ids = []
     for task_id in order:
         start, end = early[task_id]
         if tasks[task_id].status != "done" and end < as_of:
             flags[task_id].add("overdue")
+            stale_task_ids.append(task_id)
         if end > project.deadline:
             flags[task_id].add("past_deadline")
         rows.append(dict(id=task_id, start=start, finish=end,
                          latest_start=latest[task_id][0], slack_minutes=slack[task_id],
-                         critical=slack[task_id] == 0, risk_flags=sorted(flags[task_id])))
+                         critical=slack[task_id] == 0, risk_flags=sorted(flags[task_id]),
+                         explanation=explanations[task_id]))
     critical = {r["id"] for r in rows if r["critical"]}
     critical_dependencies = []
     for dep in project.dependencies:
@@ -195,7 +229,8 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
         if shifted(dep, moved) > early[dep.successor_id][0 if dep.kind[1] == "S" else 1]:
             critical_dependencies.append(dep.model_dump())
     return dict(tasks=rows, finish=finish, deadline=project.deadline,
-                forecast_stale=any("overdue" in row["risk_flags"] for row in rows),
+                forecast_stale=bool(stale_task_ids),
+                stale_task_ids=stale_task_ids,
                 as_of=as_of, baseline_delta_minutes=baseline_delta(finish),
                 deadline_exceeded=finish > project.deadline,
                 delay_minutes=max(0, int((finish-project.deadline).total_seconds()/60)),

@@ -15,6 +15,7 @@ import {
 import { Trash2 } from "lucide-react";
 import { ProjectDateInput } from "@/ProjectDateInput";
 import { useTaskDrawer } from "@/feature/TaskDrawer/useTaskDrawer";
+import { TaskDateExplanation } from "./TaskDateExplanation";
 
 export function TaskDrawer() {
   const {
@@ -52,6 +53,7 @@ export function TaskDrawer() {
     >
       {task && draft && (
         <Stack gap="md">
+          <TaskDateExplanation task={task} onOpen={setTask} />
           <TextInput
             label="Название задачи"
             value={task.name}
@@ -187,21 +189,44 @@ export function TaskDrawer() {
             onChange={(val) => updateTask({ not_before: val })}
           />
 
-          {(task.status === "in_progress" || task.status === "done" || task.status === "blocked") && (
+          {task.status === "done" && (
+            <Card withBorder p="xs" style={{ background: "rgba(34, 197, 94, 0.04)", borderColor: "rgba(34, 197, 94, 0.3)" }}>
+              <Group justify="space-between" mb={4}>
+                <Text size="xs" fw={700} c="teal">
+                  Фактические даты выполнения {task.duration_minutes === 0 ? "(Веха)" : ""}
+                </Text>
+                <Badge size="xs" color="teal" variant="light">
+                  Завершено
+                </Badge>
+              </Group>
+              <Text size="11px" c="dimmed" mb="xs">
+                {task.duration_minutes === 0
+                  ? "Для вехи фактическое начало и окончание могут совпадать."
+                  : "Плановые даты подставлены по умолчанию. При необходимости скорректируйте их."}
+              </Text>
+              <Stack gap="xs">
+                <ProjectDateInput
+                  label="Фактическое начало"
+                  zone={draft.timezone}
+                  value={task.actual_start}
+                  onChange={(val) => updateTask({ actual_start: val })}
+                />
+                <ProjectDateInput
+                  label="Фактическое окончание"
+                  zone={draft.timezone}
+                  value={task.actual_finish}
+                  onChange={(val) => updateTask({ actual_finish: val })}
+                />
+              </Stack>
+            </Card>
+          )}
+
+          {(task.status === "in_progress" || task.status === "blocked") && (
             <ProjectDateInput
               label="Фактическое начало"
               zone={draft.timezone}
               value={task.actual_start}
               onChange={(val) => updateTask({ actual_start: val })}
-            />
-          )}
-
-          {task.status === "done" && (
-            <ProjectDateInput
-              label="Фактическое окончание"
-              zone={draft.timezone}
-              value={task.actual_finish}
-              onChange={(val) => updateTask({ actual_finish: val })}
             />
           )}
 

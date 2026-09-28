@@ -95,6 +95,29 @@ export function useTaskDrawer() {
 
   const saveTask = () => {
     if (!draft || !task) return;
+
+    if (task.status === "done") {
+      if (!task.actual_start || !task.actual_finish) {
+        showNotification("Для завершённой задачи укажите фактическое начало и окончание");
+        return;
+      }
+      const sMs = new Date(task.actual_start).getTime();
+      const fMs = new Date(task.actual_finish).getTime();
+      if (task.duration_minutes === 0 && fMs < sMs) {
+        showNotification("Фактическое окончание вехи не может быть раньше начала");
+        return;
+      }
+      if (task.duration_minutes > 0 && fMs <= sMs) {
+        showNotification("Фактическое окончание задачи должно быть строго позже начала");
+        return;
+      }
+    }
+
+    if (task.status === "in_progress" && !task.actual_start) {
+      showNotification("Для начатой задачи укажите фактическое начало");
+      return;
+    }
+
     const existing = draft.tasks.some((t) => t.id === task.id);
     const newDeps = [...draft.dependencies];
     if (!existing && taskInlinePredId) {

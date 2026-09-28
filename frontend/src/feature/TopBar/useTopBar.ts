@@ -1,5 +1,5 @@
 import { useApp } from "@/context/AppContext";
-import { copy, formatMinutes, formatShortDate, getOverdueTasks, getOverloadedAssigneeIds, getZone } from "@/shared";
+import { copy, formatCalendarDuration, formatMinutes, formatShortDate, getOverdueTasks, getOverloadedAssigneeIds, getZone } from "@/shared";
 
 export function useTopBar() {
   const {
@@ -25,6 +25,7 @@ export function useTopBar() {
     overloadedAssigneeIds,
     shortDate,
     formatMinutes,
+    formatCalendarDuration,
     rescheduleOverdue,
     setTask,
     copy,

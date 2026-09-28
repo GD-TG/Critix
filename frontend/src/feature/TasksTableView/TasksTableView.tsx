@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Group, Table, Text, Title } from "@mantine/core";
+import { Badge, Button, Card, Group, Table, Text, Title, Tooltip } from "@mantine/core";
 import { useTasksTableView } from "@/feature/TasksTableView/useTasksTableView";
 
 export function TasksTableView() {
@@ -7,6 +7,7 @@ export function TasksTableView() {
     rows,
     date,
     formatMinutes,
+    formatWorkDuration,
     activeView,
     setActiveView,
     setImportModal,
@@ -28,7 +29,7 @@ export function TasksTableView() {
       <Group justify="space-between" mb="md">
         <div>
           <Title order={3}>Полная таблица задач проекта</Title>
-          <Text size="sm" c="dimmed">Кликните по задаче для детального редактирования дат, навыков и исполнителя.</Text>
+          <Text size="sm" c="dimmed">Кликните по задаче для детального редактирования дат, навыков, связей и причин сроков.</Text>
         </div>
         <Group gap="xs">
           <Button size="xs" onClick={addTask}>+ Добавить задачу</Button>
@@ -40,13 +41,14 @@ export function TasksTableView() {
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th style={{ width: 60 }}>ID</Table.Th>
+            <Table.Th style={{ width: 50 }}>ID</Table.Th>
             <Table.Th>Название задачи</Table.Th>
             <Table.Th>Приоритет</Table.Th>
             <Table.Th>Исполнитель</Table.Th>
             <Table.Th>Статус</Table.Th>
             <Table.Th>Загрузка</Table.Th>
             <Table.Th>Длительность</Table.Th>
+            <Table.Th>Причина даты (Driver)</Table.Th>
             <Table.Th>Финиш CPM</Table.Th>
             <Table.Th>Финиш Эталона</Table.Th>
             <Table.Th>Сдвиг эталона</Table.Th>
@@ -65,6 +67,44 @@ export function TasksTableView() {
               deltaMinutes = Math.round((new Date(r.finish).getTime() - new Date(baseTask.finish).getTime()) / 60000);
             }
             const deltaHours = Math.round(deltaMinutes / 60);
+
+            // Driving constraint calculation
+            let driverBadge = <Text size="xs" c="dimmed">—</Text>;
+            if (t.status === "done") {
+              driverBadge = <Badge size="xs" color="gray" variant="light">Факт (завершена)</Badge>;
+            } else if (t.actual_start) {
+              driverBadge = <Badge size="xs" color="blue" variant="light">Факт старта</Badge>;
+            } else if (r?.explanation) {
+              const violated = r.explanation.constraints.find((c) => c.violated);
+              const driving = r.explanation.constraints.find((c) => c.driving);
+              if (violated) {
+                driverBadge = (
+                  <Tooltip label={`Нарушено ограничение связи (${date(violated.bound)})`}>
+                    <Badge size="xs" color="red">Конфликт</Badge>
+                  </Tooltip>
+                );
+              } else if (driving) {
+                if (driving.source === "dependency" && driving.dependency) {
+                  const pred = draft.tasks.find((p) => p.id === driving.dependency?.predecessor_id);
+                  const predName = pred ? pred.name : driving.dependency.predecessor_id;
+                  driverBadge = (
+                    <Tooltip label={`Определяется задачей «${predName}» (${driving.dependency.kind}, лаг ${driving.dependency.lag_minutes}м)`}>
+                      <Badge size="xs" color="indigo" variant="light" style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }}>
+                        ← {predName}
+                      </Badge>
+                    </Tooltip>
+                  );
+                } else if (driving.source === "not_before") {
+                  driverBadge = (
+                    <Tooltip label={`Ограничение «Не раньше» (${date(driving.bound)})`}>
+                      <Badge size="xs" color="orange" variant="light">Не раньше</Badge>
+                    </Tooltip>
+                  );
+                } else if (driving.source === "project_start") {
+                  driverBadge = <Badge size="xs" color="gray" variant="light">Старт проекта</Badge>;
+                }
+              }
+            }
 
             return (
               <Table.Tr key={t.id} style={{ cursor: "pointer" }} onClick={() => openTask(t)}>
@@ -121,7 +161,8 @@ export function TasksTableView() {
                   <Badge color={statusColors[t.status]}>{statusLabels[t.status]}</Badge>
                 </Table.Td>
                 <Table.Td>{t.allocation_percent || 100}%</Table.Td>
-                <Table.Td>{formatMinutes(t.duration_minutes)}</Table.Td>
+                <Table.Td>{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</Table.Td>
+                <Table.Td>{driverBadge}</Table.Td>
                 <Table.Td>{r ? date(r.finish) : "—"}</Table.Td>
                 <Table.Td>
                   {baseTask ? (
@@ -143,7 +184,7 @@ export function TasksTableView() {
                     <Text size="xs" c="dimmed">—</Text>
                   )}
                 </Table.Td>
-                <Table.Td>{r?.critical ? "0 ч (Крит. путь)" : r?.slack_minutes == null ? "—" : formatMinutes(r.slack_minutes)}</Table.Td>
+                <Table.Td>{r?.critical ? "0 ч (Крит. путь)" : r?.slack_minutes == null ? "—" : formatWorkDuration(r.slack_minutes)}</Table.Td>
               </Table.Tr>
             );
           })}

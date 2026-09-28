@@ -44,6 +44,7 @@ export function TeamView() {
     calculateSkillMatch,
     skillLevelLabels,
     formatMinutes,
+    formatWorkDuration,
     shortDate,
     typeSkillLevel,
   } = useTeamView();
@@ -323,7 +324,7 @@ export function TeamView() {
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                       <Text size="xs" fw={600} lineClamp={1}>«{t.name}»</Text>
                                       <Text size="10px" c="dimmed">
-                                        {formatMinutes(t.duration_minutes)} · {t.allocation_percent || 100}% занятость {r ? `· с ${shortDate(r.start)} по ${shortDate(r.finish)}` : ""}
+                                        {formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)} · {t.allocation_percent || 100}% занятость {r ? `· с ${shortDate(r.start)} по ${shortDate(r.finish)}` : ""}
                                       </Text>
                                     </div>
                                     <Badge size="xs" color={match >= 80 ? "teal" : match >= 50 ? "yellow" : "red"} variant="light">

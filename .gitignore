@@ -29,3 +29,6 @@ dist/
 tmp/
 *.tsbuildinfo
 uv.lock
+output/
+*.pptx
+*.pdf

@@ -27,6 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import { api } from "./api";
+import { useRequestGate } from "./useRequestGate";
 import { AiMarkdown } from "./AiMarkdown";
 import type { Project, Result } from "./types";
 
@@ -52,6 +53,7 @@ const QUICK_PROMPTS = [
 ];
 
 export function AICopilotChat({ project, projectId, result }: AICopilotChatProps) {
+  const gate = useRequestGate(projectId, result?.version, project);
   const storageKey = `critix_chat_${projectId}`;
 
   const [messages, setMessages] = useState<ChatMessageItem[]>(() => {
@@ -127,6 +129,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
     if (!text || busy) return;
+    const isCurrent = gate.capture();
 
     const userMessage: ChatMessageItem = {
       id: crypto.randomUUID(),
@@ -158,7 +161,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      if (isCurrent()) setMessages((prev) => [...prev, assistantMessage]);
     } catch (e: any) {
       const errorMessage: ChatMessageItem = {
         id: crypto.randomUUID(),
@@ -166,13 +169,14 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
         content: `Ошибка связи с AI-сервисом: ${e.message || "Попробуйте позже."}`,
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      if (isCurrent()) setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setBusy(false);
     }
   };
 
   const handleClear = () => {
+    gate.invalidate();
     const initial: ChatMessageItem[] = [
       {
         id: "welcome-reset",

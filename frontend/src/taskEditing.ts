@@ -1,48 +1,96 @@
 import type { Analysis, Task } from "./types.ts";
 
+/**
+ * Предлагает значения по умолчанию для фактических дат при завершении задачи.
+ * - Для вех (duration_minutes === 0) разрешены одинаковые start и finish.
+ * - Не навязывает искусственный час к длительности задачи.
+ * - Сохраняет досрочное завершение и введенные пользователем даты.
+ */
+export function proposeActualDates(
+  task: Task,
+  plannedStart?: string | null,
+  plannedFinish?: string | null,
+  now = new Date(),
+): { actual_start: string; actual_finish: string } {
+  const isMilestone = task.duration_minutes === 0;
+  now.setSeconds(0, 0);
+  const nowIso = now.toISOString();
+
+  let start = task.actual_start || plannedStart || nowIso;
+  let finish = task.actual_finish;
+
+  if (!finish) {
+    if (isMilestone) {
+      finish = start;
+    } else if (plannedFinish && new Date(plannedFinish).getTime() > new Date(start).getTime()) {
+      finish = plannedFinish;
+    } else {
+      const durMs = Math.max(task.duration_minutes, 1) * 60000;
+      finish = new Date(new Date(start).getTime() + durMs).toISOString();
+    }
+  }
+
+  // Для вехи разрешено равенство (0 мин). Окончание не может быть раньше начала.
+  if (isMilestone) {
+    if (new Date(finish).getTime() < new Date(start).getTime()) {
+      finish = start;
+    }
+  } else {
+    // Для обычной задачи окончание должно быть строго позже начала
+    if (new Date(finish).getTime() <= new Date(start).getTime()) {
+      const durMs = Math.max(task.duration_minutes, 1) * 60000;
+      finish = new Date(new Date(start).getTime() + durMs).toISOString();
+    }
+  }
+
+  return { actual_start: start, actual_finish: finish };
+}
+
 export function changeTaskStatus(
   task: Task,
   status: Task["status"],
   plannedStart?: string,
   plannedFinish?: string,
 ): Task {
-  let actual_start = status === "todo" ? null : task.actual_start;
-  let actual_finish = status === "done" ? task.actual_finish : null;
+  if (status === "todo") {
+    return {
+      ...task,
+      status,
+      actual_start: null,
+      actual_finish: null,
+    };
+  }
 
-  if (status === "in_progress" && !actual_start) {
-    actual_start = plannedStart || new Date().toISOString();
+  if (status === "in_progress") {
+    return {
+      ...task,
+      status,
+      actual_start: task.actual_start || plannedStart || new Date().toISOString(),
+      actual_finish: null,
+    };
+  }
+
+  if (status === "blocked") {
+    return {
+      ...task,
+      status,
+      actual_finish: null,
+    };
   }
 
   if (status === "done") {
-    const durationMinutes = Math.max(task.duration_minutes || 60, 60);
-    if (!actual_start) {
-      if (plannedStart) {
-        actual_start = plannedStart;
-      } else {
-        const now = Date.now();
-        actual_start = new Date(now - durationMinutes * 60000).toISOString();
-      }
-    }
-    if (!actual_finish) {
-      if (plannedFinish && new Date(plannedFinish) > new Date(actual_start)) {
-        actual_finish = plannedFinish;
-      } else {
-        const startMs = new Date(actual_start).getTime();
-        actual_finish = new Date(startMs + durationMinutes * 60000).toISOString();
-      }
-    }
-    // Ensure actual_finish is strictly after actual_start for non-zero duration tasks
-    if (actual_start && actual_finish && new Date(actual_finish) <= new Date(actual_start)) {
-      const startMs = new Date(actual_start).getTime();
-      actual_finish = new Date(startMs + durationMinutes * 60000).toISOString();
-    }
+    const proposed = proposeActualDates(task, plannedStart, plannedFinish);
+    return {
+      ...task,
+      status,
+      actual_start: proposed.actual_start,
+      actual_finish: proposed.actual_finish,
+    };
   }
 
   return {
     ...task,
     status,
-    actual_start,
-    actual_finish,
   };
 }
 

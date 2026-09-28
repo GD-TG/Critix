@@ -4,6 +4,7 @@ import { useTeam } from "@/context/TeamContext";
 import {
   calculateSkillMatch,
   formatMinutes,
+  formatWorkDuration,
   formatShortDate,
   getAvatarClass,
   getInitials,
@@ -156,6 +157,7 @@ export function useTeamView() {
     calculateSkillMatch,
     skillLevelLabels,
     formatMinutes,
+    formatWorkDuration,
     shortDate,
     typeSkillLevel: (v: string | null) => (v as Skill["level"]) || "expert",
   };

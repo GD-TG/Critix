@@ -12,19 +12,63 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 
 from app import models, service
 from app.ai import chat, explain
-from app.db import session
+from app.db import session, SessionLocal
 from app.demo import demo
 from app.engine.analysis import analyze
 from app.engine.calendar import PlanningError
-from app.schemas import ProjectInput, SaveProject, LevelProject
+from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse
 
-app = FastAPI(title="Critix API", docs_url=None, redoc_url=None)
+from contextlib import asynccontextmanager
+
 logger = logging.getLogger(__name__)
+
+
+def validate_security_configuration():
+    env = os.environ.get("ENVIRONMENT", os.environ.get("CRITIX_ENV", "development")).lower()
+    is_prod = env in ("production", "prod")
+
+    admin_pw = os.environ.get("ADMIN_PASSWORD", "")
+    session_secret = os.environ.get("SESSION_SECRET", "")
+    app_origin = os.environ.get("APP_ORIGIN", "")
+
+    insecure_passwords = {"", "adminpassword123", "admin", "password", "123456"}
+    insecure_secrets = {"", "critix_default_super_secret_session_key_fallback_2026", "secret"}
+
+    if is_prod:
+        if admin_pw in insecure_passwords:
+            raise RuntimeError(
+                "CRITICAL SECURITY CONFIGURATION ERROR: В продакшене (ENVIRONMENT=production) необходимо задать надёжный ADMIN_PASSWORD."
+            )
+        if session_secret in insecure_secrets:
+            raise RuntimeError(
+                "CRITICAL SECURITY CONFIGURATION ERROR: В продакшене (ENVIRONMENT=production) необходимо задать уникальный SESSION_SECRET."
+            )
+        if not app_origin or "*" in app_origin:
+            raise RuntimeError(
+                "CRITICAL SECURITY CONFIGURATION ERROR: В продакшене (ENVIRONMENT=production) APP_ORIGIN должен содержать точный список разрешённых доменов, wildcard (*) запрещён."
+            )
+    else:
+        if admin_pw in insecure_passwords:
+            logger.warning("Используется пароль администратора по умолчанию. Задайте ADMIN_PASSWORD для боевого сервера.")
+        if session_secret in insecure_secrets:
+            logger.warning("Используется секрет сессий по умолчанию. Задайте SESSION_SECRET для боевого сервера.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    validate_security_configuration()
+    yield
+
+
+app = FastAPI(title="Critix API", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+
 # One worker: restarting it revokes all sessions, including previously logged-out ones.
 boot_key = secrets.token_bytes(32)
 revoked = {}
@@ -67,19 +111,22 @@ def authenticated(request: Request):
 async def security(request: Request, call_next):
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         origin = request.headers.get("origin")
+        env = os.environ.get("ENVIRONMENT", os.environ.get("CRITIX_ENV", "development")).lower()
+        is_prod = env in ("production", "prod")
         expected = os.environ.get("APP_ORIGIN", "http://localhost")
         allowed = {e.strip() for e in expected.split(",") if e.strip()}
-        if any("localhost" in e or "127.0.0.1" in e for e in allowed) or not allowed:
-            allowed.update({
-                "http://localhost", "https://localhost",
-                "http://127.0.0.1", "https://127.0.0.1",
-                "http://localhost:5173", "https://localhost:5173",
-                "http://127.0.0.1:5173", "https://127.0.0.1:5173",
-                "http://localhost:80", "https://localhost:80",
-                "http://localhost:443", "https://localhost:443",
-                "http://127.0.0.1:80", "https://127.0.0.1:443"
-            })
-        if origin and origin not in allowed:
+        if not is_prod:
+            if any("localhost" in e or "127.0.0.1" in e for e in allowed) or not allowed:
+                allowed.update({
+                    "http://localhost", "https://localhost",
+                    "http://127.0.0.1", "https://127.0.0.1",
+                    "http://localhost:5173", "https://localhost:5173",
+                    "http://127.0.0.1:5173", "https://127.0.0.1:5173",
+                    "http://localhost:80", "https://localhost:80",
+                    "http://localhost:443", "https://localhost:443",
+                    "http://127.0.0.1:80", "http://127.0.0.1:443"
+                })
+        if origin and (origin not in allowed or "*" in allowed):
             return JSONResponse(status_code=403, content={"detail": "Недопустимый источник запроса"})
         if request.headers.get("x-critix-request") != "1":
             return JSONResponse(status_code=403, content={"detail": "Отсутствует заголовок защиты запроса"})
@@ -205,10 +252,23 @@ def simulate(project_id: UUID, body: SaveProject, db=Depends(session)):
     return service.update(db, project_id, body, simulate=True)
 
 
-@app.post("/api/projects/{project_id}/ai", dependencies=calculated)
-async def ai(project_id: UUID, db=Depends(session)):
-    _, data = service.read(db, project_id)
-    return await explain(data, analyze(data))
+def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None):
+    # A worker owns the session and the slot; neither survives into the LLM wait.
+    if not calculation_slots.acquire(timeout=3):
+        raise HTTPException(503, "Сейчас выполняются другие расчёты. Повторите запрос через несколько секунд")
+    try:
+        with SessionLocal() as db:
+            _, saved_data = service.read(db, project_id)
+        data = project if project is not None else saved_data
+        return data, analyze(data)
+    finally:
+        calculation_slots.release()
+
+
+@app.post("/api/projects/{project_id}/ai", dependencies=auth)
+async def ai(project_id: UUID):
+    data, analysis = await run_in_threadpool(prepare_ai_context, project_id)
+    return await explain(data, analysis)
 
 
 class ChatMessage(BaseModel):
@@ -221,22 +281,30 @@ class ChatRequest(BaseModel):
     project: Optional[ProjectInput] = None
 
 
-@app.post("/api/projects/{project_id}/chat", dependencies=calculated)
-async def chat_copilot(project_id: UUID, body: ChatRequest, db=Depends(session)):
-    _, saved_data = service.read(db, project_id)
-    data = body.project or saved_data
-    return await chat(data, analyze(data), [m.model_dump() for m in body.messages])
-
+@app.post("/api/projects/{project_id}/chat", dependencies=auth)
+async def chat_copilot(project_id: UUID, body: ChatRequest):
+    data, analysis = await run_in_threadpool(prepare_ai_context, project_id, body.project)
+    return await chat(data, analysis, [m.model_dump() for m in body.messages])
 
 
 @app.get("/api/projects/{project_id}/history", dependencies=auth)
 def project_history(project_id: UUID, db=Depends(session)):
-    service.load(db, project_id)
-    changes = db.scalars(select(models.Change).where(models.Change.project_id == project_id)
-                         .order_by(models.Change.version.desc()).limit(20)).all()
-    return [{"version": item.version, "created_at": item.created_at,
-             "finish": item.analysis.get("finish"),
-             "task_count": len(item.snapshot.get("tasks", []))} for item in changes]
+    return service.get_history(db, project_id)
+
+
+@app.get("/api/projects/{project_id}/scenarios", dependencies=auth)
+def list_scenarios(project_id: UUID, db=Depends(session)):
+    return service.list_scenarios(db, project_id)
+
+
+@app.post("/api/projects/{project_id}/scenarios", dependencies=calculated, status_code=201)
+def create_scenario(project_id: UUID, body: CreateScenario, db=Depends(session)):
+    return service.create_scenario(db, project_id, body)
+
+
+@app.delete("/api/projects/{project_id}/scenarios/{scenario_id}", dependencies=auth)
+def delete_scenario(project_id: UUID, scenario_id: UUID, db=Depends(session)):
+    return service.delete_scenario(db, project_id, scenario_id)
 
 
 @app.post("/api/projects/{project_id}/level", dependencies=calculated)

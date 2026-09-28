@@ -17,6 +17,7 @@ services:
     build: ./backend
     restart: unless-stopped
     environment:
+      ENVIRONMENT: production
       DATABASE_URL: postgresql+psycopg://critix:${POSTGRES_PASSWORD}@db:5432/critix
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}

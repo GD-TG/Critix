@@ -8,6 +8,7 @@ export function TimelinePanel() {
     date,
     shortDate,
     formatMinutes,
+    formatWorkDuration,
     timelineMode,
     setTimelineMode,
     dependencyVisible,
@@ -114,7 +115,7 @@ export function TimelinePanel() {
                     <span className="task-name">{t.name}</span>
                     <span className="task-meta">
                       <i className={`task-status-dot ${statusClass}`} />
-                      {statusLabels[t.status]} · {person?.role ? `${person.role} · ` : ""}{formatMinutes(t.duration_minutes)}
+                      {statusLabels[t.status]} · {person?.role ? `${person.role} · ` : ""}{formatWorkDuration(t.duration_minutes, isMilestone)}
                     </span>
                   </div>
                 </div>
@@ -141,7 +142,7 @@ export function TimelinePanel() {
                       className={`task-bar ${statusClass} ${r.critical ? "critical" : ""}`}
                       style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                     >
-                      {formatMinutes(t.duration_minutes)}
+                      {formatWorkDuration(t.duration_minutes, false)}
                     </span>
                   )}
                   {dependencyVisible && (draft?.dependencies || []).some((d) => d.successor_id === t.id) && (
@@ -231,7 +232,7 @@ export function TimelinePanel() {
                   </div>
 
                   <div className="col-duration">
-                    <span className="duration-val">{formatMinutes(t.duration_minutes)}</span>
+                    <span className="duration-val">{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</span>
                     <span className="duration-sub">{t.allocation_percent || 100}% закр.</span>
                   </div>
 
@@ -253,7 +254,7 @@ export function TimelinePanel() {
                         Крит. путь
                       </span>
                     ) : r?.slack_minutes != null ? (
-                      <span className="slack-badge non-critical" title={`Свободный резерв: ${formatMinutes(r.slack_minutes)}`}>
+                      <span className="slack-badge non-critical" title={`Свободный резерв: ${formatWorkDuration(r.slack_minutes)}`}>
                         +{Math.round(r.slack_minutes / 60)} ч.
                       </span>
                     ) : (

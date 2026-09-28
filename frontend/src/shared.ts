@@ -150,14 +150,20 @@ export function getOverloadedAssigneeIds(view: Result | null): Set<string> {
   return new Set(view?.analysis.overloads.map((o) => o.assignee_id) || []);
 }
 
-export function formatMinutes(minutes: number): string {
-  if (minutes === 0) return "0 ч (веха)";
+/**
+ * Форматирует рабочие трудозатраты (длительность задачи, резерв) в рабочих часах.
+ * 8 рабочих часов = 1 рабочий день.
+ * Признак вехи определяется строго по задаче (isMilestone).
+ */
+export function formatWorkDuration(minutes: number, isMilestone = false): string {
+  if (isMilestone) return "0 ч (веха)";
+  if (minutes === 0) return "0 ч";
   const abs = Math.abs(minutes);
   const hours = abs / 60;
   if (Number.isInteger(hours)) {
     if (hours % 8 === 0 && hours >= 8) {
       const days = hours / 8;
-      return `${days} дн (${hours} ч)`;
+      return `${hours} ч (${days} раб. дн.)`;
     }
     return `${hours} ч`;
   }
@@ -166,11 +172,50 @@ export function formatMinutes(minutes: number): string {
   return h > 0 ? `${h} ч ${m} мин` : `${m} мин`;
 }
 
-export function formatDeltaText(minutes: number | null | undefined): { text: string; status: "advance" | "delay" | "ontime" | "none" } {
-  if (minutes == null) return { text: "Базовый план не зафиксирован", status: "none" };
-  if (minutes === 0) return { text: "Точно в графике эталона", status: "ontime" };
-  if (minutes < 0) {
-    return { text: `Опережение: раньше на ${formatMinutes(Math.abs(minutes))}`, status: "advance" };
-  }
-  return { text: `Задержка: позже на ${formatMinutes(minutes)}`, status: "delay" };
+/**
+ * Форматирует календарный интервал (сдвиг дедлайна, разницу дат) в календарных днях и часах.
+ * 24 часа = 1 календарный день (1440 минут).
+ * 48 календарных часов = ровно 2 календарных дня.
+ */
+export function formatCalendarDuration(minutes: number): string {
+  const abs = Math.abs(minutes);
+  if (abs === 0) return "0 ч";
+  const days = Math.floor(abs / 1440);
+  const remMinutes = abs % 1440;
+  const hours = Math.floor(remMinutes / 60);
+  const m = remMinutes % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} дн.`);
+  if (hours > 0) parts.push(`${hours} ч`);
+  if (m > 0) parts.push(`${m} мин`);
+
+  return parts.join(" ") || "0 мин";
 }
+
+/**
+ * Форматирует календарный сдвиг со знаком («позже на…» / «раньше на…»).
+ * Для нулевой разницы возвращает «Срок не изменился».
+ */
+export function formatCalendarShift(minutes: number | null | undefined): string {
+  if (minutes == null) return "Срок не задан";
+  if (minutes === 0) return "Срок не изменился";
+  if (minutes > 0) return `позже на ${formatCalendarDuration(minutes)}`;
+  return `раньше на ${formatCalendarDuration(Math.abs(minutes))}`;
+}
+
+export function formatCalendarDelta(minutes: number | null | undefined): { text: string; status: "advance" | "delay" | "ontime" | "none" } {
+  if (minutes == null) return { text: "Базовый план не зафиксирован", status: "none" };
+  if (minutes === 0) return { text: "Срок не изменился", status: "ontime" };
+  if (minutes < 0) {
+    return { text: `Опережение: раньше на ${formatCalendarDuration(Math.abs(minutes))}`, status: "advance" };
+  }
+  return { text: `Задержка: позже на ${formatCalendarDuration(minutes)}`, status: "delay" };
+}
+
+// Обратная совместимость для существующего кода
+export function formatMinutes(minutes: number): string {
+  return formatWorkDuration(minutes, false);
+}
+
+export const formatDeltaText = formatCalendarDelta;

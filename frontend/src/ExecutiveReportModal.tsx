@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -25,7 +26,7 @@ import {
   Users,
 } from "lucide-react";
 import { AiMarkdown } from "./AiMarkdown";
-import { formatDeltaText, formatMinutes } from "./shared";
+import { formatDeltaText, formatMinutes, formatWorkDuration } from "./shared";
 import type { Project, Result } from "./types";
 
 interface ExecutiveReportModalProps {
@@ -34,6 +35,7 @@ interface ExecutiveReportModalProps {
   project: Project;
   result?: Result | null;
   aiSummary?: string;
+  aiSource?: "llm" | "engine";
 }
 
 export function ExecutiveReportModal({
@@ -42,6 +44,7 @@ export function ExecutiveReportModal({
   project,
   result,
   aiSummary,
+  aiSource = "llm",
 }: ExecutiveReportModalProps) {
   const formatDate = (iso?: string | null) =>
     iso
@@ -76,16 +79,23 @@ export function ExecutiveReportModal({
   const criticalTasks = project.tasks.filter((t) => rows.get(t.id)?.critical);
   const overloads = result?.analysis.overloads || [];
   const deadlineExceeded = result?.analysis.deadline_exceeded;
+  const isStale = Boolean(result?.analysis.forecast_stale || result?.analysis.is_stale);
   const finishDate = result?.analysis.finish;
   const baselineDelta = result?.analysis.baseline_delta_minutes;
   const deltaInfo = formatDeltaText(baselineDelta);
 
   // Generate Markdown text for export / copy
   const generateMarkdown = (): string => {
+    const statusLabel = deadlineExceeded
+      ? "⚠️ Превышение дедлайна"
+      : isStale
+      ? "⚠️ Прогноз устарел (требуется актуализация исходных данных)"
+      : "✅ В плановом графике";
+
     const lines: string[] = [
       `# Исполнительный отчет по проекту: ${project.name}`,
       `**Дата формирования**: ${formatTime(new Date().toISOString())}`,
-      `**Статус дедлайна**: ${deadlineExceeded ? "⚠️ Превышение дедлайна" : "✅ В плановом графике"}`,
+      `**Статус дедлайна**: ${statusLabel}`,
       `**Базовый план (Baseline)**: ${deltaInfo.text}`,
       `**Часовой пояс**: ${project.timezone}`,
       `**Плановый старт**: ${formatDate(project.start)} | **Целевой дедлайн**: ${formatDate(project.deadline)}`,
@@ -107,7 +117,7 @@ export function ExecutiveReportModal({
       const p = project.assignees.find((a) => a.id === t.assignee_id);
       const r = rows.get(t.id);
       lines.push(
-        `| ${t.id} | ${t.name} | ${p?.name || "—"} | ${formatMinutes(t.duration_minutes)} | ${r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"} |`,
+        `| ${t.id} | ${t.name} | ${p?.name || "—"} | ${formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)} | ${r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"} |`,
       );
     });
 
@@ -121,7 +131,10 @@ export function ExecutiveReportModal({
     });
 
     if (aiSummary) {
-      lines.push("", "---", "## 4. Стратегические рекомендации AI Copilot", aiSummary);
+      const title = aiSource === "engine"
+        ? "## 4. Расчетная сводка аналитического движка (AI недоступен)"
+        : "## 4. Стратегические рекомендации AI Copilot";
+      lines.push("", "---", title, aiSummary);
     }
 
     lines.push("", "---", "## 5. Полный реестр задач проекта");
@@ -133,10 +146,10 @@ export function ExecutiveReportModal({
       const slack = r?.critical
         ? "Критический (0 ч)"
         : r?.slack_minutes != null
-        ? formatMinutes(r.slack_minutes)
+        ? formatWorkDuration(r.slack_minutes)
         : "—";
       lines.push(
-        `| ${t.id} | ${t.name} | ${t.status} | ${t.priority || "medium"} | ${p?.name || "—"} | ${formatMinutes(t.duration_minutes)} | ${slack} |`,
+        `| ${t.id} | ${t.name} | ${t.status} | ${t.priority || "medium"} | ${p?.name || "—"} | ${formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)} | ${slack} |`,
       );
     });
 
@@ -238,8 +251,8 @@ export function ExecutiveReportModal({
             <Group justify="space-between" align="flex-start">
               <div>
                 <Group gap="xs" mb={6}>
-                  <Badge size="sm" color={deadlineExceeded ? "red" : "teal"}>
-                    {deadlineExceeded ? "Превышение дедлайна" : "В плановом графике"}
+                  <Badge size="sm" color={deadlineExceeded ? "red" : isStale ? "orange" : "teal"}>
+                    {deadlineExceeded ? "Превышение дедлайна" : isStale ? "Прогноз устарел" : "В плановом графике"}
                   </Badge>
                   {baselineDelta != null && (
                     <Badge size="sm" color={deltaInfo.status === "advance" ? "teal" : deltaInfo.status === "delay" ? "red" : "blue"} variant="light">
@@ -296,13 +309,30 @@ export function ExecutiveReportModal({
             </Card>
           </SimpleGrid>
 
-          {/* AI Strategic Analysis */}
+          {isStale && (
+            <Alert
+              icon={<AlertTriangle size={16} />}
+              color="orange"
+              title="Прогноз требует актуализации исходных данных"
+              mb="md"
+            >
+              В проекте обнаружены незавершённые задачи, плановый срок окончания которых находится в прошлом. Расписание сохранено без искусственного переноса дат. Пожалуйста, внесите фактические даты завершения или скорректируйте оценки длительности.
+            </Alert>
+          )}
+
+          {/* AI Strategic Analysis / Engine Summary */}
           {aiSummary && (
-            <Card withBorder p="sm" mb="md" style={{ background: "rgba(210, 10, 46, 0.04)" }}>
+            <Card withBorder p="sm" mb="md" style={{ background: aiSource === "engine" ? "rgba(245, 159, 0, 0.05)" : "rgba(210, 10, 46, 0.04)", borderColor: aiSource === "engine" ? "rgba(245, 159, 0, 0.3)" : undefined }}>
               <Group gap="xs" mb={8}>
-                <Sparkles size={16} color="var(--brand, #d20a2e)" />
-                <Text size="xs" fw={700} c="red">
-                  СТРАТЕГИЧЕСКИЙ АНАЛИЗ И РЕКОМЕНДАЦИИ AI
+                {aiSource === "engine" ? (
+                  <AlertTriangle size={16} color="#f59f00" />
+                ) : (
+                  <Sparkles size={16} color="var(--brand, #d20a2e)" />
+                )}
+                <Text size="xs" fw={700} c={aiSource === "engine" ? "orange" : "red"}>
+                  {aiSource === "engine"
+                    ? "РАСЧЕТНАЯ СВОДКА ДВИЖКА (AI НЕДОСТУПЕН)"
+                    : "СТРАТЕГИЧЕСКИЙ АНАЛИЗ И РЕКОМЕНДАЦИИ AI"}
                 </Text>
               </Group>
               <AiMarkdown content={aiSummary} />
@@ -348,7 +378,7 @@ export function ExecutiveReportModal({
                     <Table.Td>
                       {p ? `${p.name} (${p.role || "Роль не указана"})` : "—"}
                     </Table.Td>
-                    <Table.Td>{formatMinutes(t.duration_minutes)}</Table.Td>
+                    <Table.Td>{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</Table.Td>
                     <Table.Td>{r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"}</Table.Td>
                   </Table.Tr>
                 );

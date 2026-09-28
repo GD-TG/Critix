@@ -64,3 +64,41 @@ test("rescheduling preserves completed and started tasks and future constraints"
   const onTime = { tasks: [{ id: "a", finish: "2026-10-01T12:00:00Z" }] };
   assert.equal(rescheduleOverdueTasks([future], onTime, now)[0], future);
 });
+
+test("completing milestone allows identical start and finish without artificial hour", () => {
+  const milestone = {
+    id: "m1",
+    name: "Milestone Release",
+    duration_minutes: 0,
+    allocation_percent: 100,
+    status: "todo",
+    assignee_id: null,
+    not_before: null,
+    actual_start: null,
+    actual_finish: null,
+  };
+  const plannedStart = "2026-09-28T10:00:00.000Z";
+  const plannedFinish = "2026-09-28T10:00:00.000Z";
+  const done = changeTaskStatus(milestone, "done", plannedStart, plannedFinish);
+  assert.equal(done.actual_start, plannedStart);
+  assert.equal(done.actual_finish, plannedFinish);
+  assert.equal(done.actual_start, done.actual_finish);
+});
+
+test("completing task earlier than planned preserves the earlier actual finish", () => {
+  const earlyTask = {
+    id: "e1",
+    name: "Early Delivery",
+    duration_minutes: 120,
+    allocation_percent: 100,
+    status: "in_progress",
+    assignee_id: null,
+    not_before: null,
+    actual_start: "2026-09-25T09:00:00.000Z",
+    actual_finish: "2026-09-25T11:00:00.000Z", // completed early
+  };
+  const plannedFinish = "2026-09-28T18:00:00.000Z";
+  const done = changeTaskStatus(earlyTask, "done", "2026-09-25T09:00:00.000Z", plannedFinish);
+  assert.equal(done.actual_finish, "2026-09-25T11:00:00.000Z");
+});
+

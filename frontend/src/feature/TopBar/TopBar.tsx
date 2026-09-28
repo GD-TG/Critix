@@ -28,6 +28,7 @@ export function TopBar() {
     overloadedAssigneeIds,
     shortDate,
     formatMinutes,
+    formatCalendarDuration,
     rescheduleOverdue,
     setTask,
     copy,
@@ -97,7 +98,7 @@ export function TopBar() {
                         <div style={{ flex: 1 }}>
                           <Text size="xs" fw={700} c="red">Дедлайн проекта превышен</Text>
                           <Text size="11px" c="dimmed">
-                            Расчетный финиш позже дедлайна на {formatMinutes(view.analysis.delay_minutes)}.
+                            Расчетный финиш позже дедлайна на {formatCalendarDuration(view.analysis.delay_minutes)}.
                           </Text>
                         </div>
                       </Group>

@@ -102,12 +102,28 @@ def test_http_login_demo_simulation_save_and_reopen(monkeypatch):
             changed = reopened.json()["project"]
             first = next(t for t in changed["tasks"] if t["id"] == "1")
             first.update(status="todo", actual_start=None, actual_finish=None)
-            result = client.put(url, headers=headers, json={"version": 2, "project": changed})
+            result = client.put(url, headers=headers, json={"version": 2, "project": changed, "comment": "Проверка комментария"})
             assert result.status_code == 200, result.text
             history = client.get(url + "/history")
             assert history.status_code == 200
             assert [entry["version"] for entry in history.json()] == [3, 2, 1]
+            assert history.json()[0]["comment"] == "Проверка комментария"
             assert history.json()[0]["task_count"] == len(demo().tasks)
+
+            # Test Scenarios
+            sc_resp = client.post(url + "/scenarios", headers=headers, json={
+                "name": "Сценарий 1",
+                "description": "Тестовый сценарий",
+                "base_version": 3,
+                "project": changed,
+            })
+            assert sc_resp.status_code == 201
+            sc_id = sc_resp.json()["id"]
+            sc_list = client.get(url + "/scenarios", headers=headers)
+            assert sc_list.status_code == 200
+            assert len(sc_list.json()) == 1
+            assert client.delete(url + f"/scenarios/{sc_id}", headers=headers).status_code == 200
+
             assert client.delete(url, headers=headers).status_code == 200
             assert client.get(url).status_code == 404
     finally:

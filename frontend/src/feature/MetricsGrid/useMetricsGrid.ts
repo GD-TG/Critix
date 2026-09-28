@@ -3,7 +3,7 @@ import { useApp } from "@/context/AppContext";
 import { formatShortDate, getOverdueTasks, getZone } from "@/shared";
 
 export function useMetricsGrid() {
-  const { draft, saved, preview, rescheduleOverdue } = useApp();
+  const { draft, saved, preview, rescheduleOverdue, setTask } = useApp();
 
   const view = preview || saved;
   const zone = getZone(draft, saved);
@@ -14,6 +14,14 @@ export function useMetricsGrid() {
   const progressPercent = totalTasksCount ? Math.round((completedCount / totalTasksCount) * 100) : 0;
 
   const overdueTasks = getOverdueTasks(view);
+  const isStale = Boolean(view?.analysis.forecast_stale || view?.analysis.is_stale);
+  const staleTaskIds = new Set(
+    view?.analysis.stale_task_ids || overdueTasks.map((o) => o.id),
+  );
+  const staleTasks = (draft?.tasks || []).filter(
+    (t) => t.status !== "done" && staleTaskIds.has(t.id),
+  );
+
   const baselineVarianceHours = view?.analysis.baseline_delta_minutes == null ? null : view.analysis.baseline_delta_minutes / 60;
 
   const daysRemaining = useMemo(() => {
@@ -35,8 +43,11 @@ export function useMetricsGrid() {
     totalTasksCount,
     progressPercent,
     overdueTasks,
+    isStale,
+    staleTasks,
     baselineVarianceHours,
     daysRemaining,
     rescheduleOverdue,
+    setTask,
   };
 }

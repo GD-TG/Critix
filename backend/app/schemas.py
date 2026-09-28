@@ -1,5 +1,6 @@
 from datetime import date, datetime, time
 from typing import Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -164,7 +165,28 @@ class ProjectInput(StrictModel):
 class SaveProject(StrictModel):
     version: int = Field(ge=1)
     project: ProjectInput
+    comment: str | None = Field(default=None, max_length=512)
 
 
 class LevelProject(SaveProject):
     assignee_id: str | None = None
+
+
+class CreateScenario(StrictModel):
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = Field(default=None, max_length=512)
+    base_version: int = Field(ge=1)
+    project: ProjectInput
+
+
+class ScenarioResponse(StrictModel):
+    id: UUID
+    project_id: UUID
+    name: str
+    description: str | None = None
+    base_version: int
+    is_stale: bool = False
+    created_at: datetime
+    project: ProjectInput
+    analysis: dict | None = None
+    changes: dict | None = None

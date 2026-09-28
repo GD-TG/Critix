@@ -60,6 +60,7 @@ export function App() {
     executiveReportModal,
     setExecutiveReportModal,
     aiText,
+    aiReport,
     run,
     list,
     accept,
@@ -182,6 +183,7 @@ export function App() {
           project={view?.project || draft}
           result={view}
           aiSummary={aiText}
+          aiSource={aiReport?.source || "llm"}
         />
       )}
     </MantineProvider>

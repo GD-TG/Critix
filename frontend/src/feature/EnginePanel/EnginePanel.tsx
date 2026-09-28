@@ -78,7 +78,7 @@ export function EnginePanel() {
               {view.analysis.tasks.filter((t) => !t.critical).length} некритических задач с запасом
             </Text>
             <Text size="xs" c="dimmed">
-              Резервы рассчитаны до ближайшего преемника
+              Полные резервы относительно расчётного финиша проекта
             </Text>
           </Card>
         </SimpleGrid>

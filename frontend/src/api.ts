@@ -17,11 +17,12 @@ export async function api<T>(
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const detail = (data as any).detail;
-      throw new Error(
-        Array.isArray(detail)
-          ? detail.map((item: { msg: string }) => item.msg).join("; ")
-          : detail || (response.status >= 500 ? "некорректный ответ сервера" : `Ошибка ${response.status}`),
-      );
+      const message = Array.isArray(detail)
+        ? detail.map((item: { msg: string }) => item.msg).join("; ")
+        : detail || (response.status >= 500 ? "некорректный ответ сервера" : `Ошибка ${response.status}`);
+      const err = new Error(message) as Error & { status?: number };
+      err.status = response.status;
+      throw err;
     }
     return data;
   } catch (e: any) {

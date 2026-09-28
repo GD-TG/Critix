@@ -77,4 +77,17 @@ class Change(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     snapshot: Mapped[dict] = mapped_column(JSON)
     analysis: Mapped[dict] = mapped_column(JSON)
+    comment: Mapped[str | None] = mapped_column(String(512), nullable=True)
     __table_args__ = (UniqueConstraint("project_id", "version"),)
+
+
+class Scenario(Base):
+    __tablename__ = "scenarios"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    base_version: Mapped[int]
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+

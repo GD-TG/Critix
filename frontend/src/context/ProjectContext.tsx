@@ -25,6 +25,8 @@ interface ProjectContextValue {
   dirty: boolean;
   aiText: string;
   setAiText: (v: string) => void;
+  aiReport: { available: boolean; source: "llm" | "engine"; text: string } | null;
+  setAiReport: (v: { available: boolean; source: "llm" | "engine"; text: string } | null) => void;
   list: () => Promise<Array<{ id: string; name: string }>>;
   accept: (result: Result) => void;
   change: (p: Project) => void;
@@ -46,6 +48,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [preview, setPreview] = useState<Result | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [aiText, setAiText] = useState("");
+  const [aiReport, setAiReport] = useState<{ available: boolean; source: "llm" | "engine"; text: string } | null>(null);
 
   const run = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(true);
@@ -71,6 +74,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setDraft(copy(result.project));
     setPreview(null);
     setAiText("");
+    setAiReport(null);
     setLastUpdated(new Date());
   }, []);
 
@@ -78,6 +82,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setDraft(p);
     setPreview(null);
     setAiText("");
+    setAiReport(null);
     setLastUpdated(new Date());
   }, []);
 
@@ -86,6 +91,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setDraft(null);
     setPreview(null);
     setAiText("");
+    setAiReport(null);
   }, []);
 
   // Clear the working project on logout
@@ -95,6 +101,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setDraft(null);
       setPreview(null);
       setAiText("");
+      setAiReport(null);
     }
   }, [logged]);
 
@@ -132,6 +139,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     projects, saved, draft, preview, view, rows, affected, overloadedAssigneeIds,
     lastUpdated, dirty,
     aiText, setAiText,
+    aiReport, setAiReport,
     list, accept, change, run, clearProject,
     setSaved, setDraft, setPreview,
   };
