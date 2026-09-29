@@ -4,6 +4,7 @@ import { useProjects } from "@/context/ProjectContext";
 import { useUi } from "@/context/UiContext";
 import { useTaskState } from "@/context/TaskContext";
 import { api } from "@/api";
+import { applyCheckedScenario } from "@/scenarioApplication";
 import { copy, formatDateTime, formatCalendarShift, getZone } from "@/shared";
 import type { Result, Scenario } from "@/types";
 
@@ -47,16 +48,17 @@ export function useScenarioModal() {
 
   const fetchScenarios = useCallback(async () => {
     if (!saved?.id) return;
+    const isCurrent = gate.watch();
     setLoadingScenarios(true);
     try {
       const data = await api<Scenario[]>(`/projects/${saved.id}/scenarios`);
-      setScenarios(data);
+      if (isCurrent()) setScenarios(data);
     } catch {
-      // Ignored if unauthenticated or network error
+      if (isCurrent()) setActionError("Не удалось загрузить сценарии");
     } finally {
       setLoadingScenarios(false);
     }
-  }, [saved?.id]);
+  }, [saved?.id, saved?.version, gate]);
 
   useEffect(() => {
     if (showScenarioModal && saved?.id) {
@@ -138,6 +140,8 @@ export function useScenarioModal() {
       setActionError("Укажите название сценария");
       return;
     }
+    if (actionBusy) return;
+    const isCurrent = gate.watch();
     setActionBusy(true);
     setActionError("");
     try {
@@ -147,24 +151,27 @@ export function useScenarioModal() {
         base_version: saved.version,
         project: draft,
       });
+      if (!isCurrent()) return;
       setNewScenarioName("");
       setNewScenarioDesc("");
       await fetchScenarios();
       setActiveTab("compare");
     } catch (e: any) {
-      setActionError(e?.message || "Не удалось сохранить сценарий в базу данных");
+      if (isCurrent()) setActionError(e?.message || "Не удалось сохранить сценарий в базу данных");
     } finally {
       setActionBusy(false);
     }
   };
 
   const handleCreateScenarioFromWhatif = async () => {
-    if (!saved || !simResult) return;
+    if (!saved || !simResult || !resultGuard.current?.()) return;
     const name = newScenarioName.trim();
     if (!name) {
       setActionError("Укажите название сценария");
       return;
     }
+    if (actionBusy) return;
+    const isCurrent = gate.watch();
     setActionBusy(true);
     setActionError("");
     try {
@@ -174,12 +181,13 @@ export function useScenarioModal() {
         base_version: saved.version,
         project: simResult.project,
       });
+      if (!isCurrent()) return;
       setNewScenarioName("");
       setNewScenarioDesc("");
       await fetchScenarios();
       setActiveTab("compare");
     } catch (e: any) {
-      setActionError(e?.message || "Не удалось сохранить сценарий в базу данных");
+      if (isCurrent()) setActionError(e?.message || "Не удалось сохранить сценарий в базу данных");
     } finally {
       setActionBusy(false);
     }
@@ -187,39 +195,56 @@ export function useScenarioModal() {
 
   const handleDeleteScenario = async (scenarioId: string) => {
     if (!saved) return;
+    if (actionBusy) return;
+    const isCurrent = gate.watch();
     setActionBusy(true);
     try {
       await api(`/projects/${saved.id}/scenarios/${scenarioId}`, "DELETE");
-      await fetchScenarios();
+      if (isCurrent()) await fetchScenarios();
     } catch (e: any) {
-      setActionError(e?.message || "Не удалось удалить сценарий");
+      if (isCurrent()) setActionError(e?.message || "Не удалось удалить сценарий");
     } finally {
       setActionBusy(false);
     }
   };
 
   const handleApplyScenario = async (scenario: Scenario) => {
-    if (!saved) return;
-    change(copy(scenario.project));
-    // If we have analysis or we want a fresh simulation:
-    try {
-      const res = await api<Result>(`/projects/${saved.id}/simulate`, "POST", {
-        version: saved.version,
-        project: scenario.project,
-      });
-      setPreview(res);
-    } catch {
-      if (scenario.analysis) {
-        setPreview({
-          id: saved.id,
-          version: saved.version,
-          project: scenario.project,
-          analysis: scenario.analysis,
-          changes: scenario.changes,
-        });
-      }
+    if (!saved || actionBusy || scenario.error) return;
+    if (scenario.base_version !== saved.version) {
+      setActionError("Сценарий устарел. Создайте новый вариант на основе актуального плана.");
+      return;
     }
-    close();
+    const isCurrent = gate.capture();
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await applyCheckedScenario(
+        () => api<Result>(`/projects/${saved.id}/simulate`, "POST", {
+          version: saved.version, project: scenario.project,
+        }),
+        isCurrent,
+        (res) => { change(copy(res.project)); setPreview(res); close(); },
+      );
+    } catch (error) {
+      if (isCurrent()) setActionError(error instanceof Error ? error.message : "Не удалось проверить сценарий. Черновик сохранён.");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const [analyzingIds, setAnalyzingIds] = useState<Record<string, boolean>>({});
+
+  const handleAnalyzeScenario = async (scenarioId: string) => {
+    if (!saved || actionBusy) return;
+    setAnalyzingIds((prev) => ({ ...prev, [scenarioId]: true }));
+    try {
+      const full = await api<Scenario>(`/projects/${saved.id}/scenarios/${scenarioId}`);
+      setScenarios((prev) => prev.map((s) => (s.id === scenarioId ? full : s)));
+    } catch (e: any) {
+      setActionError(e?.message || "Не удалось рассчитать сценарий");
+    } finally {
+      setAnalyzingIds((prev) => ({ ...prev, [scenarioId]: false }));
+    }
   };
 
   return {
@@ -227,6 +252,8 @@ export function useScenarioModal() {
     saved,
     scenarios,
     loadingScenarios,
+    analyzingIds,
+    handleAnalyzeScenario,
     activeTab,
     setActiveTab,
     newScenarioName,

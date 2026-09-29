@@ -9,18 +9,19 @@ export function LinksView() {
 
   return (
     <Card withBorder p="md">
-      <Group justify="space-between" mb="md">
+      <Group justify="space-between" mb="md" wrap="wrap" gap="sm">
         <div>
           <Title order={3}>Зависимости и связи между задачами</Title>
           <Text size="sm" c="dimmed">Связи задают технологическую последовательность и типы зависимостей.</Text>
         </div>
-        <Group gap="xs">
+        <Group gap="xs" wrap="wrap">
           <Button size="xs" onClick={() => setDepModal(true)}>+ Добавить связь</Button>
           <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
         </Group>
       </Group>
 
-      <Table striped highlightOnHover>
+      <div className="table-responsive-container">
+        <Table striped highlightOnHover style={{ minWidth: 620 }}>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Предшествующая задача</Table.Th>
@@ -73,6 +74,7 @@ export function LinksView() {
           })}
         </Table.Tbody>
       </Table>
+      </div>
     </Card>
   );
 }

@@ -14,7 +14,7 @@ import { useProjectManageModal } from "@/feature/ProjectManageModal/useProjectMa
 
 export function ProjectManageModal() {
   const {
-    projects, saved, draft, busy,
+    projects, saved, draft, busy, switchingId,
     projectManageModal, setProjectManageModal,
     setNewProjectModal, setJsonImportModal,
     deleteConfirmProject, setDeleteConfirmProject,
@@ -36,11 +36,11 @@ export function ProjectManageModal() {
           classNames={{ content: "project-manage-modal" }}
         >
           <Stack gap="md">
-            <Group justify="space-between">
+            <Group justify="space-between" wrap="wrap" gap="sm">
               <Text size="sm" c="dimmed">
                 Выберите проект для переключения или создайте новый.
               </Text>
-              <Group gap="xs">
+              <Group gap="xs" wrap="wrap">
                 <Button size="xs" variant="light" leftSection={<RotateCcw size={13} />} onClick={handleLoadDemoProject}>
                   Загрузить Демо-проект
                 </Button>
@@ -50,7 +50,7 @@ export function ProjectManageModal() {
               </Group>
             </Group>
 
-            <Group gap="xs">
+            <Group gap="xs" wrap="wrap">
               <Button size="xs" variant="default" leftSection={<Upload size={13} />} onClick={() => setJsonImportModal(true)}>
                 Импорт JSON
               </Button>
@@ -82,6 +82,8 @@ export function ProjectManageModal() {
                           <Button
                             size="xs"
                             variant="light"
+                            loading={switchingId === p.id}
+                            disabled={busy || Boolean(switchingId)}
                             onClick={() => switchProject(p.id, p.name)}
                           >
                             Переключиться

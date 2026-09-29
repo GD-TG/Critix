@@ -35,6 +35,7 @@ export function HistoryPanel() {
                 background: "var(--mantine-color-body)",
               }}
             >
+              {item.change_details?.map((detail, i) => <Text key={i} size="xs">{detail}</Text>)}
               <Group justify="space-between" mb={4}>
                 <Group gap="xs">
                   <Badge variant="filled" size="sm">

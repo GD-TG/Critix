@@ -1,5 +1,17 @@
 import type { Analysis, Task } from "./types.ts";
 
+export function formatIsoToMinute(input: Date | string = new Date()): string {
+  const d = typeof input === "string" ? new Date(input) : new Date(input);
+  if (isNaN(d.getTime())) return new Date().toISOString();
+  d.setSeconds(0, 0);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const hours = String(d.getUTCHours()).padStart(2, "0");
+  const minutes = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}:00Z`;
+}
+
 /**
  * Предлагает значения по умолчанию для фактических дат при завершении задачи.
  * - Для вех (duration_minutes === 0) разрешены одинаковые start и finish.
@@ -14,7 +26,7 @@ export function proposeActualDates(
 ): { actual_start: string; actual_finish: string } {
   const isMilestone = task.duration_minutes === 0;
   now.setSeconds(0, 0);
-  const nowIso = now.toISOString();
+  const nowIso = formatIsoToMinute(now);
 
   let start = task.actual_start || plannedStart || nowIso;
   let finish = task.actual_finish;
@@ -26,7 +38,7 @@ export function proposeActualDates(
       finish = plannedFinish;
     } else {
       const durMs = Math.max(task.duration_minutes, 1) * 60000;
-      finish = new Date(new Date(start).getTime() + durMs).toISOString();
+      finish = formatIsoToMinute(new Date(new Date(start).getTime() + durMs));
     }
   }
 
@@ -39,7 +51,7 @@ export function proposeActualDates(
     // Для обычной задачи окончание должно быть строго позже начала
     if (new Date(finish).getTime() <= new Date(start).getTime()) {
       const durMs = Math.max(task.duration_minutes, 1) * 60000;
-      finish = new Date(new Date(start).getTime() + durMs).toISOString();
+      finish = formatIsoToMinute(new Date(new Date(start).getTime() + durMs));
     }
   }
 
@@ -65,7 +77,7 @@ export function changeTaskStatus(
     return {
       ...task,
       status,
-      actual_start: task.actual_start || plannedStart || new Date().toISOString(),
+      actual_start: task.actual_start || (plannedStart ? formatIsoToMinute(plannedStart) : formatIsoToMinute()),
       actual_finish: null,
     };
   }

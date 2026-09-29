@@ -4,7 +4,7 @@ import { useApp } from "@/context/AppContext";
 import type { Result } from "@/types";
 
 export function useAuthForm() {
-  const { login, register, demoLogin, busy, error, setError, list, accept } = useApp();
+  const { login, register, busy, error, setError, list, accept } = useApp();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,13 +57,6 @@ export function useAuthForm() {
     }
   };
 
-  const handleDemoLogin = async () => {
-    const ok = await demoLogin();
-    if (ok) {
-      await loadProjectsAfterAuth();
-    }
-  };
-
   const handleSubmit = async () => {
     if (mode === "login") {
       await handleLogin();
@@ -84,6 +77,5 @@ export function useAuthForm() {
     busy,
     error,
     handleSubmit,
-    handleDemoLogin,
   };
 }

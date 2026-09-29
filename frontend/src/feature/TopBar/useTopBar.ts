@@ -12,6 +12,8 @@ export function useTopBar() {
     setHelpModal,
     setProjectManageModal,
     rescheduleOverdue,
+    mobileNavOpened,
+    setMobileNavOpened,
   } = useApp();
 
   const view = preview || saved;
@@ -37,5 +39,6 @@ export function useTopBar() {
     setExecutiveReportModal,
     setHelpModal,
     setProjectManageModal,
+    setMobileNavOpened,
   };
 }

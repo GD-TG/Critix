@@ -130,6 +130,7 @@ export const defaultTask = (): Task => ({
 });
 
 export type Scenario = {
+  error?: string;
   id: string;
   project_id: string;
   name: string;
@@ -153,6 +154,7 @@ export type HistoryEntry = {
   comment?: string | null;
   task_count: number;
   changed_tasks?: string[];
+  change_details?: string[];
   finish_delta_minutes?: number;
 };
 

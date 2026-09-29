@@ -26,19 +26,20 @@ export function TasksTableView() {
 
   return (
     <Card withBorder p="md">
-      <Group justify="space-between" mb="md">
+      <Group justify="space-between" mb="md" wrap="wrap" gap="sm">
         <div>
           <Title order={3}>Полная таблица задач проекта</Title>
           <Text size="sm" c="dimmed">Кликните по задаче для детального редактирования дат, навыков, связей и причин сроков.</Text>
         </div>
-        <Group gap="xs">
+        <Group gap="xs" wrap="wrap">
           <Button size="xs" onClick={addTask}>+ Добавить задачу</Button>
           <Button size="xs" variant="light" onClick={() => setImportModal(true)}>Импорт CSV</Button>
           <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>← На Главную</Button>
         </Group>
       </Group>
 
-      <Table striped highlightOnHover withTableBorder>
+      <div className="table-responsive-container">
+        <Table striped highlightOnHover withTableBorder style={{ minWidth: 920 }}>
         <Table.Thead>
           <Table.Tr>
             <Table.Th style={{ width: 50 }}>ID</Table.Th>
@@ -190,6 +191,7 @@ export function TasksTableView() {
           })}
         </Table.Tbody>
       </Table>
+      </div>
     </Card>
   );
 }

@@ -68,7 +68,8 @@ export function TimelinePanel() {
       </div>
 
       {timelineMode === "timeline" ? (
-        <div className="timeline">
+        <div className="timeline-scroll-wrap">
+          <div className="timeline">
           <div className="timeline-head">
             <div className="task-heading">ЗАДАЧА</div>
             <div className="date-heading">
@@ -159,6 +160,7 @@ export function TimelinePanel() {
               </div>
             );
           })}
+          </div>
         </div>
       ) : (
         <div className="list-view-container">

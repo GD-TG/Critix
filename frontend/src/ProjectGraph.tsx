@@ -397,24 +397,9 @@ export function ProjectGraph({
   }, [nodes, filterCriticalOnly]);
 
   return (
-    <div style={{ width: "100%", height: 680, position: "relative", borderRadius: 12, overflow: "hidden" }}>
+    <div className="project-graph-container">
       {/* Graph Toolbar */}
-      <div
-        style={{
-          position: "absolute",
-          top: 14,
-          left: 14,
-          zIndex: 10,
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          background: "var(--surface, #ffffff)",
-          padding: "6px 12px",
-          borderRadius: 8,
-          border: "1px solid var(--line, #e2e8f0)",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-        }}
-      >
+      <div className="project-graph-toolbar">
         <Button
           size="xs"
           variant="light"

@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { useProjects } from "@/context/ProjectContext";
 import { useUi } from "@/context/UiContext";
 import { useAuth } from "@/context/AuthContext";
@@ -6,7 +7,7 @@ import { exportProjectToJson } from "@/shared";
 import type { Result } from "@/types";
 
 export function useProjectManageModal() {
-  const { projects, saved, draft, list, run, accept, clearProject } = useProjects();
+  const { projects, saved, draft, dirty, list, run, accept, clearProject } = useProjects();
   const {
     projectManageModal, setProjectManageModal,
     setNewProjectModal, setJsonImportModal,
@@ -41,11 +42,30 @@ export function useProjectManageModal() {
     });
   };
 
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const switchGen = useRef(0);
+
   const switchProject = (id: string, name: string) => {
+    if (dirty && !window.confirm("В текущем проекте есть несохранённые изменения. Переключить проект без сохранения?")) {
+      return;
+    }
+    switchGen.current += 1;
+    const currentGen = switchGen.current;
+    setSwitchingId(id);
+
     void run(async () => {
-      accept(await api<Result>(`/projects/${id}`));
-      setProjectManageModal(false);
-      showNotification(`Переключено на проект «${name}»`);
+      try {
+        const result = await api<Result>(`/projects/${id}`);
+        if (switchGen.current === currentGen) {
+          accept(result);
+          setProjectManageModal(false);
+          showNotification(`Переключено на проект «${name}»`);
+        }
+      } finally {
+        if (switchGen.current === currentGen) {
+          setSwitchingId(null);
+        }
+      }
     });
   };
 
@@ -54,7 +74,7 @@ export function useProjectManageModal() {
   };
 
   return {
-    projects, saved, draft, busy,
+    projects, saved, draft, dirty, busy, switchingId,
     projectManageModal, setProjectManageModal,
     setNewProjectModal, setJsonImportModal,
     deleteConfirmProject, setDeleteConfirmProject,

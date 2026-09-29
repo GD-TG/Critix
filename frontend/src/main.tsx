@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   Button,
   Card,
+  Drawer,
   Group,
   MantineProvider,
   Stack,
@@ -65,6 +66,8 @@ export function App() {
     list,
     accept,
     showNotification,
+    mobileNavOpened,
+    setMobileNavOpened,
   } = useApp();
 
   const view = preview || saved;
@@ -94,7 +97,20 @@ export function App() {
   return (
     <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
       <div className="app-shell">
-        <SideForm onScrollTo={scrollToSection} />
+        <div className="desktop-sidebar">
+          <SideForm onScrollTo={scrollToSection} />
+        </div>
+
+        <Drawer
+          opened={mobileNavOpened}
+          onClose={() => setMobileNavOpened(false)}
+          size="280px"
+          padding={0}
+          withCloseButton={false}
+          className="mobile-nav-drawer"
+        >
+          <SideForm onScrollTo={scrollToSection} />
+        </Drawer>
 
         <main className="main-content">
           <TopBar />
@@ -143,13 +159,21 @@ export function App() {
               </>
             )}
 
-            <GraphView />
+            <ErrorBoundary fallbackTitle="Ошибка отображения графа проекта">
+              <GraphView />
+            </ErrorBoundary>
 
-            <TasksTableView />
+            <ErrorBoundary fallbackTitle="Ошибка отображения таблицы задач">
+              <TasksTableView />
+            </ErrorBoundary>
 
-            <TeamView />
+            <ErrorBoundary fallbackTitle="Ошибка отображения команды проекта">
+              <TeamView />
+            </ErrorBoundary>
 
-            <LinksView />
+            <ErrorBoundary fallbackTitle="Ошибка отображения зависимостей">
+              <LinksView />
+            </ErrorBoundary>
 
             <AiView />
           </div>

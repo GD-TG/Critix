@@ -1,7 +1,6 @@
 import {
   Alert,
   Button,
-  Divider,
   MantineProvider,
   PasswordInput,
   SegmentedControl,
@@ -10,7 +9,6 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { Zap } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { actionTheme } from "@/theme";
 import { CritixLogo } from "@/CritixLogo";
@@ -30,7 +28,6 @@ export function AuthForm() {
     busy,
     error,
     handleSubmit,
-    handleDemoLogin,
   } = useAuthForm();
 
   return (
@@ -75,7 +72,7 @@ export function AuthForm() {
               </Title>
               <Text c="dimmed" size="sm">
                 {mode === "login"
-                  ? "Войдите под своим email или используйте быстрый демо-доступ."
+                  ? "Войдите в свой аккаунт. Демо-проект доступен после входа."
                   : "Зарегистрируйтесь для ведения собственных проектов с изоляцией данных."}
               </Text>
             </div>
@@ -122,18 +119,6 @@ export function AuthForm() {
                 {mode === "login" ? "Войти в систему" : "Зарегистрироваться"}
               </Button>
 
-              <Divider label="или для жюри и проверки" labelPosition="center" my="xs" />
-
-              <Button
-                variant="light"
-                color="violet"
-                fullWidth
-                leftSection={<Zap size={16} />}
-                loading={busy}
-                onClick={() => void handleDemoLogin()}
-              >
-                Быстрый демо-вход в 1 клик
-              </Button>
             </Stack>
 
             <div className="login-secure-note" style={{ marginTop: 14 }}>

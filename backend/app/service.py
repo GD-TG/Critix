@@ -3,15 +3,24 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
+from pydantic import ValidationError
+from app.engine.calendar import PlanningError
 
 from app import models
 from app.engine.analysis import analyze, compare
 from app.schemas import ProjectInput
+ 
+MAX_SCENARIOS_PER_PROJECT = 20
 
 
 def load(db, project_id, lock=False):
-    query = select(models.Project).where(models.Project.id == project_id)
+    owner_id = db.info.get("owner_id")
+    if owner_id is not None:
+        condition = (models.Project.id == project_id) & (models.Project.owner_id == owner_id)
+    else:
+        condition = (models.Project.id == project_id) & (models.Project.owner_id.is_(None))
+    query = select(models.Project).where(condition)
     query = query.with_for_update(read=not lock).execution_options(populate_existing=True)
     row = db.scalar(query)
     if row is None:
@@ -102,36 +111,9 @@ def authenticate_user(db, email: str, password: str):
     return user
 
 
-def get_or_create_demo_user(db):
-    demo_email = "demo@critix.ru"
-    user = db.scalar(select(models.User).where(models.User.email == demo_email))
-    if not user:
-        user = models.User(
-            email=demo_email,
-            hashed_password=hash_password("critix2026"),
-            name="Демо Руководитель",
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        create(db, demo(), owner_id=user.id)
-    else:
-        has_proj = db.scalar(select(models.Project).where(models.Project.owner_id == user.id))
-        if not has_proj:
-            create(db, demo(), owner_id=user.id)
-    return user
-
-
 def list_projects_for_user(db, user_id: UUID | None = None):
-    if user_id:
-        projects = db.scalars(
-            select(models.Project)
-            .where((models.Project.owner_id == user_id) | (models.Project.owner_id.is_(None)))
-            .order_by(models.Project.name)
-        ).all()
-    else:
-        projects = db.scalars(select(models.Project).order_by(models.Project.name)).all()
+    projects = db.scalars(select(models.Project).where(
+        models.Project.owner_id == user_id).order_by(models.Project.name)).all()
     return [dict(id=p.id, name=p.name, version=p.version) for p in projects]
 
 
@@ -180,25 +162,42 @@ def level(db, project_id, request):
     return response
 
 
-def list_scenarios(db, project_id):
+def list_scenarios(db, project_id, limit: int = 20, offset: int = 0, include_analysis: bool = False):
     row = load(db, project_id)
     current_version = row.version
-    current_project = snapshot(db, row)
-    current_analysis = analyze(current_project)
     db.rollback()
 
     scenarios = db.scalars(
         select(models.Scenario)
         .where(models.Scenario.project_id == project_id)
         .order_by(models.Scenario.created_at.desc())
+        .offset(max(0, offset))
+        .limit(max(1, min(limit, 20)))
     ).all()
+
+    for item in scenarios:
+        db.expunge(item)
+    db.rollback()
+
+    current_project = None
+    current_analysis = None
+    if include_analysis and scenarios:
+        current_project = snapshot(db, row)
+        db.rollback()
+        current_analysis = analyze(current_project)
 
     result = []
     for s in scenarios:
-        scenario_proj = ProjectInput(**s.snapshot)
-        scenario_analysis = analyze(scenario_proj)
-        delta = compare(current_analysis, scenario_analysis, current_project, scenario_proj)
-        result.append({
+        try:
+            scenario_proj = ProjectInput(**s.snapshot)
+        except (ValidationError, PlanningError, Exception):
+            result.append(dict(id=s.id, project_id=s.project_id, name=s.name,
+                               description=s.description, base_version=s.base_version,
+                               is_stale=s.base_version != current_version, created_at=s.created_at,
+                               error="Сценарий не прошёл проверку; удалите его и создайте новый"))
+            continue
+
+        item_data = {
             "id": s.id,
             "project_id": s.project_id,
             "name": s.name,
@@ -207,17 +206,38 @@ def list_scenarios(db, project_id):
             "is_stale": s.base_version != current_version,
             "created_at": s.created_at,
             "project": scenario_proj,
-            "analysis": scenario_analysis,
-            "changes": delta,
-        })
+        }
+
+        if include_analysis and current_analysis and current_project:
+            try:
+                scenario_analysis = analyze(scenario_proj)
+                delta = compare(current_analysis, scenario_analysis, current_project, scenario_proj)
+                item_data["analysis"] = scenario_analysis
+                item_data["changes"] = delta
+            except (ValidationError, PlanningError):
+                item_data["error"] = "Ошибка расчёта сценария"
+
+        result.append(item_data)
     return result
 
 
 def create_scenario(db, project_id, request):
-    row = load(db, project_id)
-    current_version = row.version
-    current_project = snapshot(db, row)
+    current_version, current_project = read(db, project_id)
+    scenario_count = db.scalar(
+        select(func.count()).select_from(models.Scenario).where(models.Scenario.project_id == project_id)
+    )
+    if scenario_count >= MAX_SCENARIOS_PER_PROJECT:
+        raise HTTPException(
+            400,
+            f"Превышен лимит сценариев для проекта (максимум {MAX_SCENARIOS_PER_PROJECT}). "
+            "Удалите устаревшие сценарии перед созданием нового.",
+        )
+    if request.base_version != current_version:
+        raise HTTPException(409, "Проект изменён. Обновите данные перед сохранением сценария")
     current_analysis = analyze(current_project)
+    scenario_analysis = analyze(request.project)
+    delta = compare(current_analysis, scenario_analysis, current_project, request.project)
+    require_version(db, project_id, current_version, lock=True)
 
     scenario_row = models.Scenario(
         project_id=project_id,
@@ -231,8 +251,6 @@ def create_scenario(db, project_id, request):
     db.commit()
     db.refresh(scenario_row)
 
-    scenario_analysis = analyze(request.project)
-    delta = compare(current_analysis, scenario_analysis, current_project, request.project)
     return {
         "id": scenario_row.id,
         "project_id": scenario_row.project_id,
@@ -247,7 +265,39 @@ def create_scenario(db, project_id, request):
     }
 
 
+def get_scenario(db, project_id, scenario_id: UUID):
+    row = load(db, project_id)
+    current_version = row.version
+    current_project = snapshot(db, row)
+    db.rollback()
+    current_analysis = analyze(current_project)
+    s = db.scalar(
+        select(models.Scenario).where(
+            models.Scenario.project_id == project_id,
+            models.Scenario.id == scenario_id,
+        )
+    )
+    if s is None:
+        raise HTTPException(404, "Сценарий не найден")
+    scenario_proj = ProjectInput(**s.snapshot)
+    scenario_analysis = analyze(scenario_proj)
+    delta = compare(current_analysis, scenario_analysis, current_project, scenario_proj)
+    return {
+        "id": s.id,
+        "project_id": s.project_id,
+        "name": s.name,
+        "description": s.description,
+        "base_version": s.base_version,
+        "is_stale": s.base_version != current_version,
+        "created_at": s.created_at,
+        "project": scenario_proj,
+        "analysis": scenario_analysis,
+        "changes": delta,
+    }
+
+
 def delete_scenario(db, project_id, scenario_id: UUID):
+    load(db, project_id, lock=True)
     scenario = db.scalar(
         select(models.Scenario).where(
             models.Scenario.project_id == project_id,
@@ -267,11 +317,11 @@ def get_history(db, project_id):
         select(models.Change)
         .where(models.Change.project_id == project_id)
         .order_by(models.Change.version.desc())
-        .limit(30)
+        .limit(31)
     ).all()
 
     result = []
-    for i, item in enumerate(changes):
+    for i, item in enumerate(changes[:30]):
         prev_item = changes[i + 1] if i + 1 < len(changes) else None
         changed_tasks = []
         finish_delta = 0
@@ -304,6 +354,37 @@ def get_history(db, project_id):
             "comment": item.comment,
             "task_count": len(item.snapshot.get("tasks", [])),
             "changed_tasks": changed_tasks,
+            "change_details": describe_changes(prev_item.snapshot, item.snapshot) if prev_item else ["Исходная версия; сравнение недоступно"],
             "finish_delta_minutes": finish_delta,
         })
     return result
+
+
+def describe_changes(before, after):
+    details = []
+    for key, label in (("name", "Название проекта"), ("timezone", "Часовой пояс"),
+                       ("start", "Начало проекта"), ("deadline", "Дедлайн"),
+                       ("calendar", "Календарь проекта"), ("baseline", "Базовый план")):
+        if before.get(key) != after.get(key):
+            details.append(f"Изменено: {label}")
+    for key, identity, label in (("tasks", lambda x: x["id"], "Задача"),
+                                 ("assignees", lambda x: x["id"], "Участник"),
+                                 ("dependencies", lambda x: (x["predecessor_id"], x["successor_id"]), "Связь")):
+        old = {identity(x): x for x in before.get(key, [])}
+        new = {identity(x): x for x in after.get(key, [])}
+        for item_id in sorted(old.keys() | new.keys(), key=str):
+            previous, current = old.get(item_id), new.get(item_id)
+            if previous == current:
+                continue
+            value = current or previous
+            name = value.get("name") or " → ".join(item_id)
+            action = "Добавлено" if previous is None else "Удалено" if current is None else "Изменено"
+            fields = [] if not previous or not current else [k for k in current.keys() | previous.keys() if current.get(k) != previous.get(k)]
+            labels = {"calendar": "календарь", "skills": "навыки", "role": "роль", "name": "название",
+                      "duration_minutes": "длительность", "assignee_id": "исполнитель", "status": "статус",
+                      "allocation_percent": "загрузка", "not_before": "не раньше", "priority": "приоритет",
+                      "required_skills": "требуемые навыки", "actual_start": "фактическое начало",
+                      "actual_finish": "фактическое окончание", "kind": "тип", "lag_minutes": "лаг", "lag_mode": "шкала лага"}
+            suffix = ": " + ", ".join(labels.get(k, k) for k in sorted(fields)) if fields else ""
+            details.append(f"{action}: {label} «{name}»{suffix}")
+    return details

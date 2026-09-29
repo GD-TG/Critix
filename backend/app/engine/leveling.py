@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 
 from app.engine.analysis import analyze
-from app.engine.calendar import PlanningError
+from app.engine.calendar import PlanningError, ResourceLimitError, CalculationBudget
 
 
 def level_resources(project, assignee_id=None, max_iterations=32):
@@ -11,7 +11,8 @@ def level_resources(project, assignee_id=None, max_iterations=32):
         raise PlanningError("Исполнитель не принадлежит проекту")
     clock = datetime.now(timezone.utc)
     cache = {}
-    result = analyze(candidate, as_of=clock, calendar_cache=cache)
+    budget = CalculationBudget()
+    result = analyze(candidate, as_of=clock, calendar_cache=cache, budget=budget)
     before = result
     moved = set()
     priorities = {"low": 0, "medium": 1, "high": 2, "urgent": 3}
@@ -38,7 +39,9 @@ def level_resources(project, assignee_id=None, max_iterations=32):
         old = task.not_before
         task.not_before = bound
         try:
-            recalculated = analyze(candidate, as_of=clock, calendar_cache=cache)
+            recalculated = analyze(candidate, as_of=clock, calendar_cache=cache, budget=budget)
+        except ResourceLimitError:
+            raise
         except PlanningError:
             task.not_before = old
             break

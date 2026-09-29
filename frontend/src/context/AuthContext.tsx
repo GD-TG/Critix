@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,7 +20,6 @@ interface AuthContextValue {
   setError: (v: string) => void;
   login: (emailOrPassword: string, password?: string) => Promise<boolean>;
   register: (email: string, password: string, name: string) => Promise<boolean>;
-  demoLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
@@ -30,18 +30,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [logged, setLogged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const authGen = useRef(0);
 
   const checkAuth = useCallback(async () => {
+    const gen = ++authGen.current;
     try {
       const me = await api<User>("/auth/me");
+      if (authGen.current !== gen) return;
       if (me && me.id) {
         setUser(me);
         setLogged(true);
+      } else {
+        setUser(null);
+        setLogged(false);
       }
     } catch {
-      // Not logged in or session expired
-      setLogged(false);
-      setUser(null);
+      if (authGen.current === gen) {
+        setLogged(false);
+        setUser(null);
+      }
     }
   }, []);
 
@@ -50,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [checkAuth]);
 
   const login = useCallback(async (emailOrPassword: string, password?: string) => {
+    const gen = ++authGen.current;
     setBusy(true);
     setError("");
     try {
@@ -59,28 +67,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: emailOrPassword,
           password,
         });
+        if (authGen.current !== gen) return false;
         setUser(res);
       } else {
         // Legacy single-password login fallback
         await api("/login", "POST", { password: emailOrPassword });
+        if (authGen.current !== gen) return false;
         try {
           const me = await api<User>("/auth/me");
-          setUser(me);
+          if (authGen.current === gen) {
+            setUser(me);
+          }
         } catch {
           // Keep null if transient
         }
       }
-      setLogged(true);
+      if (authGen.current === gen) {
+        setLogged(true);
+      }
       return true;
     } catch (e: any) {
-      setError(e.message || "Ошибка входа");
+      if (authGen.current === gen) {
+        setError(e.message || "Ошибка входа");
+      }
       return false;
     } finally {
-      setBusy(false);
+      if (authGen.current === gen) {
+        setBusy(false);
+      }
     }
   }, []);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
+    const gen = ++authGen.current;
     setBusy(true);
     setError("");
     try {
@@ -89,41 +108,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         name,
       });
+      if (authGen.current !== gen) return false;
       setUser(res);
       setLogged(true);
       return true;
     } catch (e: any) {
-      setError(e.message || "Ошибка регистрации");
+      if (authGen.current === gen) {
+        setError(e.message || "Ошибка регистрации");
+      }
       return false;
     } finally {
-      setBusy(false);
-    }
-  }, []);
-
-  const demoLogin = useCallback(async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const res = await api<User>("/auth/demo", "POST");
-      setUser(res);
-      setLogged(true);
-      return true;
-    } catch (e: any) {
-      setError(e.message || "Ошибка быстрого входа");
-      return false;
-    } finally {
-      setBusy(false);
+      if (authGen.current === gen) {
+        setBusy(false);
+      }
     }
   }, []);
 
   const logout = useCallback(async () => {
+    authGen.current += 1;
+    setUser(null);
+    setLogged(false);
     try {
       await api("/auth/logout", "POST");
     } catch {
       await api("/logout", "POST");
     }
-    setUser(null);
-    setLogged(false);
   }, []);
 
   const value: AuthContextValue = {
@@ -136,7 +145,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError,
     login,
     register,
-    demoLogin,
     logout,
   };
 

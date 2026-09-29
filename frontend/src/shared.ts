@@ -1,6 +1,7 @@
 import { tasksToCsv } from "./taskCsv";
 import {
   defaultCalendar,
+  type Dependency,
   type Person,
   type Priority,
   type Project,
@@ -59,26 +60,172 @@ export function exportProjectToJson(project: Project) {
 }
 
 export function parseJsonToProject(jsonStr: string): Project {
-  const obj = JSON.parse(jsonStr);
-  if (!obj || typeof obj !== "object") {
-    throw new Error("Некорректный JSON-файл");
+  if (typeof jsonStr !== "string" || !jsonStr.trim()) {
+    throw new Error("Файл пуст или содержит некорректный текст");
   }
-  if (!obj.name || typeof obj.name !== "string") {
-    throw new Error("В проекте отсутствует название (name)");
+  if (jsonStr.length > 5 * 1024 * 1024) {
+    throw new Error("Размер JSON превышает допустимый лимит 5 МБ");
   }
-  if (!obj.start || !obj.deadline) {
-    throw new Error("В проекте отсутствуют даты start или deadline");
+
+  let obj: any;
+  try {
+    obj = JSON.parse(jsonStr);
+  } catch {
+    throw new Error("Некорректный синтаксис JSON");
   }
+
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    throw new Error("Корневой элемент JSON должен быть объектом проекта");
+  }
+
+  if (typeof obj.name !== "string" || !obj.name.trim()) {
+    throw new Error("В проекте отсутствует или пустое название (name)");
+  }
+
+  const timezone = typeof obj.timezone === "string" && obj.timezone.trim() ? obj.timezone.trim() : "Asia/Yekaterinburg";
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    throw new Error(`Недопустимый часовой пояс: «${timezone}»`);
+  }
+
+  if (!obj.start || typeof obj.start !== "string" || isNaN(new Date(obj.start).getTime())) {
+    throw new Error("В проекте отсутствует или некорректна дата начала (start)");
+  }
+  if (!obj.deadline || typeof obj.deadline !== "string" || isNaN(new Date(obj.deadline).getTime())) {
+    throw new Error("В проекте отсутствует или некорректна дата дедлайна (deadline)");
+  }
+  if (new Date(obj.start).getTime() >= new Date(obj.deadline).getTime()) {
+    throw new Error("Дата старта проекта должна быть строго раньше дедлайна");
+  }
+
+  const rawTasks = Array.isArray(obj.tasks) ? obj.tasks : [];
+  if (rawTasks.length > 200) {
+    throw new Error("Превышен лимит количества задач (максимум 200)");
+  }
+
+  const taskIds = new Set<string>();
+  const validTasks: Task[] = [];
+  for (let i = 0; i < rawTasks.length; i++) {
+    const t = rawTasks[i];
+    if (!t || typeof t !== "object" || Array.isArray(t)) {
+      throw new Error(`Задача #${i + 1} содержит недопустимое значение (null или не объект)`);
+    }
+    const id = typeof t.id === "string" ? t.id.trim() : String(t.id || "").trim();
+    if (!id) {
+      throw new Error(`Задача #${i + 1} не содержит обязательного поля id`);
+    }
+    if (taskIds.has(id)) {
+      throw new Error(`Дубликат идентификатора задачи: «${id}»`);
+    }
+    taskIds.add(id);
+
+    const name = typeof t.name === "string" && t.name.trim() ? t.name.trim() : `Задача ${id}`;
+    const dur = Number.isInteger(t.duration_minutes) && t.duration_minutes >= 0 ? t.duration_minutes : 0;
+    const status = ["todo", "in_progress", "done", "blocked"].includes(t.status) ? t.status : "todo";
+    const priority = ["low", "medium", "high", "urgent"].includes(t.priority) ? t.priority : "medium";
+    const alloc = Number.isInteger(t.allocation_percent) && t.allocation_percent >= 1 && t.allocation_percent <= 100 ? t.allocation_percent : 100;
+
+    validTasks.push({
+      id,
+      name,
+      duration_minutes: dur,
+      priority,
+      status,
+      allocation_percent: alloc,
+      required_skills: Array.isArray(t.required_skills) ? t.required_skills.filter((s: any) => typeof s === "string") : [],
+      assignee_id: typeof t.assignee_id === "string" && t.assignee_id.trim() ? t.assignee_id.trim() : null,
+      not_before: typeof t.not_before === "string" ? t.not_before : null,
+      actual_start: typeof t.actual_start === "string" ? t.actual_start : null,
+      actual_finish: typeof t.actual_finish === "string" ? t.actual_finish : null,
+    });
+  }
+
+  const rawDeps = Array.isArray(obj.dependencies) ? obj.dependencies : [];
+  if (rawDeps.length > 2000) {
+    throw new Error("Превышен лимит количества связей (максимум 2000)");
+  }
+
+  const validDeps: Dependency[] = [];
+  for (let i = 0; i < rawDeps.length; i++) {
+    const d = rawDeps[i];
+    if (!d || typeof d !== "object" || Array.isArray(d)) {
+      throw new Error(`Связь #${i + 1} содержит недопустимое значение (null или не объект)`);
+    }
+    const predId = typeof d.predecessor_id === "string" ? d.predecessor_id.trim() : typeof d.from_task_id === "string" ? d.from_task_id.trim() : "";
+    const succId = typeof d.successor_id === "string" ? d.successor_id.trim() : typeof d.to_task_id === "string" ? d.to_task_id.trim() : "";
+    if (!predId || !succId) {
+      throw new Error(`Связь #${i + 1} не содержит идентификаторов предшественника или последователя`);
+    }
+    if (predId === succId) {
+      throw new Error(`Связь #${i + 1}: задача «${predId}» не может ссылаться сама на себя`);
+    }
+    if (!taskIds.has(predId) || !taskIds.has(succId)) {
+      throw new Error(`Связь #${i + 1} ссылается на несуществующую задачу: ${predId} -> ${succId}`);
+    }
+    const kind = ["FS", "SS", "FF", "SF"].includes(d.kind || d.type) ? (d.kind || d.type) : "FS";
+    const lag = Number.isInteger(d.lag_minutes) ? d.lag_minutes : 0;
+    const lagMode = ["working", "elapsed"].includes(d.lag_mode) ? d.lag_mode : "working";
+
+    validDeps.push({
+      predecessor_id: predId,
+      successor_id: succId,
+      kind,
+      lag_minutes: lag,
+      lag_mode: lagMode,
+    });
+  }
+
+  const rawAssignees = Array.isArray(obj.assignees) ? obj.assignees : [];
+  if (rawAssignees.length > 100) {
+    throw new Error("Превышен лимит количества участников (максимум 100)");
+  }
+  const validAssignees: Person[] = [];
+  const assigneeIds = new Set<string>();
+  for (let i = 0; i < rawAssignees.length; i++) {
+    const a = rawAssignees[i];
+    if (!a || typeof a !== "object" || Array.isArray(a)) continue;
+    const id = typeof a.id === "string" ? a.id.trim() : String(a.id || "").trim();
+    if (!id || assigneeIds.has(id)) continue;
+    assigneeIds.add(id);
+
+    const role = typeof a.role === "string" && a.role.trim() ? a.role.trim() : undefined;
+    const skills: Skill[] = Array.isArray(a.skills)
+      ? a.skills
+          .map((s: any) => {
+            if (typeof s === "string" && s.trim()) {
+              return { name: s.trim(), level: "intermediate" as const };
+            }
+            if (s && typeof s === "object" && typeof s.name === "string" && s.name.trim()) {
+              const level = ["beginner", "intermediate", "advanced", "expert"].includes(s.level)
+                ? s.level
+                : ("intermediate" as const);
+              return { name: s.name.trim(), level };
+            }
+            return null;
+          })
+          .filter(Boolean) as Skill[]
+      : [];
+
+    validAssignees.push({
+      id,
+      name: typeof a.name === "string" && a.name.trim() ? a.name.trim() : `Сотрудник ${id}`,
+      role,
+      skills,
+      calendar: a.calendar || defaultCalendar(),
+    });
+  }
+
   return {
-    name: obj.name,
-    timezone: obj.timezone || "Asia/Yekaterinburg",
+    name: obj.name.trim(),
+    timezone,
     start: obj.start,
     deadline: obj.deadline,
     calendar: obj.calendar || defaultCalendar(),
     baseline: obj.baseline || null,
-    assignees: Array.isArray(obj.assignees) ? obj.assignees : [],
-    tasks: Array.isArray(obj.tasks) ? obj.tasks : [],
-    dependencies: Array.isArray(obj.dependencies) ? obj.dependencies : [],
+    assignees: validAssignees,
+    tasks: validTasks,
+    dependencies: validDeps,
   };
 }
 

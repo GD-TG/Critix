@@ -53,14 +53,14 @@ export function TeamView() {
 
   return (
     <Card withBorder p="md" radius="md">
-      <Group justify="space-between" mb="md">
+      <Group justify="space-between" mb="md" wrap="wrap" gap="sm">
         <div>
           <Title order={3}>Управление командой и ресурсами</Title>
           <Text size="sm" c="dimmed">
             Матрица компетенций, персональные рабочие графики, отпуска и загрузка сотрудников.
           </Text>
         </div>
-        <Group gap="xs">
+        <Group gap="xs" wrap="wrap">
           <Button
             size="xs"
             leftSection={<Plus size={14} />}
@@ -87,9 +87,9 @@ export function TeamView() {
           </Button>
         </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, minHeight: 600 }}>
+        <div className="team-grid">
           {/* Left Column: Team Members List */}
-          <div style={{ borderRight: "1px solid var(--line, #e2e8f0)", paddingRight: 16 }}>
+          <div className="team-sidebar-col">
             <TextInput
               placeholder="Поиск по имени или роли..."
               size="xs"
@@ -98,7 +98,7 @@ export function TeamView() {
               onChange={(e) => setTeamMemberSearch(e.target.value)}
             />
 
-            <ScrollArea h={560}>
+            <ScrollArea h={560} className="team-member-list-scroll">
               <Stack gap={8}>
                 {draft.assignees
                   .filter((p) =>

@@ -5,12 +5,14 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { api } from "@/api";
 import { copy } from "@/shared";
 import type { Analysis, Project, Result } from "@/types";
 import { useAuth } from "@/context/AuthContext";
+import { readBackup, writeBackup, clearBackup } from "@/draftBackup";
 
 interface ProjectContextValue {
   projects: Array<{ id: string; name: string }>;
@@ -40,7 +42,7 @@ interface ProjectContextValue {
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-  const { busy, setBusy, setError, logged, setLogged } = useAuth();
+  const { busy, setBusy, setError, logged } = useAuth();
 
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [saved, setSaved] = useState<Result | null>(null);
@@ -63,15 +65,36 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [setBusy, setError]);
 
+  const sessionGen = useRef(0);
+
   const list = useCallback(async () => {
+    const currentSession = sessionGen.current;
     const data = await api<Array<{ id: string; name: string }>>("/projects");
-    setProjects(data);
+    if (sessionGen.current === currentSession && logged) {
+      setProjects(data);
+    }
     return data;
-  }, []);
+  }, [logged]);
 
   const accept = useCallback((result: Result) => {
     setSaved(result);
-    setDraft(copy(result.project));
+    let initialDraft = copy(result.project);
+    try {
+      const backup = readBackup(localStorage, result.id);
+      if (
+        backup &&
+        JSON.stringify(backup.draft) !== JSON.stringify(result.project)
+      ) {
+        // User has unsaved edits in backup; preserve them so work is never lost.
+        // Even if server baseVersion changed, user can review diff or cancel.
+        initialDraft = backup.draft;
+      } else {
+        clearBackup(localStorage, result.id);
+      }
+    } catch {
+      clearBackup(localStorage, result.id);
+    }
+    setDraft(initialDraft);
     setPreview(null);
     setAiText("");
     setAiReport(null);
@@ -94,32 +117,63 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setAiReport(null);
   }, []);
 
-  // Clear the working project on logout
+  // Synchronize projects with auth session
   useEffect(() => {
+    sessionGen.current += 1;
+    const currentGen = sessionGen.current;
+
     if (!logged) {
+      setProjects([]);
       setSaved(null);
       setDraft(null);
       setPreview(null);
       setAiText("");
       setAiReport(null);
+      return;
     }
-  }, [logged]);
 
-  // Initial bootstrap: load project list and open the first project
-  useEffect(() => {
     void run(async () => {
-      const data = await list();
-      if (data.length > 0) {
-        accept(await api<Result>(`/projects/${data[0].id}`));
+      try {
+        const data = await list();
+        if (sessionGen.current !== currentGen) return;
+        if (data.length > 0) {
+          const res = await api<Result>(`/projects/${data[0].id}`);
+          if (sessionGen.current === currentGen) {
+            accept(res);
+          }
+        }
+      } catch {
+        // Ignore aborted or failed fetch on session teardown
       }
-      setLogged(true);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [logged, list, accept, run]);
 
   const dirty = Boolean(
     saved && draft && JSON.stringify(saved.project) !== JSON.stringify(draft),
   );
+
+  // Auto-backup draft to localStorage when modified
+  useEffect(() => {
+    if (dirty && saved?.id && draft) {
+      try {
+        writeBackup(localStorage, saved.id, saved.version, draft);
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  }, [dirty, saved?.id, saved?.version, draft]);
+
+  // Warn user before closing tab if there are unsaved changes
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "В проекте есть несохранённые изменения. Вы уверены, что хотите покинуть страницу?";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   const view = preview || saved;
   const rows = useMemo(

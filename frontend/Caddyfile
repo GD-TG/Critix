@@ -11,7 +11,9 @@
         max_size 2MB
     }
     handle /api/* {
-        reverse_proxy api:8000
+        reverse_proxy api:8000 {
+            header_up X-Critix-Client-IP {remote_host}
+        }
     }
     handle {
         root * /srv

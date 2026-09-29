@@ -135,14 +135,15 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
             Укажите рабочие смены для каждого дня недели. Время задаётся в часовом поясе проекта.
           </Text>
 
-          <Table verticalSpacing="xs" striped highlightOnHover withTableBorder>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ width: 120 }}>День недели</Table.Th>
-                <Table.Th>Рабочие смены / Перерывы</Table.Th>
-                <Table.Th style={{ width: 100 }}>Действия</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
+          <div className="table-responsive-container">
+            <Table verticalSpacing="xs" striped highlightOnHover withTableBorder style={{ minWidth: 500 }}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th style={{ width: 120 }}>День недели</Table.Th>
+                  <Table.Th>Рабочие смены / Перерывы</Table.Th>
+                  <Table.Th style={{ width: 100 }}>Действия</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
             <Table.Tbody>
               {DAYS_OF_WEEK.map(({ index, label, short }) => {
                 const dayShifts = value.week[index] || [];
@@ -251,6 +252,7 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
               })}
             </Table.Tbody>
           </Table>
+          </div>
         </Stack>
       )}
 
@@ -261,7 +263,7 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
             <Text size="xs" fw={700} mb="xs" c="blue">
               ПЕРИОД ОТПУСКА / ОТГУЛА (МАССОВОЕ ДОБАВЛЕНИЕ)
             </Text>
-            <Group align="flex-end" grow>
+            <Group align="flex-end" grow wrap="wrap">
               <TextInput
                 label="Дата начала отпуска"
                 type="date"
@@ -372,7 +374,8 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
                 Нет назначенных исключений или отпусков. График рассчитывается строго по расписанию недели.
               </Text>
             ) : (
-              <Table verticalSpacing="xs" striped highlightOnHover withTableBorder>
+              <div className="table-responsive-container">
+                <Table verticalSpacing="xs" striped highlightOnHover withTableBorder style={{ minWidth: 480 }}>
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th style={{ width: 140 }}>Дата</Table.Th>
@@ -460,6 +463,7 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
                   })}
                 </Table.Tbody>
               </Table>
+              </div>
             )}
           </div>
         </Stack>

@@ -51,7 +51,7 @@ export function DraftBanner() {
             </Box>
           )}
 
-          <Group gap="sm" mt="xs">
+          <Group gap="sm" mt="xs" wrap="wrap">
             <Text size="xs">Сохранение поверх серверной версии полностью заменит её вашим черновиком, включая задачи, связи и календари. Это не объединение изменений.</Text>
             <Button
               variant="default"
@@ -95,13 +95,13 @@ export function DraftBanner() {
       mb="lg"
     >
       <Stack gap="xs">
-        <Group justify="space-between" align="center">
-          <Text size="sm">
+        <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+          <Text size="sm" style={{ flex: "1 1 240px" }}>
             {preview
               ? `Изменились даты ${affected.size} задач. Сдвиг завершения: ${formatCalendarShift(preview.changes!.finish_delta_minutes)}.`
               : "Рассчитайте последствия перед сохранением или сохраните как отдельный сценарий."}
           </Text>
-          <Group gap="xs">
+          <Group gap="xs" wrap="wrap">
             <Button
               variant="subtle"
               size="xs"

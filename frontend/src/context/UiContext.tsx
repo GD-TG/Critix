@@ -42,6 +42,9 @@ interface UiContextValue {
   showScenarioModal: boolean;
   setShowScenarioModal: (v: boolean) => void;
 
+  mobileNavOpened: boolean;
+  setMobileNavOpened: (v: boolean) => void;
+
   rescheduleOverdue: () => void;
 }
 
@@ -66,6 +69,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const [settingsTab, setSettingsTab] = useState<string | null>("project");
   const [deleteConfirmProject, setDeleteConfirmProject] = useState<{ id: string; name: string } | null>(null);
   const [showScenarioModal, setShowScenarioModal] = useState(false);
+  const [mobileNavOpened, setMobileNavOpened] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mantine-color-scheme", colorScheme);
@@ -106,6 +110,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     settings, setSettings, settingsTab, setSettingsTab,
     deleteConfirmProject, setDeleteConfirmProject,
     showScenarioModal, setShowScenarioModal,
+    mobileNavOpened, setMobileNavOpened,
     rescheduleOverdue,
   };
 

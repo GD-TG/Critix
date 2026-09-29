@@ -134,16 +134,35 @@ def current_user(request: Request, db=Depends(session)):
     info = get_session_info(request)
     user_id = info.get("user_id")
     if user_id:
-        try:
+        user = db.scalar(select(models.User).where(models.User.id == user_id))
+        if user is None:
+            raise HTTPException(401, "Учётная запись недоступна")
+        return user
+    return TransientAdmin()
+
+
+class DetachedUser:
+    def __init__(self, id, email, name):
+        self.id = id
+        self.email = email
+        self.name = name
+
+
+def detached_current_user(request: Request) -> DetachedUser:
+    info = get_session_info(request)
+    user_id = info.get("user_id")
+    if user_id:
+        with SessionLocal() as db:
             user = db.scalar(select(models.User).where(models.User.id == user_id))
-            if user:
-                return user
-        except Exception:
-            pass
-    try:
-        return service.get_or_create_demo_user(db)
-    except Exception:
-        return TransientAdmin()
+            if user is None:
+                raise HTTPException(401, "Учётная запись недоступна")
+            return DetachedUser(user.id, user.email, user.name)
+    return DetachedUser(None, "admin@critix.local", "Администратор")
+
+
+def project_session(user=Depends(current_user), db=Depends(session)):
+    db.info["owner_id"] = user.id
+    return db
 
 
 def set_auth_cookie(response: Response, user_id: UUID | None = None):
@@ -210,6 +229,8 @@ class Login(BaseModel):
 
 # Single-process limiter; one API worker in the VPS configuration.
 attempts = {}
+account_attempts = {}
+registrations = {}
 
 
 def client_address(request):
@@ -225,7 +246,17 @@ def client_address(request):
 
 
 @app.post("/api/auth/register", status_code=201)
-def register(body: UserRegister, response: Response, db=Depends(session)):
+def register(body: UserRegister, request: Request, response: Response, db=Depends(session)):
+    address = client_address(request)
+    now = time.monotonic()
+    with auth_lock:
+        for key in list(registrations):
+            if registrations[key][1] < now:
+                del registrations[key]
+        count, until = registrations.get(address, (0, now + 600))
+        if count >= 10:
+            raise HTTPException(429, "Слишком много регистраций с вашего адреса. Подождите 10 минут")
+        registrations[address] = (count + 1, until)
     user = service.create_user(db, body.email, body.password, body.name)
     set_auth_cookie(response, user.id)
     return {"id": user.id, "email": user.email, "name": user.name, "created_at": user.created_at}
@@ -234,28 +265,36 @@ def register(body: UserRegister, response: Response, db=Depends(session)):
 @app.post("/api/auth/login")
 def auth_login(body: UserLogin, request: Request, response: Response, db=Depends(session)):
     address = client_address(request)
+    account_key = body.email.strip().lower()
     now = time.monotonic()
     with auth_lock:
         for key in list(attempts):
             if attempts[key][1] < now:
                 del attempts[key]
-        count, until = attempts.get(address, (0, now + 300))
-        if count >= 10:
-            raise HTTPException(429, "Слишком много попыток. Подождите 5 минут")
+        for key in list(account_attempts):
+            if account_attempts[key][1] < now:
+                del account_attempts[key]
+        ip_count, ip_until = attempts.get(address, (0, now + 300))
+        acc_count, acc_until = account_attempts.get(account_key, (0, now + 300))
+        if ip_count >= 10:
+            raise HTTPException(429, "Слишком много попыток с вашего адреса. Подождите 5 минут")
+        if acc_count >= 10:
+            raise HTTPException(429, "Слишком много попыток входа для этого аккаунта. Подождите 5 минут")
         user = service.authenticate_user(db, body.email, body.password)
         if not user:
-            attempts[address] = (count + 1, until)
+            attempts[address] = (ip_count + 1, ip_until)
+            account_attempts[account_key] = (acc_count + 1, acc_until)
             raise HTTPException(401, "Неверный email или пароль")
         attempts.pop(address, None)
+        account_attempts.pop(account_key, None)
     set_auth_cookie(response, user.id)
     return {"id": user.id, "email": user.email, "name": user.name, "created_at": user.created_at}
 
 
 @app.post("/api/auth/demo")
-def auth_demo(response: Response, db=Depends(session)):
-    demo_user = service.get_or_create_demo_user(db)
-    set_auth_cookie(response, demo_user.id)
-    return {"id": demo_user.id, "email": demo_user.email, "name": demo_user.name, "created_at": demo_user.created_at}
+def auth_demo():
+    # Keep an explicit response for old clients, without a DB dependency or work.
+    raise HTTPException(410, "Публичный демо-вход отключён. Войдите в аккаунт или зарегистрируйтесь")
 
 
 @app.get("/api/auth/me")
@@ -311,47 +350,88 @@ calculated = [*auth, Depends(calculation_slot)]
 
 
 @app.get("/api/projects", dependencies=auth)
-def projects(db=Depends(session), user=Depends(current_user)):
+def projects(db=Depends(project_session), user=Depends(current_user)):
     return service.list_projects_for_user(db, user.id)
 
 
 @app.post("/api/projects", dependencies=calculated, status_code=201)
-def create(body: ProjectInput, db=Depends(session), user=Depends(current_user)):
+def create(body: ProjectInput, db=Depends(project_session), user=Depends(current_user)):
     return service.create(db, body, owner_id=user.id)
 
 
 @app.post("/api/demo", dependencies=calculated, status_code=201)
-def create_demo(db=Depends(session), user=Depends(current_user)):
+def create_demo(db=Depends(project_session), user=Depends(current_user)):
     return service.create(db, demo(), owner_id=user.id)
 
 
 @app.get("/api/projects/{project_id}", dependencies=calculated)
-def get_project(project_id: UUID, db=Depends(session)):
+def get_project(project_id: UUID, db=Depends(project_session)):
     version, data = service.read(db, project_id)
     return dict(id=project_id, version=version, project=data, analysis=analyze(data))
 
 
 @app.put("/api/projects/{project_id}", dependencies=calculated)
-def update(project_id: UUID, body: SaveProject, db=Depends(session)):
+def update(project_id: UUID, body: SaveProject, db=Depends(project_session)):
     return service.update(db, project_id, body)
 
 
 @app.delete("/api/projects/{project_id}", dependencies=auth)
-def delete_project(project_id: UUID, db=Depends(session)):
+def delete_project(project_id: UUID, db=Depends(project_session)):
     return service.delete_project(db, project_id)
 
 
 @app.post("/api/projects/{project_id}/simulate", dependencies=calculated)
-def simulate(project_id: UUID, body: SaveProject, db=Depends(session)):
+def simulate(project_id: UUID, body: SaveProject, db=Depends(project_session)):
     return service.update(db, project_id, body, simulate=True)
 
 
-def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None):
+ai_concurrency = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENT_AI", "2")))
+ai_user_quotas = {}
+ai_quota_lock = Lock()
+AI_DAILY_BUDGET = int(os.getenv("AI_DAILY_BUDGET_REQUESTS", "500"))
+AI_USER_DAILY_BUDGET = int(os.getenv("AI_USER_DAILY_BUDGET", "50"))
+
+ai_global_daily_count = 0
+ai_global_daily_reset = 0.0
+ai_user_daily_counts = {}
+
+
+def check_ai_quota(user_id: UUID | None, client_ip: str):
+    global ai_global_daily_count, ai_global_daily_reset
+    key = str(user_id) if user_id is not None else f"ip_{client_ip}"
+    now = time.monotonic()
+    with ai_quota_lock:
+        if now > ai_global_daily_reset:
+            ai_global_daily_count = 0
+            ai_global_daily_reset = now + 86400
+            ai_user_daily_counts.clear()
+
+        if ai_global_daily_count >= AI_DAILY_BUDGET:
+            raise HTTPException(429, "Исчерпан общий суточный лимит обращений к сервису ИИ. Попробуйте снова позже")
+
+        user_daily = ai_user_daily_counts.get(key, 0)
+        if user_daily >= AI_USER_DAILY_BUDGET:
+            raise HTTPException(429, "Исчерпан суточный лимит запросов к ИИ для вашего аккаунта")
+
+        for k in list(ai_user_quotas):
+            if ai_user_quotas[k][1] < now:
+                del ai_user_quotas[k]
+        count, reset_at = ai_user_quotas.get(key, (0, now + 60))
+        if count >= 10:
+            raise HTTPException(429, "Превышен лимит запросов к ИИ для вашего аккаунта (максимум 10 в минуту). Пожалуйста, подождите минуту")
+        ai_user_quotas[key] = (count + 1, reset_at)
+        ai_global_daily_count += 1
+        ai_user_daily_counts[key] = user_daily + 1
+
+
+def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None, owner_id=None):
     # A worker owns the session and the slot; neither survives into the LLM wait.
     if not calculation_slots.acquire(timeout=3):
         raise HTTPException(503, "Сейчас выполняются другие расчёты. Повторите запрос через несколько секунд")
     try:
         with SessionLocal() as db:
+            if owner_id is not None:
+                db.info["owner_id"] = owner_id
             _, saved_data = service.read(db, project_id)
         data = project if project is not None else saved_data
         return data, analyze(data)
@@ -360,9 +440,19 @@ def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None)
 
 
 @app.post("/api/projects/{project_id}/ai", dependencies=auth)
-async def ai(project_id: UUID):
-    data, analysis = await run_in_threadpool(prepare_ai_context, project_id)
-    return await explain(data, analysis)
+async def ai(project_id: UUID, request: Request = None, user=Depends(detached_current_user)):
+    if not isinstance(request, Request):
+        if request is not None:
+            user = request
+        request = None
+    check_ai_quota(getattr(user, "id", None), client_address(request) if request is not None else "127.0.0.1")
+    data, analysis = await run_in_threadpool(prepare_ai_context, project_id, None, getattr(user, "id", None))
+    try:
+        async with asyncio.timeout(20):
+            async with ai_concurrency:
+                return await explain(data, analysis)
+    except (TimeoutError, asyncio.TimeoutError):
+        raise HTTPException(503, "Сервис ИИ временно перегружен запросами. Повторите попытку через минуту")
 
 
 class ChatMessage(BaseModel):
@@ -376,31 +466,46 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/projects/{project_id}/chat", dependencies=auth)
-async def chat_copilot(project_id: UUID, body: ChatRequest):
-    data, analysis = await run_in_threadpool(prepare_ai_context, project_id, body.project)
-    return await chat(data, analysis, [m.model_dump() for m in body.messages])
+async def chat_copilot(project_id: UUID, body: ChatRequest, request: Request = None, user=Depends(detached_current_user)):
+    if not isinstance(request, Request):
+        if request is not None:
+            user = request
+        request = None
+    check_ai_quota(getattr(user, "id", None), client_address(request) if request is not None else "127.0.0.1")
+    data, analysis = await run_in_threadpool(prepare_ai_context, project_id, body.project, getattr(user, "id", None))
+    try:
+        async with asyncio.timeout(20):
+            async with ai_concurrency:
+                return await chat(data, analysis, [m.model_dump() for m in body.messages])
+    except (TimeoutError, asyncio.TimeoutError):
+        raise HTTPException(503, "Сервис ИИ временно перегружен запросами. Повторите попытку через минуту")
 
 
 @app.get("/api/projects/{project_id}/history", dependencies=auth)
-def project_history(project_id: UUID, db=Depends(session)):
+def project_history(project_id: UUID, db=Depends(project_session)):
     return service.get_history(db, project_id)
 
 
 @app.get("/api/projects/{project_id}/scenarios", dependencies=auth)
-def list_scenarios(project_id: UUID, db=Depends(session)):
-    return service.list_scenarios(db, project_id)
+def list_scenarios(project_id: UUID, limit: int = 20, offset: int = 0, include_analysis: bool = False, db=Depends(project_session)):
+    return service.list_scenarios(db, project_id, limit=limit, offset=offset, include_analysis=include_analysis)
+
+
+@app.get("/api/projects/{project_id}/scenarios/{scenario_id}", dependencies=calculated)
+def get_scenario(project_id: UUID, scenario_id: UUID, db=Depends(project_session)):
+    return service.get_scenario(db, project_id, scenario_id)
 
 
 @app.post("/api/projects/{project_id}/scenarios", dependencies=calculated, status_code=201)
-def create_scenario(project_id: UUID, body: CreateScenario, db=Depends(session)):
+def create_scenario(project_id: UUID, body: CreateScenario, db=Depends(project_session)):
     return service.create_scenario(db, project_id, body)
 
 
 @app.delete("/api/projects/{project_id}/scenarios/{scenario_id}", dependencies=auth)
-def delete_scenario(project_id: UUID, scenario_id: UUID, db=Depends(session)):
+def delete_scenario(project_id: UUID, scenario_id: UUID, db=Depends(project_session)):
     return service.delete_scenario(db, project_id, scenario_id)
 
 
 @app.post("/api/projects/{project_id}/level", dependencies=calculated)
-def level_project(project_id: UUID, body: LevelProject, db=Depends(session)):
+def level_project(project_id: UUID, body: LevelProject, db=Depends(project_session)):
     return service.level(db, project_id, body)

@@ -1,7 +1,9 @@
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 
-from app.engine.calendar import MINUTE, PlanningError, WorkCalendar
+from app.engine.calendar import (MINUTE, PlanningError, WorkCalendar, CalculationBudget,
+                                 ResourceLimitError, MAX_HORIZON_DAYS, MAX_CALENDAR_MINUTES,
+                                 MAX_RESOURCE_SEGMENTS)
 from app.schemas import ProjectInput
 
 
@@ -27,7 +29,9 @@ def topology(project: ProjectInput):
     return order, incoming, outgoing
 
 
-def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
+def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None):
+    budget = budget or CalculationBudget()
+    budget.check()
     # Time-dependent flags are deterministic for an explicitly supplied instant.
     as_of = as_of or datetime.now(timezone.utc)
     def baseline_delta(finish):
@@ -42,13 +46,24 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
     people = {a.id: a for a in project.assignees}
     all_starts = [project.start] + [t.actual_start for t in project.tasks if t.actual_start] + [t.not_before for t in project.tasks if t.not_before]
     all_finishes = [project.deadline] + [t.actual_finish for t in project.tasks if t.actual_finish]
-    min_start = min(all_starts).astimezone(timezone.utc)
-    max_target = max(all_finishes).astimezone(timezone.utc)
     total_dur_days = max(30, sum(t.duration_minutes for t in project.tasks) // 480 + 90)
-    lower = min_start - timedelta(days=60)
-    upper = max(max_target + timedelta(days=90), min_start + timedelta(days=total_dur_days + 180))
+    try:
+        min_start = min(all_starts).astimezone(timezone.utc)
+        max_target = max([*all_finishes, *all_starts]).astimezone(timezone.utc)
+        lower = min_start - timedelta(days=60)
+        upper = max(max_target + timedelta(days=90), min_start + timedelta(days=total_dur_days + 180))
+        if (upper - lower).total_seconds() > MAX_HORIZON_DAYS * 86400:
+            raise ResourceLimitError(f"Горизонт расчёта не должен превышать {MAX_HORIZON_DAYS} дней. Проверьте даты и длительности")
+        # Leave room for timezone conversion and arithmetic at both boundaries.
+        if lower.year < 2 or upper.year > 9998:
+            raise ResourceLimitError("Даты выходят за поддерживаемый диапазон расчёта")
+    except (OverflowError, OSError) as exc:
+        raise ResourceLimitError("Даты выходят за поддерживаемый диапазон расчёта") from exc
     calendars = {}
     definitions_cache = calendar_cache if calendar_cache is not None else {}
+    retained_minutes = sum(len(c.slots) for c in definitions_cache.values())
+    if retained_minutes > MAX_CALENDAR_MINUTES:
+        raise ResourceLimitError("Превышен общий бюджет календарей")
     # Share precomputed calendars across tasks assigned to the same person.
     for person in {t.assignee_id for t in project.tasks}:
         definitions = [project.calendar]
@@ -56,7 +71,9 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
             definitions.append(people[person].calendar)
         key = (project.timezone, lower, upper, tuple(sorted({c.model_dump_json() for c in definitions})))
         if key not in definitions_cache:
-            definitions_cache[key] = WorkCalendar(definitions, project.timezone, lower, upper)
+            definitions_cache[key] = WorkCalendar(definitions, project.timezone, lower, upper,
+                max_minutes=MAX_CALENDAR_MINUTES - retained_minutes, budget=budget)
+            retained_minutes += len(definitions_cache[key].slots)
         calendars[person] = definitions_cache[key]
     calendar = {t.id: calendars[t.assignee_id] for t in project.tasks}
     early, indices, flags = {}, {}, defaultdict(set)
@@ -81,6 +98,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
         return lo
 
     for task_id in order:
+        budget.check()
         task, cal = tasks[task_id], calendar[task_id]
         start_bound = max(project.start, task.not_before or project.start)
         finish_bound = None
@@ -141,6 +159,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
     # unequal calendars and both positive/negative working lags without
     # assuming that work-calendar addition is invertible at weekends.
     for task_id in reversed(order):
+        budget.check()
         task, cal = tasks[task_id], calendar[task_id]
         if task.actual_start:
             latest[task_id], slack[task_id] = early[task_id], None
@@ -173,25 +192,37 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None):
         slack[task_id] = lo - indices[task_id]
 
     events = defaultdict(lambda: defaultdict(list))
+    segments = 0
     for task_id in order:
         task, cal = tasks[task_id], calendar[task_id]
         if task.assignee_id is None or task.status == "done":
             continue
         start, end = early[task_id]
-        slots = cal.slots[cal.index(start):cal.index(end)]
+        begin_index, end_index = cal.index(start), cal.index(end)
+        budget.consume_work(end_index - begin_index)
+        slots = cal.slots[begin_index:end_index]
         if not slots:
             continue
         first = previous = slots[0]
-        for current in slots[1:]:
+        for offset, current in enumerate(slots[1:]):
+            if offset % 4096 == 0:
+                budget.check()
             if current != previous + MINUTE:
+                segments += 1
+                if segments > MAX_RESOURCE_SEGMENTS:
+                    raise ResourceLimitError("Слишком много рабочих интервалов для анализа загрузки")
                 events[task.assignee_id][first].append((task_id, task.allocation_percent))
                 events[task.assignee_id][previous + MINUTE].append((task_id, -task.allocation_percent))
                 first = current
             previous = current
+        segments += 1
+        if segments > MAX_RESOURCE_SEGMENTS:
+            raise ResourceLimitError("Слишком много рабочих интервалов для анализа загрузки")
         events[task.assignee_id][first].append((task_id, task.allocation_percent))
         events[task.assignee_id][previous + MINUTE].append((task_id, -task.allocation_percent))
     overloads = []
     for person, timeline in events.items():
+        budget.check()
         active = {}
         points = sorted(timeline)
         for i, point in enumerate(points[:-1]):

@@ -17,7 +17,7 @@ export function SideForm({ onScrollTo }: Props) {
     draft, colorScheme, toggleTheme,
     activeView, setActiveView,
     setProjectManageModal, setSettings,
-    setSelectedAssigneeId, addPerson, logout,
+    setSelectedAssigneeId, handleSelectAssignee, addPerson, logout,
     totalTasksCount, overdueTasks, overloadedAssigneeIds,
   } = useSideForm(onScrollTo);
 
@@ -76,10 +76,7 @@ export function SideForm({ onScrollTo }: Props) {
             key={person.id}
             title={person.name}
             className={`avatar ${getAvatarClass(person.id)}`}
-            onClick={() => {
-              setSelectedAssigneeId(person.id);
-              setActiveView("team");
-            }}
+            onClick={() => handleSelectAssignee(person.id)}
             style={{ cursor: "pointer" }}
           >
             {getInitials(person.name)}

@@ -28,13 +28,15 @@ class Calendar(StrictModel):
         day: [Shift(start=time(9), end=time(13)), Shift(start=time(14), end=time(18))]
         for day in range(5)
     })
-    exceptions: dict[date, list[Shift]] = Field(default_factory=dict)
+    exceptions: dict[date, list[Shift]] = Field(default_factory=dict, max_length=1096)
 
     @model_validator(mode="after")
     def validate_shifts(self):
         if any(day not in range(7) for day in self.week):
             raise ValueError("День недели должен быть от 0 до 6")
         for shifts in [*self.week.values(), *self.exceptions.values()]:
+            if len(shifts) > 16:
+                raise ValueError("Допускается не более 16 смен в день")
             ordered = sorted(shifts, key=lambda s: s.start)
             if any(a.end > b.start for a, b in zip(ordered, ordered[1:])):
                 raise ValueError("Смены не должны пересекаться")
@@ -216,4 +218,3 @@ class UserResponse(StrictModel):
     email: str
     name: str
     created_at: datetime
-

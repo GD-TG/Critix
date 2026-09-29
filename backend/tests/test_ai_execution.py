@@ -52,8 +52,8 @@ def test_ai_preparation_runs_off_loop_and_releases_resources_before_provider(mon
     monkeypatch.setattr(main, "chat", provider)
 
     async def run():
-        request = (main.chat_copilot(uuid4(), main.ChatRequest(messages=[main.ChatMessage(role="user", content="test")]))
-                   if use_chat else main.ai(uuid4()))
+        request = (main.chat_copilot(uuid4(), main.ChatRequest(messages=[main.ChatMessage(role="user", content="test")]), main.TransientAdmin())
+                   if use_chat else main.ai(uuid4(), main.TransientAdmin()))
         task = asyncio.create_task(request)
         try:
             assert await asyncio.to_thread(started.wait, 3)

@@ -16,3 +16,11 @@ export function readBackup(storage: Pick<Storage, "getItem">, id: string): Draft
 export function writeBackup(storage: Pick<Storage, "setItem">, id: string, version: number, draft: Project) {
   storage.setItem(backupKey(id), JSON.stringify({draft, baseVersion: version, timestamp: Date.now()}));
 }
+
+export function clearBackup(storage: Pick<Storage, "removeItem">, id: string) {
+  try {
+    storage.removeItem(backupKey(id));
+  } catch {
+    // Ignore storage errors
+  }
+}

@@ -24,6 +24,8 @@ export function ScenarioModal() {
     saved,
     scenarios,
     loadingScenarios,
+    analyzingIds,
+    handleAnalyzeScenario,
     activeTab,
     setActiveTab,
     newScenarioName,
@@ -91,7 +93,8 @@ export function ScenarioModal() {
               Сравните исходный рабочий план с альтернативными вариантами решений в PostgreSQL. Выберите подходящий сценарий и примените его в рабочий черновик.
             </Text>
 
-            <Table striped highlightOnHover withTableBorder>
+            <div className="table-responsive-container">
+              <Table striped highlightOnHover withTableBorder style={{ minWidth: 640 }}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Вариант / Сценарий</Table.Th>
@@ -148,6 +151,7 @@ export function ScenarioModal() {
                     <Table.Tr key={sc.id}>
                       <Table.Td>
                         <Text fw={600} size="sm">{sc.name}</Text>
+                        {sc.error && <Text size="xs" c="red">{sc.error}</Text>}
                         {sc.description && <Text size="xs" c="dimmed">{sc.description}</Text>}
                         {sc.changes?.changed_task_ids && sc.changes.changed_task_ids.length > 0 && (
                           <Text size="xs" c="dimmed">Изменено задач: {sc.changes.changed_task_ids.length}</Text>
@@ -165,30 +169,52 @@ export function ScenarioModal() {
                         )}
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm" fw={500}>{sc.analysis ? date(sc.analysis.finish) : "—"}</Text>
-                      </Table.Td>
-                      <Table.Td>
-                        {deltaMin > 0 ? (
-                          <Badge size="xs" color="red">+{formatCalendarShift(deltaMin)}</Badge>
-                        ) : deltaMin < 0 ? (
-                          <Badge size="xs" color="teal">{formatCalendarShift(deltaMin)}</Badge>
+                        {sc.analysis ? (
+                          <Text size="sm" fw={500}>{date(sc.analysis.finish)}</Text>
+                        ) : sc.error ? (
+                          <Text size="xs" c="dimmed">—</Text>
                         ) : (
-                          <Badge size="xs" color="gray" variant="light">0 мин</Badge>
+                          <Button
+                            size="compact-xs"
+                            variant="subtle"
+                            loading={Boolean(analyzingIds[sc.id])}
+                            onClick={() => handleAnalyzeScenario(sc.id)}
+                          >
+                            Рассчитать
+                          </Button>
                         )}
                       </Table.Td>
                       <Table.Td>
-                        <Badge size="xs" color={exceeded ? "red" : "green"}>
-                          {exceeded ? "Превышен" : "В срок"}
-                        </Badge>
+                        {sc.error ? "—" : sc.changes ? (
+                          deltaMin > 0 ? (
+                            <Badge size="xs" color="red">+{formatCalendarShift(deltaMin)}</Badge>
+                          ) : deltaMin < 0 ? (
+                            <Badge size="xs" color="teal">{formatCalendarShift(deltaMin)}</Badge>
+                          ) : (
+                            <Badge size="xs" color="gray" variant="light">0 мин</Badge>
+                          )
+                        ) : "—"}
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm">{overloadsCount}</Text>
+                        {sc.error ? (
+                          <Badge size="xs" color="gray">Нет расчёта</Badge>
+                        ) : sc.analysis ? (
+                          <Badge size="xs" color={exceeded ? "red" : "green"}>
+                            {exceeded ? "Превышен" : "В срок"}
+                          </Badge>
+                        ) : (
+                          "—"
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm">{sc.error || !sc.analysis ? "—" : overloadsCount}</Text>
                       </Table.Td>
                       <Table.Td>
                         <Group gap={6}>
                           <Button
                             size="compact-xs"
                             variant="light"
+                            disabled={actionBusy || isStale || !!sc.error}
                             onClick={() => handleApplyScenario(sc)}
                           >
                             В черновик
@@ -210,6 +236,7 @@ export function ScenarioModal() {
                 })}
               </Table.Tbody>
             </Table>
+            </div>
 
             {scenarios.length === 0 && !loadingScenarios && (
               <Card withBorder p="md" style={{ textAlign: "center" }}>

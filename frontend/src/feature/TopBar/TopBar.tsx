@@ -17,6 +17,7 @@ import {
   CircleHelp,
   FileText,
   LogOut,
+  Menu as MenuIcon,
   Sparkles,
   User as UserIcon,
 } from "lucide-react";
@@ -40,30 +41,43 @@ export function TopBar() {
     setExecutiveReportModal,
     setHelpModal,
     setProjectManageModal,
+    setMobileNavOpened,
   } = useTopBar();
 
   return (
     <header className="topbar">
-      <div className="breadcrumbs">
+      <div className="topbar-left">
         <button
           type="button"
-          className="breadcrumb-btn"
-          onClick={() => setProjectManageModal(true)}
-          title="Переключить проект"
+          className="mobile-menu-btn"
+          aria-label="Открыть меню навигации"
+          onClick={() => setMobileNavOpened(true)}
         >
-          <span>Проекты</span>
-          <ChevronDown size={13} />
+          <MenuIcon size={20} />
         </button>
-        <span>/</span>
-        <button
-          type="button"
-          className="breadcrumb-current"
-          onClick={() => setProjectManageModal(true)}
-          title="Настройки проекта"
-        >
-          <strong>{draft?.name || "Выбор проекта"}</strong>
-        </button>
+
+        <div className="breadcrumbs">
+          <button
+            type="button"
+            className="breadcrumb-btn"
+            onClick={() => setProjectManageModal(true)}
+            title="Переключить проект"
+          >
+            <span>Проекты</span>
+            <ChevronDown size={13} />
+          </button>
+          <span>/</span>
+          <button
+            type="button"
+            className="breadcrumb-current"
+            onClick={() => setProjectManageModal(true)}
+            title="Настройки проекта"
+          >
+            <strong>{draft?.name || "Выбор проекта"}</strong>
+          </button>
+        </div>
       </div>
+
       <div className="top-actions">
         {/* Notification Center Popover */}
         <Popover width={360} position="bottom-end" withArrow shadow="md">

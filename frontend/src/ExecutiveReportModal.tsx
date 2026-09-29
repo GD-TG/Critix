@@ -197,11 +197,11 @@ export function ExecutiveReportModal({
             {copyStatus}
           </Badge>
         )}
-        <Group justify="space-between" align="center" className="no-print">
+        <Group justify="space-between" align="center" className="no-print" wrap="wrap" gap="sm">
           <Text size="xs" c="dimmed">
             Сформирован автоматический отчет со всеми метриками CPM, анализом рисков и выводами.
           </Text>
-          <Group gap="xs">
+          <Group gap="xs" wrap="wrap">
             <Button
               size="xs"
               variant="default"
@@ -343,89 +343,93 @@ export function ExecutiveReportModal({
           <Title order={4} size="sm" mb="xs">
             Задачи на критическом пути (наивысший приоритет внимания)
           </Title>
-          <Table striped highlightOnHover withTableBorder mb="md" verticalSpacing="xs">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ width: 60 }}>ID</Table.Th>
-                <Table.Th>Задача</Table.Th>
-                <Table.Th>Исполнитель / Роль</Table.Th>
-                <Table.Th>Длительность</Table.Th>
-                <Table.Th>Плановые даты</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {criticalTasks.map((t) => {
-                const p = project.assignees.find((a) => a.id === t.assignee_id);
-                const r = rows.get(t.id);
-                const isMilestone = t.duration_minutes === 0;
-                return (
-                  <Table.Tr key={t.id}>
-                    <Table.Td>{t.id}</Table.Td>
-                    <Table.Td fw={600}>
-                      <Group gap={6}>
-                        {isMilestone ? (
-                          <Badge size="xs" color="violet" variant="filled">
-                            Веха
-                          </Badge>
-                        ) : (
-                          <Badge size="xs" color="red" variant="filled">
-                            CPM
-                          </Badge>
-                        )}
-                        <span>{t.name}</span>
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>
-                      {p ? `${p.name} (${p.role || "Роль не указана"})` : "—"}
-                    </Table.Td>
-                    <Table.Td>{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</Table.Td>
-                    <Table.Td>{r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"}</Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
+          <div className="table-responsive-container">
+            <Table striped highlightOnHover withTableBorder mb="md" verticalSpacing="xs" style={{ minWidth: 540 }}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th style={{ width: 60 }}>ID</Table.Th>
+                  <Table.Th>Задача</Table.Th>
+                  <Table.Th>Исполнитель / Роль</Table.Th>
+                  <Table.Th>Длительность</Table.Th>
+                  <Table.Th>Плановые даты</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {criticalTasks.map((t) => {
+                  const p = project.assignees.find((a) => a.id === t.assignee_id);
+                  const r = rows.get(t.id);
+                  const isMilestone = t.duration_minutes === 0;
+                  return (
+                    <Table.Tr key={t.id}>
+                      <Table.Td>{t.id}</Table.Td>
+                      <Table.Td fw={600}>
+                        <Group gap={6}>
+                          {isMilestone ? (
+                            <Badge size="xs" color="violet" variant="filled">
+                              Веха
+                            </Badge>
+                          ) : (
+                            <Badge size="xs" color="red" variant="filled">
+                              CPM
+                            </Badge>
+                          )}
+                          <span>{t.name}</span>
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>
+                        {p ? `${p.name} (${p.role || "Роль не указана"})` : "—"}
+                      </Table.Td>
+                      <Table.Td>{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</Table.Td>
+                      <Table.Td>{r ? `${formatDate(r.start)} → ${formatDate(r.finish)}` : "—"}</Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </div>
 
           {/* Team Workload Table */}
           <Title order={4} size="sm" mb="xs">
             Команда и распределение нагрузки
           </Title>
-          <Table striped highlightOnHover withTableBorder verticalSpacing="xs">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Сотрудник</Table.Th>
-                <Table.Th>Должность / Роль</Table.Th>
-                <Table.Th>Ключевые компетенции</Table.Th>
-                <Table.Th>Задач</Table.Th>
-                <Table.Th>Нерабочие исключения</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {project.assignees.map((a) => {
-                const count = project.tasks.filter((t) => t.assignee_id === a.id).length;
-                const excCount = Object.values(a.calendar?.exceptions || {}).filter(
-                  (shifts) => shifts.length === 0,
-                ).length;
-                return (
-                  <Table.Tr key={a.id}>
-                    <Table.Td fw={600}>{a.name}</Table.Td>
-                    <Table.Td>{a.role || "Роль не указана"}</Table.Td>
-                    <Table.Td>
-                      <Group gap={4}>
-                        {(a.skills || []).map((s, idx) => (
-                          <Badge key={idx} size="xs" variant="light" color="indigo">
-                            {s.name}
-                          </Badge>
-                        ))}
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>{count}</Table.Td>
-                    <Table.Td>{excCount > 0 ? `${excCount} дн.` : "—"}</Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
+          <div className="table-responsive-container">
+            <Table striped highlightOnHover withTableBorder verticalSpacing="xs" style={{ minWidth: 540 }}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Сотрудник</Table.Th>
+                  <Table.Th>Должность / Роль</Table.Th>
+                  <Table.Th>Ключевые компетенции</Table.Th>
+                  <Table.Th>Задач</Table.Th>
+                  <Table.Th>Нерабочие исключения</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {project.assignees.map((a) => {
+                  const count = project.tasks.filter((t) => t.assignee_id === a.id).length;
+                  const excCount = Object.values(a.calendar?.exceptions || {}).filter(
+                    (shifts) => shifts.length === 0,
+                  ).length;
+                  return (
+                    <Table.Tr key={a.id}>
+                      <Table.Td fw={600}>{a.name}</Table.Td>
+                      <Table.Td>{a.role || "Роль не указана"}</Table.Td>
+                      <Table.Td>
+                        <Group gap={4}>
+                          {(a.skills || []).map((s, idx) => (
+                            <Badge key={idx} size="xs" variant="light" color="indigo">
+                              {s.name}
+                            </Badge>
+                          ))}
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>{count}</Table.Td>
+                      <Table.Td>{excCount > 0 ? `${excCount} дн.` : "—"}</Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </div>
         </div>
       </Stack>
     </Modal>
