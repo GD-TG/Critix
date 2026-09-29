@@ -1,4 +1,5 @@
-import { Badge, Button, Card, Group, Table, Text, Title, Tooltip } from "@mantine/core";
+import { Badge, Button, Card, Group, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { ChevronRight, Clock, User, Calendar } from "lucide-react";
 import { useTasksTableView } from "@/feature/TasksTableView/useTasksTableView";
 
 export function TasksTableView() {
@@ -38,7 +39,8 @@ export function TasksTableView() {
         </Group>
       </Group>
 
-      <div className="table-responsive-container">
+      {/* 1. Десктопная версия: полноценная многоколоночная таблица */}
+      <div className="desktop-tasks-table table-responsive-container">
         <Table striped highlightOnHover withTableBorder style={{ minWidth: 920 }}>
         <Table.Thead>
           <Table.Tr>
@@ -69,7 +71,6 @@ export function TasksTableView() {
             }
             const deltaHours = Math.round(deltaMinutes / 60);
 
-            // Driving constraint calculation
             let driverBadge = <Text size="xs" c="dimmed">—</Text>;
             if (t.status === "done") {
               driverBadge = <Badge size="xs" color="gray" variant="light">Факт (завершена)</Badge>;
@@ -191,6 +192,81 @@ export function TasksTableView() {
           })}
         </Table.Tbody>
       </Table>
+      </div>
+
+      {/* 2. Мобильная версия: оптимизированные карточки задач для смартфонов */}
+      <div className="mobile-tasks-cards">
+        {draft.tasks.map((t) => {
+          const r = rows.get(t.id);
+          const person = draft.assignees.find((a) => a.id === t.assignee_id);
+          const isOverdue = r?.risk_flags.includes("overdue");
+          const baseTask = draft.baseline?.tasks[t.id];
+          let deltaHours = 0;
+          if (baseTask && r) {
+            deltaHours = Math.round((new Date(r.finish).getTime() - new Date(baseTask.finish).getTime()) / 3600000);
+          }
+
+          return (
+            <Card
+              key={t.id}
+              withBorder
+              p="sm"
+              radius="md"
+              className="mobile-task-card"
+              onClick={() => openTask(t)}
+            >
+              <Group justify="space-between" align="flex-start" wrap="nowrap" mb={6}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Group gap={6} mb={4}>
+                    <Badge size="xs" variant="outline" color="gray">#{t.id}</Badge>
+                    {t.duration_minutes === 0 ? (
+                      <Badge size="xs" color="violet">Веха</Badge>
+                    ) : r?.critical ? (
+                      <Badge size="xs" color="red">Крит. путь</Badge>
+                    ) : null}
+                    {isOverdue && <Badge size="xs" color="red">Просрочена</Badge>}
+                  </Group>
+                  <Text fw={700} size="sm" lineClamp={2}>
+                    {t.name}
+                  </Text>
+                </div>
+                <ChevronRight size={18} color="var(--muted)" style={{ flexShrink: 0, marginTop: 4 }} />
+              </Group>
+
+              <Group justify="space-between" align="center" mt="xs" wrap="wrap" gap="xs">
+                <Group gap={6}>
+                  <Badge size="xs" color={statusColors[t.status]}>{statusLabels[t.status]}</Badge>
+                  <Badge size="xs" color={priorityColors[t.priority || "medium"]}>
+                    {priorityLabels[t.priority || "medium"]}
+                  </Badge>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Длительность: <strong>{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</strong>
+                </Text>
+              </Group>
+
+              <Group justify="space-between" align="center" mt={8} pt={8} style={{ borderTop: "1px solid var(--line)" }}>
+                <Group gap={6}>
+                  <User size={13} color="var(--muted)" />
+                  <Text size="xs" fw={500}>
+                    {person ? person.name : <span style={{ color: "var(--muted)" }}>Не назначен</span>}
+                  </Text>
+                </Group>
+                <Group gap={6}>
+                  <Calendar size={13} color="var(--muted)" />
+                  <Text size="xs" fw={600}>
+                    {r ? date(r.finish) : "—"}
+                  </Text>
+                  {baseTask && r && deltaHours !== 0 && (
+                    <Badge size="xs" color={deltaHours > 0 ? "red" : "teal"}>
+                      {deltaHours > 0 ? `+${deltaHours}ч` : `${deltaHours}ч`}
+                    </Badge>
+                  )}
+                </Group>
+              </Group>
+            </Card>
+          );
+        })}
       </div>
     </Card>
   );
