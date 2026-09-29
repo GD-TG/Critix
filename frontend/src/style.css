@@ -2049,7 +2049,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   }
 }
 
-.mobile-tasks-cards {
+.mobile-tasks-cards,
+.mobile-calendar-cards,
+.mobile-exceptions-cards {
   display: none;
 }
 
@@ -2244,6 +2246,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     grid-template-columns: 1fr;
     min-height: auto;
     gap: 16px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .team-grid > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
   }
 
   .team-sidebar-col {
@@ -2251,6 +2261,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     border-bottom: 1px solid var(--line);
     padding-right: 0;
     padding-bottom: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .desktop-calendar-table,
+  .desktop-exceptions-table {
+    display: none !important;
+  }
+
+  .mobile-calendar-cards,
+  .mobile-exceptions-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .mobile-calendar-card,
+  .mobile-exception-card {
+    background: var(--surface);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .team-member-list-scroll {

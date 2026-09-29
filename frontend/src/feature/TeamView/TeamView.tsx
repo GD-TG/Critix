@@ -211,7 +211,7 @@ export function TeamView() {
 
                     <Divider my="sm" />
 
-                    <Group grow>
+                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
                       <TextInput
                         label="Имя и фамилия"
                         value={activePerson.name}
@@ -223,7 +223,7 @@ export function TeamView() {
                         value={activePerson.role || ""}
                         onChange={(e) => updatePerson(activePerson.id, { role: e.target.value })}
                       />
-                    </Group>
+                    </SimpleGrid>
                   </Card>
 
                   {/* Skills & Tasks Grid */}
@@ -261,12 +261,12 @@ export function TeamView() {
 
                       <Divider my="xs" />
 
-                      <Group gap="xs" align="flex-end">
+                      <Group gap="xs" align="flex-end" wrap="wrap">
                         <TextInput
                           label="Новый навык"
                           placeholder="React, SQL, Docker..."
                           size="xs"
-                          style={{ flex: 1 }}
+                          style={{ minWidth: 130, flex: 1 }}
                           value={inlineNewSkillName}
                           onChange={(e) => setInlineNewSkillName(e.target.value)}
                           onKeyDown={(e) => {
@@ -279,7 +279,7 @@ export function TeamView() {
                         <Select
                           label="Грейд"
                           size="xs"
-                          w={130}
+                          w={120}
                           data={[
                             { value: "beginner", label: "Начинающий" },
                             { value: "intermediate", label: "Средний" },

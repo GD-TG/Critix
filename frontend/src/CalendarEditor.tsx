@@ -135,7 +135,8 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
             Укажите рабочие смены для каждого дня недели. Время задаётся в часовом поясе проекта.
           </Text>
 
-          <div className="table-responsive-container">
+          {/* Desktop Table */}
+          <div className="desktop-calendar-table table-responsive-container">
             <Table verticalSpacing="xs" striped highlightOnHover withTableBorder style={{ minWidth: 500 }}>
               <Table.Thead>
                 <Table.Tr>
@@ -252,6 +253,106 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
               })}
             </Table.Tbody>
           </Table>
+          </div>
+
+          {/* Mobile Cards for Week Schedule */}
+          <div className="mobile-calendar-cards">
+            {DAYS_OF_WEEK.map(({ index, label, short }) => {
+              const dayShifts = value.week[index] || [];
+              const isWorking = dayShifts.length > 0;
+
+              return (
+                <Card key={index} withBorder p="xs" radius="sm" className="mobile-calendar-card">
+                  <Group justify="space-between" align="center" mb={6}>
+                    <Group gap="xs">
+                      <Badge size="xs" color={isWorking ? "blue" : "gray"}>
+                        {short}
+                      </Badge>
+                      <Text size="xs" fw={600}>{label}</Text>
+                    </Group>
+                    <Group gap={4}>
+                      <Button
+                        size="compact-xs"
+                        variant="light"
+                        onClick={() =>
+                          updateWeekDay(index, [
+                            ...dayShifts,
+                            { start: "09:00", end: "18:00" },
+                          ])
+                        }
+                      >
+                        + смена
+                      </Button>
+                      {isWorking && (
+                        <Button
+                          size="compact-xs"
+                          variant="subtle"
+                          color="gray"
+                          onClick={() => updateWeekDay(index, [])}
+                        >
+                          Выходной
+                        </Button>
+                      )}
+                    </Group>
+                  </Group>
+
+                  {dayShifts.length === 0 ? (
+                    <Text size="xs" c="dimmed">
+                      Выходной день (нет рабочих смен)
+                    </Text>
+                  ) : (
+                    <Stack gap={6}>
+                      {dayShifts.map((shift, shiftIdx) => (
+                        <Group key={shiftIdx} gap={4} align="center" wrap="nowrap">
+                          <TextInput
+                            size="xs"
+                            type="time"
+                            style={{ flex: 1 }}
+                            value={shift.start.slice(0, 5)}
+                            onChange={(e) =>
+                              updateWeekDay(
+                                index,
+                                dayShifts.map((s, j) =>
+                                  shiftIdx === j ? { ...s, start: e.target.value } : s,
+                                ),
+                              )
+                            }
+                          />
+                          <Text size="xs" c="dimmed">–</Text>
+                          <TextInput
+                            size="xs"
+                            type="time"
+                            style={{ flex: 1 }}
+                            value={shift.end.slice(0, 5)}
+                            onChange={(e) =>
+                              updateWeekDay(
+                                index,
+                                dayShifts.map((s, j) =>
+                                  shiftIdx === j ? { ...s, end: e.target.value } : s,
+                                ),
+                              )
+                            }
+                          />
+                          <ActionIcon
+                            size="sm"
+                            color="red"
+                            variant="subtle"
+                            onClick={() =>
+                              updateWeekDay(
+                                index,
+                                dayShifts.filter((_, j) => j !== shiftIdx),
+                              )
+                            }
+                          >
+                            ×
+                          </ActionIcon>
+                        </Group>
+                      ))}
+                    </Stack>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         </Stack>
       )}
@@ -374,16 +475,101 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
                 Нет назначенных исключений или отпусков. График рассчитывается строго по расписанию недели.
               </Text>
             ) : (
-              <div className="table-responsive-container">
-                <Table verticalSpacing="xs" striped highlightOnHover withTableBorder style={{ minWidth: 480 }}>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: 140 }}>Дата</Table.Th>
-                    <Table.Th>Тип / Смены</Table.Th>
-                    <Table.Th style={{ width: 100 }}>Действие</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
+              <>
+                {/* Desktop Exceptions Table */}
+                <div className="desktop-exceptions-table table-responsive-container">
+                  <Table verticalSpacing="xs" striped highlightOnHover withTableBorder style={{ minWidth: 480 }}>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th style={{ width: 140 }}>Дата</Table.Th>
+                      <Table.Th>Тип / Смены</Table.Th>
+                      <Table.Th style={{ width: 100 }}>Действие</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {sortedExceptions.map((dateKey) => {
+                      const shifts = value.exceptions[dateKey] || [];
+                      const isVacation = shifts.length === 0;
+                      const d = new Date(dateKey);
+                      const formattedDate = d.toLocaleDateString("ru-RU", {
+                        timeZone: "UTC",
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        weekday: "short",
+                      });
+
+                      return (
+                        <Table.Tr key={dateKey}>
+                          <Table.Td>
+                            <Text size="xs" fw={600}>
+                              {formattedDate}
+                            </Text>
+                            <Text size="10px" c="dimmed">
+                              {dateKey}
+                            </Text>
+                          </Table.Td>
+
+                          <Table.Td>
+                            {isVacation ? (
+                              <Badge color="red" variant="light" size="sm">
+                                Отпуск / Выходной
+                              </Badge>
+                            ) : (
+                              <Group gap="xs" wrap="wrap">
+                                <Badge color="teal" variant="light" size="sm">
+                                  Рабочий день
+                                </Badge>
+                                {shifts.map((s, idx) => (
+                                  <Text key={idx} size="xs">
+                                    {s.start.slice(0, 5)} – {s.end.slice(0, 5)}
+                                  </Text>
+                                ))}
+                              </Group>
+                            )}
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Group gap="xs">
+                              <Button
+                                size="compact-xs"
+                                variant="subtle"
+                                color={isVacation ? "teal" : "gray"}
+                                onClick={() => {
+                                  const nextShifts = isVacation
+                                    ? [{ start: "09:00", end: "18:00" }]
+                                    : [];
+                                  onChange({
+                                    ...value,
+                                    exceptions: {
+                                      ...value.exceptions,
+                                      [dateKey]: nextShifts,
+                                    },
+                                  });
+                                }}
+                              >
+                                {isVacation ? "Сделать рабочим" : "Сделать отпуском"}
+                              </Button>
+                              <ActionIcon
+                                size="xs"
+                                color="red"
+                                variant="subtle"
+                                title="Удалить исключение"
+                                onClick={() => removeException(dateKey)}
+                              >
+                                <Trash2 size={14} />
+                              </ActionIcon>
+                            </Group>
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+                </div>
+
+                {/* Mobile Cards for Exceptions */}
+                <div className="mobile-exceptions-cards">
                   {sortedExceptions.map((dateKey) => {
                     const shifts = value.exceptions[dateKey] || [];
                     const isVacation = shifts.length === 0;
@@ -397,37 +583,24 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
                     });
 
                     return (
-                      <Table.Tr key={dateKey}>
-                        <Table.Td>
-                          <Text size="xs" fw={600}>
-                            {formattedDate}
-                          </Text>
-                          <Text size="10px" c="dimmed">
-                            {dateKey}
-                          </Text>
-                        </Table.Td>
-
-                        <Table.Td>
-                          {isVacation ? (
-                            <Badge color="red" variant="light" size="sm">
-                              Отпуск / Выходной
-                            </Badge>
-                          ) : (
-                            <Group gap="xs" wrap="wrap">
-                              <Badge color="teal" variant="light" size="sm">
-                                Рабочий день
-                              </Badge>
-                              {shifts.map((s, idx) => (
-                                <Text key={idx} size="xs">
-                                  {s.start.slice(0, 5)} – {s.end.slice(0, 5)}
-                                </Text>
-                              ))}
+                      <Card key={dateKey} withBorder p="xs" radius="sm" className="mobile-exception-card">
+                        <Group justify="space-between" align="center" wrap="nowrap">
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <Text size="xs" fw={700}>{formattedDate}</Text>
+                            <Group gap={6} mt={2}>
+                              <Text size="10px" c="dimmed">{dateKey}</Text>
+                              {isVacation ? (
+                                <Badge color="red" variant="light" size="xs">
+                                  Отпуск / Выходной
+                                </Badge>
+                              ) : (
+                                <Badge color="teal" variant="light" size="xs">
+                                  {shifts.map(s => `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`).join(", ") || "Рабочий"}
+                                </Badge>
+                              )}
                             </Group>
-                          )}
-                        </Table.Td>
-
-                        <Table.Td>
-                          <Group gap="xs">
+                          </div>
+                          <Group gap={4} wrap="nowrap">
                             <Button
                               size="compact-xs"
                               variant="subtle"
@@ -445,10 +618,10 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
                                 });
                               }}
                             >
-                              {isVacation ? "Сделать рабочим" : "Сделать отпуском"}
+                              {isVacation ? "Рабочий" : "Отпуск"}
                             </Button>
                             <ActionIcon
-                              size="xs"
+                              size="sm"
                               color="red"
                               variant="subtle"
                               title="Удалить исключение"
@@ -457,13 +630,12 @@ export function CalendarEditor({ value, onChange, title }: CalendarEditorProps) 
                               <Trash2 size={14} />
                             </ActionIcon>
                           </Group>
-                        </Table.Td>
-                      </Table.Tr>
+                        </Group>
+                      </Card>
                     );
                   })}
-                </Table.Tbody>
-              </Table>
-              </div>
+                </div>
+              </>
             )}
           </div>
         </Stack>
