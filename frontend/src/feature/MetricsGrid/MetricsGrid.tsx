@@ -1,7 +1,10 @@
-import { Alert, Button, Group, Text } from "@mantine/core";
-import { AlertTriangle, CalendarDays, Gauge, Target } from "lucide-react";
+import { useState } from "react";
+import { Alert, Button, Collapse, Group, Text } from "@mantine/core";
+import { AlertTriangle, CalendarDays, ChevronDown, ChevronUp, Gauge, Target } from "lucide-react";
 import { copy } from "@/shared";
 import { useMetricsGrid } from "./useMetricsGrid";
+
+const STORAGE_KEY = "critix_metrics_collapsed";
 
 export function MetricsGrid() {
   const {
@@ -20,11 +23,109 @@ export function MetricsGrid() {
     setTask,
   } = useMetricsGrid();
 
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(STORAGE_KEY, String(next));
+      } catch {
+        // safe fallback
+      }
+      return next;
+    });
+  };
+
   if (!view || !draft) return null;
+
+  const criticalTasksCount = (view?.analysis.tasks || []).filter((t) => t.critical).length;
 
   return (
     <>
-      <section className="metric-grid">
+      <div className={`metrics-toggle-wrapper ${collapsed ? "is-collapsed" : ""}`}>
+        {collapsed ? (
+          <div
+            className="metrics-collapsed-summary"
+            onClick={toggleCollapsed}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleCollapsed();
+              }
+            }}
+            title="Нажмите, чтобы развернуть показатели проекта"
+          >
+            <div className="metrics-summary-chips">
+              <span className="metrics-chip">
+                <Gauge size={13} style={{ color: "var(--purple)" }} />
+                <strong>{progressPercent}%</strong> прогресс ({completedCount}/{totalTasksCount})
+              </span>
+              <span className="metrics-chip">
+                <CalendarDays size={13} style={{ color: "var(--brand)" }} />
+                <strong>{daysRemaining}</strong> дн. до финиша
+              </span>
+              <span className="metrics-chip">
+                <Target size={13} style={{ color: "var(--green)" }} />
+                <strong>{criticalTasksCount}</strong> на крит. пути
+              </span>
+              {overdueTasks.length > 0 ? (
+                <span className="metrics-chip chip-coral">
+                  <AlertTriangle size={13} />
+                  <strong>{overdueTasks.length}</strong> {overdueTasks.length === 1 ? "просрочена" : "просрочено"}
+                </span>
+              ) : (
+                <span className="metrics-chip chip-positive">В графике</span>
+              )}
+              {view?.analysis.deadline_exceeded && (
+                <span className="metrics-chip chip-coral">Дедлайн превышен</span>
+              )}
+              {isStale && (
+                <span className="metrics-chip chip-warning">Прогноз устарел</span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="metrics-collapse-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCollapsed();
+              }}
+              aria-expanded={false}
+              title="Развернуть показатели"
+            >
+              <span>Показатели</span>
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        ) : (
+          <div className="metrics-expanded-header">
+            <span className="metrics-expanded-title">Ключевые показатели проекта</span>
+            <button
+              type="button"
+              className="metrics-collapse-btn"
+              onClick={toggleCollapsed}
+              aria-expanded={true}
+              title="Свернуть блок показателей"
+            >
+              <span>Свернуть</span>
+              <ChevronUp size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <Collapse in={!collapsed}>
+        <section className="metric-grid">
         <article className="metric-card">
           <div className="metric-top">
             <span className="metric-label">Прогресс проекта</span>
@@ -118,6 +219,7 @@ export function MetricsGrid() {
           </div>
         </article>
       </section>
+      </Collapse>
 
       {isStale && staleTasks.length > 0 && (
         <Alert

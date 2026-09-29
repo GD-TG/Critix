@@ -727,6 +727,133 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-size: 10px;
 }
 
+/* ==========================================================================
+   Metrics Grid Collapsible Accordion (Option B)
+   ========================================================================== */
+.metrics-toggle-wrapper {
+  margin: -4px 0 10px;
+}
+
+.metrics-toggle-wrapper.is-collapsed {
+  margin: -4px 0 16px;
+}
+
+.metrics-expanded-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-bottom: 8px;
+}
+
+.metrics-expanded-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+.metrics-collapsed-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+}
+
+.metrics-collapsed-summary:hover {
+  background: var(--bg);
+  border-color: #cfd6e0;
+  box-shadow: var(--shadow-card-hover);
+}
+
+[data-mantine-color-scheme="dark"] .metrics-collapsed-summary:hover {
+  border-color: #555;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.metrics-summary-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.metrics-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ink);
+  background: var(--bg);
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.metrics-chip strong {
+  font-weight: 700;
+}
+
+.metrics-chip.chip-positive {
+  color: #2b8a3e;
+  background: rgba(43, 138, 62, 0.09);
+  border-color: rgba(43, 138, 62, 0.25);
+}
+
+.metrics-chip.chip-coral {
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-color: rgba(210, 10, 46, 0.25);
+}
+
+[data-mantine-color-scheme="dark"] .metrics-chip.chip-coral {
+  background: rgba(225, 67, 95, 0.15);
+  border-color: rgba(225, 67, 95, 0.35);
+}
+
+.metrics-chip.chip-warning {
+  color: #d97706;
+  background: rgba(245, 159, 0, 0.1);
+  border-color: rgba(245, 159, 0, 0.3);
+}
+
+.metrics-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.metrics-collapse-btn:hover {
+  background: var(--bg);
+  color: var(--ink);
+  border-color: #cfd6e0;
+}
+
+[data-mantine-color-scheme="dark"] .metrics-collapse-btn:hover {
+  border-color: #666;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2375,6 +2502,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .metric-grid {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .metrics-collapsed-summary {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 7px 10px;
+  }
+
+  .metrics-summary-chips {
+    gap: 6px;
+  }
+
+  .metrics-chip {
+    font-size: 10.5px;
+    padding: 3px 7px;
+  }
+
+  .metrics-collapse-btn {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    margin-left: auto;
   }
 }
 
