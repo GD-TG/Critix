@@ -188,21 +188,22 @@ def set_auth_cookie(response: Response, user_id: UUID | None = None):
 async def security(request: Request, call_next):
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         origin = request.headers.get("origin")
+        if origin:
+            origin = origin.rstrip("/")
         env = os.environ.get("ENVIRONMENT", os.environ.get("CRITIX_ENV", "development")).lower()
         is_prod = env in ("production", "prod")
         expected = os.environ.get("APP_ORIGIN", "http://localhost")
-        allowed = {e.strip() for e in expected.split(",") if e.strip()}
-        if not is_prod:
-            if any("localhost" in e or "127.0.0.1" in e for e in allowed) or not allowed:
-                allowed.update({
-                    "http://localhost", "https://localhost",
-                    "http://127.0.0.1", "https://127.0.0.1",
-                    "http://localhost:5173", "https://localhost:5173",
-                    "http://127.0.0.1:5173", "https://127.0.0.1:5173",
-                    "http://localhost:80", "https://localhost:80",
-                    "http://localhost:443", "https://localhost:443",
-                    "http://127.0.0.1:80", "http://127.0.0.1:443"
-                })
+        allowed = {e.strip().rstrip("/") for e in expected.split(",") if e.strip()}
+        if not is_prod or any("localhost" in e or "127.0.0.1" in e for e in allowed) or not allowed:
+            allowed.update({
+                "http://localhost", "https://localhost",
+                "http://127.0.0.1", "https://127.0.0.1",
+                "http://localhost:5173", "https://localhost:5173",
+                "http://127.0.0.1:5173", "https://127.0.0.1:5173",
+                "http://localhost:80", "https://localhost:80",
+                "http://localhost:443", "https://localhost:443",
+                "http://127.0.0.1:80", "http://127.0.0.1:443"
+            })
         if origin and (origin not in allowed or "*" in allowed):
             return JSONResponse(status_code=403, content={"detail": "Недопустимый источник запроса"})
         if request.headers.get("x-critix-request") != "1":
