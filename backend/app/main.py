@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import hashlib
 import asyncio
 import logging
@@ -22,7 +23,7 @@ from app.db import session, SessionLocal
 from app.demo import demo
 from app.engine.analysis import analyze
 from app.engine.calendar import PlanningError
-from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse
+from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse
 
 from contextlib import asynccontextmanager
 
@@ -94,17 +95,74 @@ def signature(value):
     return hmac.new(secret(), value.encode(), hashlib.sha256).hexdigest()
 
 
-def authenticated(request: Request):
+def get_session_info(request: Request):
     token = request.cookies.get("critix_session", "")
+    parts = token.split(".")
+    user_id = None
+    valid = False
+    nonce = ""
     try:
-        expires, nonce, digest = token.split(".")
-        valid = hmac.compare_digest(digest, signature(f"{expires}.{nonce}")) and int(expires) > time.time()
+        if len(parts) == 4:
+            expires, user_id_str, nonce, digest = parts
+            valid = hmac.compare_digest(digest, signature(f"{expires}.{user_id_str}.{nonce}")) and int(expires) > time.time()
+            if valid:
+                user_id = UUID(user_id_str)
+        elif len(parts) == 3:
+            expires, nonce, digest = parts
+            valid = hmac.compare_digest(digest, signature(f"{expires}.{nonce}")) and int(expires) > time.time()
         with auth_lock:
             valid = valid and nonce not in revoked
     except (ValueError, TypeError):
         valid = False
     if not valid:
         raise HTTPException(401, "Войдите в аккаунт руководителя")
+    return {"user_id": user_id, "nonce": nonce}
+
+
+def authenticated(request: Request):
+    return get_session_info(request)
+
+
+class TransientAdmin:
+    id = None
+    email = "admin@critix.local"
+    name = "Администратор"
+    created_at = datetime.now(timezone.utc)
+
+
+def current_user(request: Request, db=Depends(session)):
+    info = get_session_info(request)
+    user_id = info.get("user_id")
+    if user_id:
+        try:
+            user = db.scalar(select(models.User).where(models.User.id == user_id))
+            if user:
+                return user
+        except Exception:
+            pass
+    try:
+        return service.get_or_create_demo_user(db)
+    except Exception:
+        return TransientAdmin()
+
+
+def set_auth_cookie(response: Response, user_id: UUID | None = None):
+    expires = int(time.time()) + 86400 * 7
+    nonce = secrets.token_hex(16)
+    if user_id is not None:
+        payload = f"{expires}.{user_id}.{nonce}"
+    else:
+        payload = f"{expires}.{nonce}"
+    token = f"{payload}.{signature(payload)}"
+    response.set_cookie(
+        "critix_session",
+        token,
+        httponly=True,
+        secure=os.getenv("COOKIE_SECURE", "true").lower() == "true",
+        samesite="strict",
+        max_age=86400 * 7,
+    )
+    return token
 
 
 @app.middleware("http")
@@ -166,6 +224,45 @@ def client_address(request):
     return address
 
 
+@app.post("/api/auth/register", status_code=201)
+def register(body: UserRegister, response: Response, db=Depends(session)):
+    user = service.create_user(db, body.email, body.password, body.name)
+    set_auth_cookie(response, user.id)
+    return {"id": user.id, "email": user.email, "name": user.name, "created_at": user.created_at}
+
+
+@app.post("/api/auth/login")
+def auth_login(body: UserLogin, request: Request, response: Response, db=Depends(session)):
+    address = client_address(request)
+    now = time.monotonic()
+    with auth_lock:
+        for key in list(attempts):
+            if attempts[key][1] < now:
+                del attempts[key]
+        count, until = attempts.get(address, (0, now + 300))
+        if count >= 10:
+            raise HTTPException(429, "Слишком много попыток. Подождите 5 минут")
+        user = service.authenticate_user(db, body.email, body.password)
+        if not user:
+            attempts[address] = (count + 1, until)
+            raise HTTPException(401, "Неверный email или пароль")
+        attempts.pop(address, None)
+    set_auth_cookie(response, user.id)
+    return {"id": user.id, "email": user.email, "name": user.name, "created_at": user.created_at}
+
+
+@app.post("/api/auth/demo")
+def auth_demo(response: Response, db=Depends(session)):
+    demo_user = service.get_or_create_demo_user(db)
+    set_auth_cookie(response, demo_user.id)
+    return {"id": demo_user.id, "email": demo_user.email, "name": demo_user.name, "created_at": demo_user.created_at}
+
+
+@app.get("/api/auth/me")
+def auth_me(user=Depends(current_user)):
+    return {"id": user.id, "email": user.email, "name": user.name, "created_at": user.created_at}
+
+
 @app.post("/api/login")
 def login(body: Login, request: Request, response: Response):
     now = time.monotonic()
@@ -184,22 +281,19 @@ def login(body: Login, request: Request, response: Response):
             attempts[address] = (count+1, until)
             raise HTTPException(401, "Неверный пароль")
         attempts.pop(address, None)
-    value = f"{int(time.time())+28800}.{secrets.token_hex(16)}"
-    response.set_cookie("critix_session", f"{value}.{signature(value)}", httponly=True,
-                        secure=os.getenv("COOKIE_SECURE", "true").lower() == "true", samesite="strict", max_age=28800)
+    set_auth_cookie(response, None)
     return {"ok": True}
 
 
 @app.post("/api/logout")
+@app.post("/api/auth/logout")
 def logout(request: Request, response: Response):
     try:
-        authenticated(request)
-        expires, nonce, _ = request.cookies["critix_session"].split(".")
-        with auth_lock:
-            for key in list(revoked):
-                if revoked[key] <= time.time():
-                    del revoked[key]
-            revoked[nonce] = int(expires)
+        info = get_session_info(request)
+        nonce = info.get("nonce")
+        if nonce:
+            with auth_lock:
+                revoked[nonce] = int(time.time()) + 86400 * 7
     except (HTTPException, ValueError, KeyError):
         pass
     response.delete_cookie("critix_session")
@@ -217,18 +311,18 @@ calculated = [*auth, Depends(calculation_slot)]
 
 
 @app.get("/api/projects", dependencies=auth)
-def projects(db=Depends(session)):
-    return [dict(id=p.id, name=p.name, version=p.version) for p in db.scalars(select(models.Project).order_by(models.Project.name))]
+def projects(db=Depends(session), user=Depends(current_user)):
+    return service.list_projects_for_user(db, user.id)
 
 
 @app.post("/api/projects", dependencies=calculated, status_code=201)
-def create(body: ProjectInput, db=Depends(session)):
-    return service.create(db, body)
+def create(body: ProjectInput, db=Depends(session), user=Depends(current_user)):
+    return service.create(db, body, owner_id=user.id)
 
 
 @app.post("/api/demo", dependencies=calculated, status_code=201)
-def create_demo(db=Depends(session)):
-    return service.create(db, demo())
+def create_demo(db=Depends(session), user=Depends(current_user)):
+    return service.create(db, demo(), owner_id=user.id)
 
 
 @app.get("/api/projects/{project_id}", dependencies=calculated)

@@ -3,6 +3,8 @@ import { copy, formatCalendarDuration, formatMinutes, formatShortDate, getOverdu
 
 export function useTopBar() {
   const {
+    user,
+    logout,
     draft, saved, preview,
     setTask,
     setActiveView,
@@ -19,6 +21,8 @@ export function useTopBar() {
   const overloadedAssigneeIds = getOverloadedAssigneeIds(view);
 
   return {
+    user,
+    logout,
     draft,
     view,
     overdueTasks,

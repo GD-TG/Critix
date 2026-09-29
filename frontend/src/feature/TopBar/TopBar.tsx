@@ -16,12 +16,16 @@ import {
   ChevronDown,
   CircleHelp,
   FileText,
+  LogOut,
   Sparkles,
+  User as UserIcon,
 } from "lucide-react";
 import { useTopBar } from "./useTopBar";
 
 export function TopBar() {
   const {
+    user,
+    logout,
     draft,
     view,
     overdueTasks,
@@ -174,6 +178,69 @@ export function TopBar() {
         <button className="help-button" aria-label="Помощь" onClick={() => setHelpModal(true)}>
           <CircleHelp size={14} />
         </button>
+
+        {user && (
+          <Popover width={220} position="bottom-end" shadow="md">
+            <Popover.Target>
+              <button
+                type="button"
+                className="user-profile-btn"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border-color)",
+                  background: "transparent",
+                  color: "inherit",
+                  cursor: "pointer",
+                }}
+                title={user.email}
+              >
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    background: "var(--purple)",
+                    color: "#fff",
+                    fontSize: 11,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                  }}
+                >
+                  {user.name ? user.name[0].toUpperCase() : "U"}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 500, maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user.name}
+                </span>
+              </button>
+            </Popover.Target>
+            <Popover.Dropdown p="xs">
+              <Stack gap="xs">
+                <div>
+                  <Text size="xs" fw={700}>{user.name}</Text>
+                  <Text size="11px" c="dimmed">{user.email}</Text>
+                </div>
+                <Divider />
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  color="red"
+                  leftSection={<LogOut size={13} />}
+                  onClick={() => void logout()}
+                  fullWidth
+                  justify="flex-start"
+                >
+                  Выйти из системы
+                </Button>
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+        )}
       </div>
     </header>
   );

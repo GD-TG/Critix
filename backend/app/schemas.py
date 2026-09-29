@@ -190,3 +190,30 @@ class ScenarioResponse(StrictModel):
     project: ProjectInput
     analysis: dict | None = None
     changes: dict | None = None
+
+
+class UserRegister(StrictModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=6, max_length=128)
+    name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("Некорректный формат email")
+        return v
+
+
+class UserLogin(StrictModel):
+    email: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class UserResponse(StrictModel):
+    id: UUID
+    email: str
+    name: str
+    created_at: datetime
+

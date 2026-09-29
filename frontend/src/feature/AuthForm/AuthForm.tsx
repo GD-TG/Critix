@@ -1,4 +1,16 @@
-import { PasswordInput, Button, Alert, Title, Text, MantineProvider, Group } from "@mantine/core";
+import {
+  Alert,
+  Button,
+  Divider,
+  MantineProvider,
+  PasswordInput,
+  SegmentedControl,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from "@mantine/core";
+import { Zap } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { actionTheme } from "@/theme";
 import { CritixLogo } from "@/CritixLogo";
@@ -6,7 +18,20 @@ import { useAuthForm } from "./useAuthForm";
 
 export function AuthForm() {
   const { colorScheme } = useApp();
-  const { password, setPassword, handleLogin, busy, error } = useAuthForm();
+  const {
+    mode,
+    setMode,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    name,
+    setName,
+    busy,
+    error,
+    handleSubmit,
+    handleDemoLogin,
+  } = useAuthForm();
 
   return (
     <MantineProvider forceColorScheme={colorScheme} theme={actionTheme}>
@@ -14,48 +39,110 @@ export function AuthForm() {
         <aside className="login-panel">
           <div className="login-statement">
             <span className="login-overline">РАБОЧЕЕ ПРОСТРАНСТВО</span>
-            <h1>Проект<br />в фокусе<span>.</span></h1>
-            <p>Сроки, связи и решения команды — в одном плане.</p>
+            <h1>
+              Проект<br />в фокусе<span>.</span>
+            </h1>
+            <p>Сроки, связи, риски и выравнивание ресурсов — в единой системе принятия решений.</p>
           </div>
           <div className="login-panel-footer">
             <span>ПРОЕКТНОЕ УПРАВЛЕНИЕ</span>
             <span>CRITIX</span>
           </div>
         </aside>
+
         <section className="login-main">
           <div className="login-form">
             <div className="login-lockup">
               <CritixLogo size={40} />
               <span>Critix</span>
             </div>
-            <div className="login-form-heading">
-              <span>ВХОД В СИСТЕМУ</span>
-              <Title order={2}>С возвращением</Title>
-              <Text c="dimmed" size="sm">Введите пароль руководителя, чтобы продолжить.</Text>
-            </div>
 
-            {error && <Alert color="red">{error}</Alert>}
-
-            <PasswordInput
-              label="Пароль руководителя"
-              placeholder="Введите пароль"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <SegmentedControl
+              fullWidth
+              value={mode}
+              onChange={(val) => setMode(val as "login" | "register")}
+              data={[
+                { label: "Вход", value: "login" },
+                { label: "Регистрация", value: "register" },
+              ]}
+              mb="md"
             />
 
-            <Button
-              className="login-submit"
-              fullWidth
-              loading={busy}
-              onClick={() => void handleLogin()}
-            >
-              Войти в рабочее пространство
-            </Button>
-            <div className="login-secure-note">
-              <span />Доступ только для участников команды
+            <div className="login-form-heading">
+              <span>{mode === "login" ? "АВТОРИЗАЦИЯ" : "СОЗДАНИЕ АККАУНТА"}</span>
+              <Title order={2}>
+                {mode === "login" ? "С возвращением" : "Новый руководитель"}
+              </Title>
+              <Text c="dimmed" size="sm">
+                {mode === "login"
+                  ? "Войдите под своим email или используйте быстрый демо-доступ."
+                  : "Зарегистрируйтесь для ведения собственных проектов с изоляцией данных."}
+              </Text>
+            </div>
+
+            {error && <Alert color="red" mb="xs">{error}</Alert>}
+
+            <Stack gap="xs">
+              {mode === "register" && (
+                <TextInput
+                  label="Ваше имя"
+                  placeholder="Иван Петров"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              )}
+
+              <TextInput
+                label="Email"
+                placeholder={mode === "login" ? "pm@critix.ru (или оставьте пустым)" : "pm@critix.ru"}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+
+              <PasswordInput
+                label="Пароль"
+                placeholder="Введите пароль"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !busy) void handleSubmit();
+                }}
+                required
+              />
+
+              <Button
+                className="login-submit"
+                fullWidth
+                loading={busy}
+                onClick={() => void handleSubmit()}
+                mt="xs"
+              >
+                {mode === "login" ? "Войти в систему" : "Зарегистрироваться"}
+              </Button>
+
+              <Divider label="или для жюри и проверки" labelPosition="center" my="xs" />
+
+              <Button
+                variant="light"
+                color="violet"
+                fullWidth
+                leftSection={<Zap size={16} />}
+                loading={busy}
+                onClick={() => void handleDemoLogin()}
+              >
+                Быстрый демо-вход в 1 клик
+              </Button>
+            </Stack>
+
+            <div className="login-secure-note" style={{ marginTop: 14 }}>
+              <span />Индивидуальная рабочая область для каждого аккаунта
             </div>
           </div>
-          <span className="login-copyright">© CRITIX · МЕТОД КРИТИЧЕСКОГО ПУТИ И УПРАВЛЕНИЕ РЕСУРСАМИ</span>
+          <span className="login-copyright">
+            © CRITIX · МЕТОД КРИТИЧЕСКОГО ПУТИ И УПРАВЛЕНИЕ РЕСУРСАМИ
+          </span>
         </section>
       </main>
     </MantineProvider>

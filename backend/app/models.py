@@ -7,6 +7,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
 
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class Project(Base):
     __tablename__ = "projects"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -17,6 +26,7 @@ class Project(Base):
     baseline: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     calendar: Mapped[dict] = mapped_column(JSON)
     version: Mapped[int] = mapped_column(default=1)
+    owner_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     __table_args__ = (CheckConstraint("deadline > start"), CheckConstraint("version > 0"))
 
 

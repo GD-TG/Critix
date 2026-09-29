@@ -65,9 +65,74 @@ def write(db, row, data, result, comment=None):
     return dict(id=row.id, version=row.version, project=data, analysis=result)
 
 
-def create(db, data):
+from app.auth import hash_password, verify_password
+from app.demo import demo
+
+
+def create(db, data, owner_id=None):
     result = analyze(data)
-    return write(db, models.Project(version=1), data, result)
+    return write(db, models.Project(version=1, owner_id=owner_id), data, result)
+
+
+def create_user(db, email: str, password: str, name: str):
+    email = email.strip().lower()
+    existing = db.scalar(select(models.User).where(models.User.email == email))
+    if existing:
+        raise HTTPException(400, "Пользователь с таким email уже зарегистрирован")
+    user = models.User(
+        email=email,
+        hashed_password=hash_password(password),
+        name=name.strip(),
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    create(db, demo(), owner_id=user.id)
+    return user
+
+
+def authenticate_user(db, email: str, password: str):
+    email = email.strip().lower()
+    user = db.scalar(select(models.User).where(models.User.email == email))
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+
+def get_or_create_demo_user(db):
+    demo_email = "demo@critix.ru"
+    user = db.scalar(select(models.User).where(models.User.email == demo_email))
+    if not user:
+        user = models.User(
+            email=demo_email,
+            hashed_password=hash_password("critix2026"),
+            name="Демо Руководитель",
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        create(db, demo(), owner_id=user.id)
+    else:
+        has_proj = db.scalar(select(models.Project).where(models.Project.owner_id == user.id))
+        if not has_proj:
+            create(db, demo(), owner_id=user.id)
+    return user
+
+
+def list_projects_for_user(db, user_id: UUID | None = None):
+    if user_id:
+        projects = db.scalars(
+            select(models.Project)
+            .where((models.Project.owner_id == user_id) | (models.Project.owner_id.is_(None)))
+            .order_by(models.Project.name)
+        ).all()
+    else:
+        projects = db.scalars(select(models.Project).order_by(models.Project.name)).all()
+    return [dict(id=p.id, name=p.name, version=p.version) for p in projects]
 
 
 def read(db, project_id):
