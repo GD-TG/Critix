@@ -1,5 +1,11 @@
 # Critix Backend Service
 
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?style=flat&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
+[![pytest](https://img.shields.io/badge/pytest-63_passed-0A9EDC?style=flat&logo=pytest&logoColor=white)](tests)
+
 Бэкенд-сервис системы Critix на FastAPI (Python 3.12). Включает детерминированное математическое ядро метода критического пути (CPM), многопользовательский слой управления проектами и изолированный AI Copilot.
 
 ---
@@ -77,7 +83,7 @@ python -m venv ..\.venv
 
 Покрытие тестами включает:
 - Расчет ранних/поздних дат, свободных и полных резервов времени.
-- Защиту от циклических зависимостей в графе.
+- Защиту от циклических зависимостей в графе (алгоритм Кана).
 - Конфликты версий при параллельном сохранении (HTTP 409).
 - Изоляцию аккаунтов и проверку прав доступа.
 - Лимиты на объем задач, длительности и расписания.
