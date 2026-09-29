@@ -1,6 +1,7 @@
 import { tasksToCsv } from "./taskCsv";
 import {
   defaultCalendar,
+  safeRandomUuid,
   type Dependency,
   type Person,
   type Priority,
@@ -9,6 +10,8 @@ import {
   type Skill,
   type Task,
 } from "./types";
+
+export { safeRandomUuid };
 
 export const copy = <T,>(value: T): T => structuredClone(value);
 

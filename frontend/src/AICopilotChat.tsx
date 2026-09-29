@@ -29,7 +29,7 @@ import {
 import { api } from "./api";
 import { useRequestGate } from "./useRequestGate";
 import { AiMarkdown } from "./AiMarkdown";
-import type { Project, Result } from "./types";
+import { safeRandomUuid, type Project, type Result } from "./types";
 
 export interface ChatMessageItem {
   id: string;
@@ -53,7 +53,7 @@ const QUICK_PROMPTS = [
 ];
 
 export function AICopilotChat({ project, projectId, result }: AICopilotChatProps) {
-  const gate = useRequestGate(projectId, result?.version, project);
+  const gate = useRequestGate(projectId);
   const storageKey = `critix_chat_${projectId}`;
 
   const [messages, setMessages] = useState<ChatMessageItem[]>(() => {
@@ -132,7 +132,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
     const isCurrent = gate.capture();
 
     const userMessage: ChatMessageItem = {
-      id: crypto.randomUUID(),
+      id: safeRandomUuid(),
       role: "user",
       content: text,
       timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
@@ -155,7 +155,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
       );
 
       const assistantMessage: ChatMessageItem = {
-        id: crypto.randomUUID(),
+        id: safeRandomUuid(),
         role: "assistant",
         content: res.reply || "Не удалось сформировать ответ.",
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
@@ -164,7 +164,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
       if (isCurrent()) setMessages((prev) => [...prev, assistantMessage]);
     } catch (e: any) {
       const errorMessage: ChatMessageItem = {
-        id: crypto.randomUUID(),
+        id: safeRandomUuid(),
         role: "assistant",
         content: `Ошибка связи с AI-сервисом: ${e.message || "Попробуйте позже."}`,
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),

@@ -7,7 +7,7 @@ import {
 } from "react";
 import { useProjects } from "@/context/ProjectContext";
 import { useUi } from "@/context/UiContext";
-import { defaultCalendar, type Person, type Skill } from "@/types";
+import { defaultCalendar, safeRandomUuid, type Person, type Skill } from "@/types";
 
 interface TeamContextValue {
   selectedAssigneeId: string | null;
@@ -43,7 +43,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   const addPerson = useCallback(() => {
     if (!draft) return;
-    const newId = crypto.randomUUID();
+    const newId = safeRandomUuid();
     const newPerson: Person = {
       id: newId,
       name: `Сотрудник ${draft.assignees.length + 1}`,

@@ -26,7 +26,7 @@ export function AiView() {
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         <AICopilotChat
           key={saved.id}
-          project={saved.project}
+          project={draft || saved.project}
           projectId={saved.id}
           result={saved}
         />
