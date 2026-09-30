@@ -5,7 +5,6 @@ import {
   Download,
   FileJson,
   FileText,
-  Plus,
   SlidersHorizontal,
   Sparkles,
   Upload,
@@ -23,8 +22,6 @@ export function DashboardHeader() {
     handleSaveAsBaseline,
     exportProjectToJson,
     exportTasksToCsv,
-    defaultTask,
-    setTask,
     setSimResult,
     setShowScenarioModal,
     setExecutiveReportModal,
@@ -47,9 +44,6 @@ export function DashboardHeader() {
       </div>
 
       <div className="heading-actions">
-        <button className="primary-button" disabled={!draft} onClick={() => setTask(defaultTask())}>
-          <Plus size={16} /> Новая задача
-        </button>
         <button className="secondary-button" disabled={!draft?.tasks.length} onClick={() => {setSimResult(null); setShowScenarioModal(true);}}>
           <Sparkles size={14} /> Симуляция (What-If)
         </button>

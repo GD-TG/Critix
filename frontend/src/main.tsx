@@ -136,12 +136,12 @@ export function App() {
               </div>
             )}
 
-            <MetricsGrid />
-
             <DraftBanner />
 
             {activeView === "dashboard" && draft && view && (
               <>
+                <MetricsGrid />
+
                 <section className="dashboard-grid">
                   <TimelinePanel />
 
