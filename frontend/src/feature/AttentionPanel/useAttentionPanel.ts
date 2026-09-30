@@ -8,7 +8,7 @@ import {
 } from "@/shared";
 
 export function useAttentionPanel() {
-  const { draft, saved, preview, setTask, setActiveView, setShowScenarioModal } = useApp();
+  const { draft, saved, preview, setTask, setActiveView, setShowScenarioModal, openDecisionLabForTask } = useApp();
 
   const view = preview || saved;
   const zone = getZone(draft, saved);
@@ -26,5 +26,6 @@ export function useAttentionPanel() {
     copy,
     setActiveView,
     setShowScenarioModal,
+    openDecisionLabForTask,
   };
 }

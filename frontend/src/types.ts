@@ -101,6 +101,11 @@ export type Result = {
     changed_task_ids: string[];
     removed_task_ids: string[];
     finish_delta_minutes: number;
+    downstream_task_ids?: string[];
+    critical_added_task_ids?: string[];
+    critical_removed_task_ids?: string[];
+    delay_before_minutes?: number;
+    delay_after_minutes?: number;
   };
 };
 export const defaultCalendar = (): Calendar => ({
@@ -133,7 +138,7 @@ export function safeRandomUuid(): string {
 
 export const defaultTask = (): Task => ({
   id: safeRandomUuid(),
-  name: "",
+  name: "Новая задача",
   duration_minutes: 480,
   priority: "medium",
   required_skills: [],

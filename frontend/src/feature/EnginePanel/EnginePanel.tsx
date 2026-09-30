@@ -1,84 +1,138 @@
-import { Badge, Button, Card, Group, SimpleGrid, Text } from "@mantine/core";
+import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon } from "@mantine/core";
+import { AlertCircle, CheckCircle2, Clock, Coins, Flame, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEnginePanel } from "./useEnginePanel";
 
+const formatMoney = (val: number) => `${val.toLocaleString("ru-RU")} ₽`;
+
 export function EnginePanel() {
-  const { draft, view, preview, zone, setSettingsTab, setSettings } = useEnginePanel();
+  const {
+    draft,
+    view,
+    preview,
+    shortDate,
+    lateDays,
+    bufferDays,
+    financialLoss,
+    criticalCount,
+    nonCriticalCount,
+    maxSlackHours,
+    openDecisionLabForTask,
+  } = useEnginePanel();
 
   if (!draft || !view) return null;
+
+  const hasExceeded = view.analysis.deadline_exceeded || lateDays > 0;
 
   return (
     <article className="panel health-panel">
       <div className="panel-header">
         <div>
           <Group gap="xs" align="center">
-            <h2>Параметры движка и расчёта</h2>
-            {preview ? (
-              <Badge color="yellow" variant="light" size="sm">
-                Черновик (What-If)
+            <h2>Финансовый пульс и устойчивость</h2>
+            {hasExceeded ? (
+              <Badge color="red" variant="light" size="sm">
+                Риск срыва дедлайна
               </Badge>
             ) : (
               <Badge color="teal" variant="light" size="sm">
-                Боевой план
+                План в графике
+              </Badge>
+            )}
+            {preview && (
+              <Badge color="yellow" variant="outline" size="xs">
+                Черновик
               </Badge>
             )}
           </Group>
-          <p>Дискретный расчёт CPM/CCPM, календари и ограничения</p>
+          <p>Оценка финансовых потерь от задержек, запас времени и статус критического пути</p>
         </div>
         <Button
           size="xs"
+          color="red"
           variant="light"
-          onClick={() => {
-            setSettingsTab("calendar");
-            setSettings(true);
-          }}
+          leftSection={<Coins size={14} />}
+          onClick={() => openDecisionLabForTask()}
         >
-          Настроить календари
+          Пульт решений
         </Button>
       </div>
 
       <div style={{ padding: "0 20px 20px 20px" }}>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <Card withBorder p="xs" radius="md">
-            <Text size="xs" fw={700} c="dimmed" mb={4}>ТОПОЛОГИЯ И СВЯЗИ</Text>
-            <Text size="sm" fw={600}>
-              {draft.tasks.length} задач · {draft.dependencies.length} связей
+          {/* КАРТОЧКА 1: Финансовые риски */}
+          <Card withBorder p="sm" radius="md">
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" fw={700} c="dimmed">
+                ФИНАНСОВЫЙ РИСК СРЫВА
+              </Text>
+              <ThemeIcon color={hasExceeded ? "red" : "teal"} size="sm" variant="light">
+                {hasExceeded ? <Flame size={14} /> : <CheckCircle2 size={14} />}
+              </ThemeIcon>
+            </Group>
+            <Text size="lg" fw={700} c={hasExceeded ? "red.7" : "green.7"}>
+              {hasExceeded ? formatMoney(financialLoss) : "0 ₽ (в графике)"}
             </Text>
             <Text size="xs" c="dimmed">
-              {view.analysis.tasks.filter((t) => t.risk_flags.includes("dependency_conflict")).length === 0
-                ? "Конфликтов и циклов в графе нет"
-                : "Есть конфликты связей"}
+              {hasExceeded
+                ? `Штраф за ${lateDays} дн. опоздания (~35 000 ₽ / сутки)`
+                : "Проект укладывается в срок, штрафные санкции отсутствуют"}
             </Text>
           </Card>
 
-          <Card withBorder p="xs" radius="md">
-            <Text size="xs" fw={700} c="dimmed" mb={4}>КАЛЕНДАРЬ И ЧАСОВОЙ ПОЯС</Text>
-            <Text size="sm" fw={600}>
-              {zone}
+          {/* КАРТОЧКА 2: Финиш vs Дедлайн */}
+          <Card withBorder p="sm" radius="md">
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" fw={700} c="dimmed">
+                ФИНИШ VS ЦЕЛЕВОЙ ДЕДЛАЙН
+              </Text>
+              <ThemeIcon color="blue" size="sm" variant="light">
+                <Clock size={14} />
+              </ThemeIcon>
+            </Group>
+            <Text size="sm" fw={700}>
+              Финиш: {shortDate(view.analysis.finish)}
             </Text>
             <Text size="xs" c="dimmed">
-              {Object.keys(draft.calendar.week).length} раб. дней · {Object.keys(draft.calendar.exceptions || {}).length} исключений/праздников
+              Дедлайн: {shortDate(draft.deadline)} ·{" "}
+              <span style={{ fontWeight: 600, color: hasExceeded ? "var(--mantine-color-red-7)" : "var(--mantine-color-teal-7)" }}>
+                {hasExceeded ? `Срыв на ${lateDays} дн.` : `Запас: ${bufferDays} дн.`}
+              </span>
             </Text>
           </Card>
 
-          <Card withBorder p="xs" radius="md">
-            <Text size="xs" fw={700} c="dimmed" mb={4}>КОМАНДА И РЕСУРСЫ</Text>
-            <Text size="sm" fw={600}>
-              {draft.assignees.length} исполнителей в проекте
+          {/* КАРТОЧКА 3: Критический путь */}
+          <Card withBorder p="sm" radius="md">
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" fw={700} c="dimmed">
+                КРИТИЧЕСКИЙ ПУТЬ (CPM)
+              </Text>
+              <ThemeIcon color="red" size="sm" variant="light">
+                <ShieldAlert size={14} />
+              </ThemeIcon>
+            </Group>
+            <Text size="sm" fw={700}>
+              {criticalCount} из {draft.tasks.length} задач на критическом пути
             </Text>
-            <Text size="xs" c={view.analysis.overloads.length > 0 ? "orange" : "teal"}>
-              {view.analysis.overloads.length > 0
-                ? `${view.analysis.overloads.length} окон перегрузки (>100%)`
-                : "Все сотрудники в пределах нормы"}
+            <Text size="xs" c="dimmed">
+              Задачи с нулевым резервом времени: любая задержка сдвигает сдачу всего проекта
             </Text>
           </Card>
 
-          <Card withBorder p="xs" radius="md">
-            <Text size="xs" fw={700} c="dimmed" mb={4}>РЕЗЕРВЫ ВРЕМЕНИ (FLOAT)</Text>
-            <Text size="sm" fw={600}>
-              {view.analysis.tasks.filter((t) => !t.critical).length} некритических задач с запасом
+          {/* КАРТОЧКА 4: Резервы времени (Float) */}
+          <Card withBorder p="sm" radius="md">
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" fw={700} c="dimmed">
+                РЕЗЕРВЫ НЕКРИТИЧЕСКИХ ЗАДАЧ
+              </Text>
+              <ThemeIcon color="teal" size="sm" variant="light">
+                <ShieldCheck size={14} />
+              </ThemeIcon>
+            </Group>
+            <Text size="sm" fw={700}>
+              {nonCriticalCount} задач имеют свободный буфер
             </Text>
             <Text size="xs" c="dimmed">
-              Полные резервы относительно расчётного финиша проекта
+              Максимальный запас задачи: до {maxSlackHours} ч. (их сдвиг безопасен для дедлайна)
             </Text>
           </Card>
         </SimpleGrid>

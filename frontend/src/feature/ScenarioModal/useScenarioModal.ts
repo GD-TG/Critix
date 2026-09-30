@@ -105,7 +105,7 @@ export function useScenarioModal() {
               ? {
                   ...t,
                   duration_minutes:
-                    t.duration_minutes + Math.round(simDelayDays * 60),
+                    t.duration_minutes + Math.round(simDelayDays * 480),
                 }
               : t,
           ),

@@ -11,6 +11,7 @@ export function AttentionPanel() {
     copy,
     setActiveView,
     setShowScenarioModal,
+    openDecisionLabForTask,
   } = useAttentionPanel();
 
   return (
@@ -36,9 +37,18 @@ export function AttentionPanel() {
               <div>
                 <strong>Задача не завершена к плановому финишу</strong>
                 <p>«{taskObj?.name}» задерживается от финиша.</p>
-                <button className="text-action" onClick={() => taskObj && setTask(copy(taskObj))}>
-                  Открыть задачу <ArrowRight size={10} />
-                </button>
+                <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                  <button className="text-action" onClick={() => taskObj && setTask(copy(taskObj))}>
+                    Открыть задачу <ArrowRight size={10} />
+                  </button>
+                  <button
+                    className="text-action"
+                    style={{ color: "var(--brand)", fontWeight: 600 }}
+                    onClick={() => openDecisionLabForTask(t.id)}
+                  >
+                    Пульт решений <ArrowRight size={10} />
+                  </button>
+                </div>
               </div>
               <span className="time">{shortDate(t.finish)}</span>
             </div>

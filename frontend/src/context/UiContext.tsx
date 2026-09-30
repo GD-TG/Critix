@@ -42,6 +42,12 @@ interface UiContextValue {
   showScenarioModal: boolean;
   setShowScenarioModal: (v: boolean) => void;
 
+  decisionLabOpened: boolean;
+  setDecisionLabOpened: (v: boolean) => void;
+  decisionLabTaskId: string | null;
+  setDecisionLabTaskId: (id: string | null) => void;
+  openDecisionLabForTask: (taskId?: string) => void;
+
   mobileNavOpened: boolean;
   setMobileNavOpened: (v: boolean) => void;
 
@@ -69,7 +75,14 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const [settingsTab, setSettingsTab] = useState<string | null>("project");
   const [deleteConfirmProject, setDeleteConfirmProject] = useState<{ id: string; name: string } | null>(null);
   const [showScenarioModal, setShowScenarioModal] = useState(false);
+  const [decisionLabOpened, setDecisionLabOpened] = useState(false);
+  const [decisionLabTaskId, setDecisionLabTaskId] = useState<string | null>(null);
   const [mobileNavOpened, setMobileNavOpened] = useState(false);
+
+  const openDecisionLabForTask = useCallback((taskId?: string) => {
+    setDecisionLabTaskId(taskId || null);
+    setDecisionLabOpened(true);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-mantine-color-scheme", colorScheme);
@@ -110,6 +123,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
     settings, setSettings, settingsTab, setSettingsTab,
     deleteConfirmProject, setDeleteConfirmProject,
     showScenarioModal, setShowScenarioModal,
+    decisionLabOpened, setDecisionLabOpened,
+    decisionLabTaskId, setDecisionLabTaskId,
+    openDecisionLabForTask,
     mobileNavOpened, setMobileNavOpened,
     rescheduleOverdue,
   };

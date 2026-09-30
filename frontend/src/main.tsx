@@ -50,7 +50,6 @@ import type { Result } from "./types";
 import { DecisionLab } from "./feature/DecisionLab/DecisionLab";
 
 export function App() {
-  const [decisionLabOpened, setDecisionLabOpened] = useState(false);
   const {
     logged,
     colorScheme,
@@ -71,6 +70,9 @@ export function App() {
     showNotification,
     mobileNavOpened,
     setMobileNavOpened,
+    decisionLabOpened,
+    setDecisionLabOpened,
+    openDecisionLabForTask,
   } = useApp();
 
   const view = preview || saved;
@@ -146,7 +148,7 @@ export function App() {
                 <Button
                   color="red"
                   size="xs"
-                  onClick={() => setDecisionLabOpened(true)}
+                  onClick={() => openDecisionLabForTask()}
                 >
                   Разобрать ситуацию и риски
                 </Button>
@@ -215,7 +217,11 @@ export function App() {
       </div>
 
       <Toast />
-      <DecisionLab opened={decisionLabOpened} onClose={() => setDecisionLabOpened(false)} />
+      <DecisionLab
+        opened={decisionLabOpened}
+        onClose={() => setDecisionLabOpened(false)}
+        onLoadDemo={handleLoadDemoProject}
+      />
 
       <DependencyModal />
 
