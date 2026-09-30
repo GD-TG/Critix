@@ -109,6 +109,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   height: 4px;
   background: linear-gradient(90deg, var(--brand), #f0445d 68%, #ff8797);
   content: "";
+  display: none;
 }
 
 .brand {

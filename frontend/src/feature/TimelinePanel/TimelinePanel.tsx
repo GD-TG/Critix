@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, List, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, List } from "lucide-react";
 import { useTimelinePanel } from "./useTimelinePanel";
 
 export function TimelinePanel() {
@@ -25,7 +25,6 @@ export function TimelinePanel() {
     priorityLabels,
     setTask,
     copy,
-    setActiveView,
   } = useTimelinePanel();
 
   return (
@@ -62,9 +61,6 @@ export function TimelinePanel() {
             <span style={{ opacity: 0.8 }}><i style={{ width: 8, height: 2, borderBottom: "1px dashed #8994a4", display: "inline-block", marginRight: 4 }} />Базовый план</span>
           )}
         </div>
-        <button className="filter-button" onClick={() => setActiveView("tasks_table")}>
-          <SlidersHorizontal size={12} /> Таблица задач <ChevronDown size={12} />
-        </button>
       </div>
 
       {timelineMode === "timeline" ? (
