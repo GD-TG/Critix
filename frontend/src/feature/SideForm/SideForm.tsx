@@ -28,9 +28,13 @@ export function SideForm({ onScrollTo }: Props) {
         <span>Critix</span>
       </div>
 
-      <div className="workspace-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+      <div className="workspace-label">ТЕКУЩИЙ ПРОЕКТ</div>
 
-      <button className="project-switcher" onClick={() => setProjectManageModal(true)}>
+      <button
+        className="project-switcher"
+        onClick={() => setProjectManageModal(true)}
+        title="Нажмите, чтобы переключить проект"
+      >
         <span className="project-dot" />
         <span>
           <strong>{draft?.name || "Выберите проект"}</strong>
@@ -38,6 +42,7 @@ export function SideForm({ onScrollTo }: Props) {
         </span>
         <ChevronDown size={15} />
       </button>
+      <div className="workspace-caption">Нажмите, чтобы переключить</div>
 
       <nav className="main-nav">
         <button className="nav-item" onClick={() => onScrollTo("overview")}>

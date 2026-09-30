@@ -334,6 +334,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   padding: 10px;
   color: var(--ink);
   border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.project-switcher:hover {
+  background: var(--bg);
+  border-color: var(--icon);
+}
+
+.workspace-caption {
+  color: var(--muted);
+  font-size: 9px;
+  padding: 6px 12px 0;
+  opacity: 0.75;
 }
 
 .project-switcher strong, .project-switcher small {

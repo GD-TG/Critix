@@ -25,7 +25,6 @@ import { DraftBanner } from "./feature/DraftBanner/DraftBanner";
 import { MetricsGrid } from "./feature/MetricsGrid/MetricsGrid";
 import { TimelinePanel } from "./feature/TimelinePanel/TimelinePanel";
 import { AttentionPanel } from "./feature/AttentionPanel/AttentionPanel";
-import { DecisionPanel } from "./feature/DecisionPanel/DecisionPanel";
 import { HistoryPanel } from "./feature/HistoryPanel/HistoryPanel";
 import { EnginePanel } from "./feature/EnginePanel/EnginePanel";
 import { GraphView } from "./feature/GraphView/GraphView";
@@ -148,7 +147,6 @@ export function App() {
 
                   <aside className="side-column">
                     <AttentionPanel />
-                    <DecisionPanel />
                   </aside>
                 </section>
 
