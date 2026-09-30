@@ -79,6 +79,7 @@ export interface TaskNodeData extends Record<string, unknown> {
     slack_minutes: number | null;
   };
   isAffected?: boolean;
+  successorsCount?: number;
   onEdit: (task: Task) => void;
 }
 
@@ -136,11 +137,18 @@ export function CustomTaskNode({ data }: NodeProps<Node<TaskNodeData>>) {
         <Text size="sm" fw={700} lineClamp={2} title={task.name}>
           {task.name}
         </Text>
-        {isCritical && (
-          <Badge size="xs" color="red" variant="filled" mt={3} leftSection={<Target size={10} />}>
-            Критический путь
-          </Badge>
-        )}
+        <Group gap={4} mt={3}>
+          {isCritical && (
+            <Badge size="xs" color="red" variant="filled" leftSection={<Target size={10} />}>
+              Критический путь
+            </Badge>
+          )}
+          {data.successorsCount !== undefined && data.successorsCount >= 2 && (
+            <Badge size="xs" color="orange" variant="light">
+              Блокирует: {data.successorsCount} зв.
+            </Badge>
+          )}
+        </Group>
       </div>
 
       {/* Assignee & Duration */}
@@ -312,6 +320,7 @@ export function ProjectGraph({
             analysisRow,
             timezone: project.timezone,
             isAffected,
+            successorsCount: outgoing.get(task.id)?.length || 0,
             onEdit: onEditTask,
           },
         });
@@ -396,6 +405,12 @@ export function ProjectGraph({
     return nodes.filter((n) => n.data.analysisRow?.critical);
   }, [nodes, filterCriticalOnly]);
 
+  const displayedEdges = useMemo(() => {
+    if (!filterCriticalOnly) return edges;
+    const criticalNodeIds = new Set(displayedNodes.map((n) => n.id));
+    return edges.filter((e) => criticalNodeIds.has(e.source) && criticalNodeIds.has(e.target));
+  }, [edges, displayedNodes, filterCriticalOnly]);
+
   return (
     <div className="project-graph-container">
       {/* Graph Toolbar */}
@@ -422,7 +437,7 @@ export function ProjectGraph({
 
       <ReactFlow<Node<TaskNodeData>>
         nodes={displayedNodes}
-        edges={edges}
+        edges={displayedEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onConnect={onConnect}

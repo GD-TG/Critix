@@ -1,4 +1,4 @@
-import { ChevronRight, List } from "lucide-react";
+import { ChevronRight, List, Target } from "lucide-react";
 import { useTimelinePanel } from "./useTimelinePanel";
 
 export function TimelinePanel() {
@@ -11,18 +11,17 @@ export function TimelinePanel() {
     formatWorkDuration,
     timelineMode,
     setTimelineMode,
-    dependencyVisible,
-    setDependencyVisible,
     rows,
-    projStartMs,
-    projTotalMs,
-    timelineTicks,
-    timelineHeading,
+    timelineStartMs,
+    timelineTotalMs,
+    timelineDays,
+    timelineMonths,
     todayMarkerPercent,
+    deadlineMarkerPercent,
+    taskDependencyCounts,
     getAvatarClass,
     getInitials,
     statusLabels,
-    priorityLabels,
     setTask,
     copy,
   } = useTimelinePanel();
@@ -32,7 +31,7 @@ export function TimelinePanel() {
       <div className="panel-header">
         <div>
           <h2>План проекта</h2>
-          <p>Последовательность работ, базовый план и зависимости</p>
+          <p>Календарная шкала, критический путь и резервы времени</p>
         </div>
         <div className="view-tabs">
           <button
@@ -57,6 +56,10 @@ export function TimelinePanel() {
           <span><i className="legend-dot planned" />Запланировано</span>
           <span><i className="legend-dot critical" />Критический путь</span>
           <span><span style={{ color: "var(--brand)", marginRight: 4 }}>◆</span>Веха (0 ч)</span>
+          <span><span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(0,0,0,0.06)", border: "1px solid var(--line)", marginRight: 4, verticalAlign: "middle" }} />Выходные</span>
+          {deadlineMarkerPercent !== null && (
+            <span><i style={{ width: 8, height: 2, background: "var(--red)", display: "inline-block", marginRight: 4, verticalAlign: "middle" }} />Дедлайн</span>
+          )}
           {draft?.baseline && (
             <span style={{ opacity: 0.8 }}><i style={{ width: 8, height: 2, borderBottom: "1px dashed #8994a4", display: "inline-block", marginRight: 4 }} />Базовый план</span>
           )}
@@ -66,99 +69,187 @@ export function TimelinePanel() {
       {timelineMode === "timeline" ? (
         <div className="timeline-scroll-wrap">
           <div className="timeline">
-          <div className="timeline-head">
-            <div className="task-heading">ЗАДАЧА</div>
-            <div className="date-heading">
-              {timelineHeading}
-              <div className="dates">
-                {timelineTicks.map((tick, i) => (
-                  <span key={i} title={tick.full}>
-                    {tick.day}
-                  </span>
-                ))}
+            {/* ШАПКА КАЛЕНДАРЯ: Месяцы и дни недели с точным позиционированием */}
+            <div className="timeline-head" style={{ height: "48px" }}>
+              <div className="task-heading" style={{ display: "flex", alignItems: "center" }}>ЗАДАЧА</div>
+              <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+                {/* Месяцы */}
+                <div style={{ position: "absolute", top: 3, left: 0, right: 0, height: 18, borderBottom: "1px solid var(--line)" }}>
+                  {timelineMonths.map((m, idx) => (
+                    <div
+                      key={`month-${idx}`}
+                      style={{
+                        position: "absolute",
+                        left: `${m.pctStart}%`,
+                        width: `${m.pctWidth}%`,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: "var(--muted)",
+                        paddingLeft: 6,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {m.name}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Дни недели и числа */}
+                <div style={{ position: "absolute", top: 22, left: 0, right: 0, bottom: 0 }}>
+                  {timelineDays.map((d) => (
+                    <div
+                      key={d.key}
+                      title={`${d.weekday}, ${d.dayNum} ${d.month} (${d.isWeekend ? "Выходной" : "Рабочий день"})`}
+                      style={{
+                        position: "absolute",
+                        left: `${d.pctStart}%`,
+                        width: `${d.pctWidth}%`,
+                        height: "100%",
+                        borderLeft: "1px solid var(--line)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 8,
+                        color: d.isToday ? "var(--brand)" : d.isWeekend ? "var(--muted)" : "var(--ink)",
+                        fontWeight: d.isToday ? 800 : d.isWeekend ? 500 : 700,
+                        background: d.isWeekend ? "rgba(0,0,0,0.03)" : undefined,
+                      }}
+                    >
+                      <span style={{ fontSize: 7, textTransform: "uppercase", opacity: 0.7 }}>{d.weekday}</span>
+                      <span>{d.dayNum}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {(draft?.tasks || []).map((t) => {
-            const r = rows.get(t.id);
-            if (!r) return null;
-            const person = draft?.assignees.find((p) => p.id === t.assignee_id);
-            const tStartMs = new Date(r.start).getTime();
-            const tEndMs = new Date(r.finish).getTime();
+            {/* СТРОКИ ЗАДАЧ: 100% честный масштаб */}
+            {(draft?.tasks || []).map((t) => {
+              const r = rows.get(t.id);
+              if (!r) return null;
+              const person = draft?.assignees.find((p) => p.id === t.assignee_id);
+              const tStartMs = new Date(r.start).getTime();
+              const tEndMs = new Date(r.finish).getTime();
 
-            const leftPct = Math.max(0, Math.min(85, ((tStartMs - projStartMs) / projTotalMs) * 85));
-            const widthPct = Math.max(0.3, Math.min(85 - leftPct, ((tEndMs - tStartMs) / projTotalMs) * 85));
+              const leftPct = Math.max(0, Math.min(100, ((tStartMs - timelineStartMs) / timelineTotalMs) * 100));
+              const widthPct = Math.max(0.4, Math.min(100 - leftPct, ((tEndMs - tStartMs) / timelineTotalMs) * 100));
 
-            let baseLeftPct = 0;
-            let baseWidthPct = 0;
-            if (draft?.baseline && draft.baseline.tasks[t.id]) {
-              const bStartMs = new Date(draft.baseline.tasks[t.id].start).getTime();
-              const bEndMs = new Date(draft.baseline.tasks[t.id].finish).getTime();
-              baseLeftPct = Math.max(0, Math.min(85, ((bStartMs - projStartMs) / projTotalMs) * 85));
-              baseWidthPct = Math.max(0.3, Math.min(85 - baseLeftPct, ((bEndMs - bStartMs) / projTotalMs) * 85));
-            }
+              let baseLeftPct = 0;
+              let baseWidthPct = 0;
+              if (draft?.baseline && draft.baseline.tasks[t.id]) {
+                const bStartMs = new Date(draft.baseline.tasks[t.id].start).getTime();
+                const bEndMs = new Date(draft.baseline.tasks[t.id].finish).getTime();
+                baseLeftPct = Math.max(0, Math.min(100, ((bStartMs - timelineStartMs) / timelineTotalMs) * 100));
+                baseWidthPct = Math.max(0.4, Math.min(100 - baseLeftPct, ((bEndMs - bStartMs) / timelineTotalMs) * 100));
+              }
 
-            const statusClass = t.status === "done" ? "done" : t.status === "in_progress" ? "progress" : "planned";
-            const isMilestone = t.duration_minutes === 0;
+              const statusClass = t.status === "done" ? "done" : t.status === "in_progress" ? "progress" : "planned";
+              const isMilestone = t.duration_minutes === 0;
+              const depCounts = taskDependencyCounts.get(t.id);
+              const totalDeps = (depCounts?.incoming || 0) + (depCounts?.outgoing || 0);
 
-            return (
-              <div className="task-row" key={t.id} onClick={() => setTask(copy(t))} style={{ cursor: "pointer" }}>
-                <div className="task-info">
-                  <span className={`avatar mini-avatar ${person ? getAvatarClass(person.id) : "avatar-ink"}`}>
-                    {person ? getInitials(person.name) : "—"}
-                  </span>
-                  <div>
-                    <span className="task-name">{t.name}</span>
-                    <span className="task-meta">
-                      <i className={`task-status-dot ${statusClass}`} />
-                      {statusLabels[t.status]} · {person?.role ? `${person.role} · ` : ""}{formatWorkDuration(t.duration_minutes, isMilestone)}
+              return (
+                <div className="task-row" key={t.id} onClick={() => setTask(copy(t))} style={{ cursor: "pointer" }}>
+                  <div className="task-info">
+                    <span className={`avatar mini-avatar ${person ? getAvatarClass(person.id) : "avatar-ink"}`}>
+                      {person ? getInitials(person.name) : "—"}
                     </span>
+                    <div>
+                      <span className="task-name">{t.name}</span>
+                      <span className="task-meta">
+                        <i className={`task-status-dot ${statusClass}`} />
+                        {statusLabels[t.status]} · {person?.role ? `${person.role} · ` : ""}{formatWorkDuration(t.duration_minutes, isMilestone)}
+                        {totalDeps > 0 && (
+                          <span style={{ marginLeft: 6, fontWeight: 600, color: "var(--muted)" }} title={`Связи: ${depCounts?.incoming} предш. / ${depCounts?.outgoing} след.`}>
+                            🔗 {totalDeps}
+                          </span>
+                        )}
+                        {r.critical && (
+                          <span style={{ color: "var(--red)", fontWeight: 700, marginLeft: 6 }}>
+                            CPM (0 ч)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="task-chart">
+                    {/* Выходные дни (штриховка) */}
+                    {timelineDays.map((d) =>
+                      d.isWeekend ? (
+                        <div
+                          key={`bg-${d.key}`}
+                          className="weekend-col"
+                          style={{ left: `${d.pctStart}%`, width: `${d.pctWidth}%` }}
+                        />
+                      ) : null
+                    )}
+
+                    {/* Вертикальные разделители дней */}
+                    {timelineDays.map((d) => (
+                      <div
+                        key={`line-${d.key}`}
+                        className="day-grid-line"
+                        style={{ left: `${d.pctStart}%` }}
+                      />
+                    ))}
+
+                    {/* Дедлайн проекта */}
+                    {deadlineMarkerPercent !== null && (
+                      <div
+                        className="deadline-marker"
+                        style={{ left: `${deadlineMarkerPercent}%` }}
+                        title={draft?.deadline ? `Дедлайн проекта: ${shortDate(draft.deadline)}` : "Дедлайн проекта"}
+                      />
+                    )}
+
+                    {/* Маркер "Сегодня" */}
+                    {todayMarkerPercent !== null && (
+                      <span
+                        className="today-marker"
+                        style={{ left: `${todayMarkerPercent}%` }}
+                        title={`Сегодня: ${shortDate(new Date().toISOString())}`}
+                      />
+                    )}
+
+                    {/* Базовый эталон (пунктир) */}
+                    {draft?.baseline && draft.baseline.tasks[t.id] && (
+                      <span
+                        className="baseline-bar"
+                        style={{ left: `${baseLeftPct}%`, width: `${baseWidthPct}%` }}
+                        title={`Базовый план: ${date(draft.baseline.tasks[t.id].start)} → ${date(draft.baseline.tasks[t.id].finish)}`}
+                      />
+                    )}
+
+                    {/* Полоса задачи */}
+                    {isMilestone ? (
+                      <span
+                        className={`task-milestone-marker ${statusClass} ${r.critical ? "critical" : ""}`}
+                        style={{ left: `${leftPct}%` }}
+                        title={`Веха: «${t.name}» (${date(r.start)})`}
+                      >
+                        ◆
+                      </span>
+                    ) : (
+                      <span
+                        className={`task-bar ${statusClass} ${r.critical ? "critical" : ""}`}
+                        style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                        title={`«${t.name}»: ${date(r.start)} → ${date(r.finish)} · ${formatWorkDuration(t.duration_minutes, false)}${r.critical ? " (Критический путь)" : ""}`}
+                      >
+                        {formatWorkDuration(t.duration_minutes, false)}
+                      </span>
+                    )}
                   </div>
                 </div>
-
-                <div className="task-chart">
-                  {draft?.baseline && draft.baseline.tasks[t.id] && (
-                    <span
-                      className="baseline-bar"
-                      style={{ left: `${baseLeftPct}%`, width: `${baseWidthPct}%` }}
-                      title={`Базовый эталон: ${date(draft.baseline.tasks[t.id].start)} → ${date(draft.baseline.tasks[t.id].finish)}`}
-                    />
-                  )}
-
-                  {isMilestone ? (
-                    <span
-                      className={`task-milestone-marker ${statusClass} ${r.critical ? "critical" : ""}`}
-                      style={{ left: `${leftPct}%` }}
-                      title={`Веха: ${t.name} (${date(r.start)})`}
-                    >
-                      ◆
-                    </span>
-                  ) : (
-                    <span
-                      className={`task-bar ${statusClass} ${r.critical ? "critical" : ""}`}
-                      style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                    >
-                      {formatWorkDuration(t.duration_minutes, false)}
-                    </span>
-                  )}
-                  {dependencyVisible && (draft?.dependencies || []).some((d) => d.successor_id === t.id) && (
-                    <span className="task-connector" />
-                  )}
-                  {todayMarkerPercent !== null && (
-                    <span
-                      className="today-marker"
-                      style={{ left: `${todayMarkerPercent}%` }}
-                      title={`Сегодня: ${shortDate(new Date().toISOString())}`}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
         </div>
       ) : (
+        /* РЕЖИМ СПИСКА */
         <div className="list-view-container">
           <div className="list-view-header">
             <span className="col-task">Задача</span>
@@ -191,28 +282,18 @@ export function TimelinePanel() {
                       {isCritical && <span className="cpm-tag" title="Задача на критическом пути">CPM</span>}
                       {isOverdue && <span className="overdue-tag">Просрочена</span>}
                     </div>
-                    {t.required_skills && t.required_skills.length > 0 && (
-                      <div className="list-task-skills">
-                        {t.required_skills.map((s, idx) => (
-                          <span key={idx} className="skill-chip">{s}</span>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   <div className="col-assignee">
                     {person ? (
-                      <div className="list-person">
+                      <span className="list-assignee-chip">
                         <span className={`avatar mini-avatar ${getAvatarClass(person.id)}`}>
                           {getInitials(person.name)}
                         </span>
-                        <div className="list-person-details">
-                          <span className="list-person-name">{person.name}</span>
-                          <span className="list-person-role">{person.role || "Участник"}</span>
-                        </div>
-                      </div>
+                        <span className="assignee-name">{person.name}</span>
+                      </span>
                     ) : (
-                      <span className="list-unassigned">Не назначен</span>
+                      <span className="unassigned-text">—</span>
                     )}
                   </div>
 
@@ -224,46 +305,41 @@ export function TimelinePanel() {
                   </div>
 
                   <div className="col-priority">
-                    <span className={`priority-tag ${t.priority || "medium"}`}>
-                      {priorityLabels[t.priority || "medium"]}
+                    <span className={`priority-tag ${t.priority}`}>
+                      {t.priority}
                     </span>
                   </div>
 
                   <div className="col-duration">
-                    <span className="duration-val">{formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}</span>
-                    <span className="duration-sub">{t.allocation_percent || 100}% закр.</span>
+                    {formatWorkDuration(t.duration_minutes, t.duration_minutes === 0)}
                   </div>
 
                   <div className="col-dates">
                     {r ? (
-                      <div className="list-date-wrap">
-                        <span>{shortDate(r.start)}</span>
-                        <span className="date-arrow">→</span>
-                        <span className={isOverdue ? "coral-text" : ""}>{shortDate(r.finish)}</span>
-                      </div>
+                      <span className="cpm-dates">
+                        {shortDate(r.start)} → {shortDate(r.finish)}
+                      </span>
                     ) : (
-                      <span className="list-unassigned">—</span>
+                      "—"
                     )}
                   </div>
 
                   <div className="col-slack">
-                    {isCritical ? (
-                      <span className="slack-badge critical" title="Критический путь">
-                        Крит. путь
-                      </span>
-                    ) : r?.slack_minutes != null ? (
-                      <span className="slack-badge non-critical" title={`Свободный резерв: ${formatWorkDuration(r.slack_minutes)}`}>
-                        +{Math.round(r.slack_minutes / 60)} ч.
-                      </span>
+                    {r ? (
+                      isCritical ? (
+                        <span className="slack-zero">0 ч</span>
+                      ) : r.slack_minutes !== null ? (
+                        <span className="slack-positive">+{formatWorkDuration(r.slack_minutes)}</span>
+                      ) : (
+                        "—"
+                      )
                     ) : (
-                      <span className="slack-badge">—</span>
+                      "—"
                     )}
                   </div>
 
                   <div className="col-action">
-                    <button className="list-row-btn" title="Редактировать">
-                      <ChevronRight size={14} />
-                    </button>
+                    <ChevronRight size={14} className="row-chevron" />
                   </div>
                 </div>
               );
@@ -271,20 +347,6 @@ export function TimelinePanel() {
           </div>
         </div>
       )}
-
-      <div className="timeline-footer">
-        <span>Сегодня, {new Date().toLocaleDateString("ru-RU", { timeZone: zone, day: "numeric", month: "long", year: "numeric" })}</span>
-        <span className="today-line" />
-        <span>
-          Показать зависимости{" "}
-          <button
-            className={`toggle ${dependencyVisible ? "active" : ""}`}
-            onClick={() => setDependencyVisible(!dependencyVisible)}
-          >
-            <span />
-          </button>
-        </span>
-      </div>
     </article>
   );
 }

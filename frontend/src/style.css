@@ -1486,7 +1486,42 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .task-chart {
   position: relative;
-  background-image: linear-gradient(to right, transparent 0, transparent calc(25% - 1px), var(--line) calc(25% - 1px), var(--line) 25%, transparent 25%, transparent calc(50% - 1px), var(--line) calc(50% - 1px), var(--line) 50%, transparent 50%, transparent calc(75% - 1px), var(--line) calc(75% - 1px), var(--line) 75%, transparent 75%);
+  background: transparent;
+  overflow: hidden;
+}
+
+.weekend-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.035);
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-mantine-color-scheme="dark"] .weekend-col {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.day-grid-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.deadline-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--red);
+  z-index: 2;
+  pointer-events: none;
 }
 
 .baseline-bar {
