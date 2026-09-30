@@ -25,6 +25,9 @@ class Project(Base):
     deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     baseline: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     calendar: Mapped[dict] = mapped_column(JSON)
+    deliveries: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
+    optional_task_ids: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
+    deferred_task_ids: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
     version: Mapped[int] = mapped_column(default=1)
     owner_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     __table_args__ = (CheckConstraint("deadline > start"), CheckConstraint("version > 0"))
@@ -46,6 +49,7 @@ class Task(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     duration_minutes: Mapped[int]
+    remaining_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     required_skills: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
     not_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -57,6 +61,7 @@ class Task(Base):
     __table_args__ = (
         ForeignKeyConstraint(["project_id", "assignee_id"], ["assignees.project_id", "assignees.id"]),
         CheckConstraint("duration_minutes >= 0"),
+        CheckConstraint("remaining_minutes IS NULL OR (remaining_minutes BETWEEN 0 AND 525600 AND actual_start IS NOT NULL AND status IN ('in_progress', 'blocked'))", name="ck_tasks_remaining_work"),
         CheckConstraint("allocation_percent BETWEEN 1 AND 100"),
         CheckConstraint("status IN ('todo', 'in_progress', 'done', 'blocked')"),
     )
@@ -88,6 +93,7 @@ class Change(Base):
     snapshot: Mapped[dict] = mapped_column(JSON)
     analysis: Mapped[dict] = mapped_column(JSON)
     comment: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    decision: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     __table_args__ = (UniqueConstraint("project_id", "version"),)
 
 

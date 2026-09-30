@@ -15,6 +15,7 @@ def test_ai_preparation_runs_off_loop_and_releases_resources_before_provider(mon
     data = object()
     slots = BoundedSemaphore(2)
     monkeypatch.setattr(main, "calculation_slots", slots)
+    monkeypatch.setattr(main, "configuration_error", lambda: None)
 
     class Session:
         def __enter__(self):

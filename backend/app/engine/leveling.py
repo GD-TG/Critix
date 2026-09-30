@@ -5,13 +5,13 @@ from app.engine.analysis import analyze
 from app.engine.calendar import PlanningError, ResourceLimitError, CalculationBudget
 
 
-def level_resources(project, assignee_id=None, max_iterations=32):
+def level_resources(project, assignee_id=None, max_iterations=32, *, as_of=None, budget=None):
     candidate = project.model_copy(deep=True)
     if assignee_id and assignee_id not in {p.id for p in project.assignees}:
         raise PlanningError("Исполнитель не принадлежит проекту")
-    clock = datetime.now(timezone.utc)
+    clock = as_of or datetime.now(timezone.utc)
     cache = {}
-    budget = CalculationBudget()
+    budget = budget or CalculationBudget()
     result = analyze(candidate, as_of=clock, calendar_cache=cache, budget=budget)
     before = result
     moved = set()

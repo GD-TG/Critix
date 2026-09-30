@@ -1,10 +1,14 @@
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
+import hashlib
+import json
 
 from app.engine.calendar import (MINUTE, PlanningError, WorkCalendar, CalculationBudget,
                                  ResourceLimitError, MAX_HORIZON_DAYS, MAX_CALENDAR_MINUTES,
                                  MAX_RESOURCE_SEGMENTS)
 from app.schemas import ProjectInput
+from app.engine.attention import summarize_attention
+from app.engine.delivery_planning import prepare_deliveries, enrich_delivery_analysis
 
 
 def topology(project: ProjectInput):
@@ -34,19 +38,31 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
     budget.check()
     # Time-dependent flags are deterministic for an explicitly supplied instant.
     as_of = as_of or datetime.now(timezone.utc)
+    if as_of.tzinfo is None:
+        raise PlanningError("Момент расчёта должен содержать часовой пояс")
+    as_of = as_of.astimezone(timezone.utc)
+    snapshot_id = hashlib.sha256((json.dumps(project.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
+                                  + as_of.isoformat()).encode()).hexdigest()
+    source_project = project
+    project, delivery_reports = prepare_deliveries(project)
     def baseline_delta(finish):
         return (int((finish - datetime.fromisoformat(project.baseline["finish"])).total_seconds() / 60)
                 if project.baseline else None)
     order, incoming, outgoing = topology(project)
     if not order:
-        return dict(tasks=[], finish=project.start, deadline=project.deadline,
+        result = dict(tasks=[], finish=project.start, deadline=project.deadline,
                     deadline_exceeded=False, delay_minutes=0, overloads=[], critical_dependencies=[],
-                    as_of=as_of, forecast_stale=False, baseline_delta_minutes=baseline_delta(project.start))
+                    as_of=as_of, snapshot_id=snapshot_id, forecast_stale=False, stale_task_ids=[],
+                    attention=[], health="empty", intervention_required=False,
+                    baseline_delta_minutes=baseline_delta(project.start))
+        return enrich_delivery_analysis(source_project, result, delivery_reports)
     tasks = {t.id: t for t in project.tasks}
     people = {a.id: a for a in project.assignees}
     all_starts = [project.start] + [t.actual_start for t in project.tasks if t.actual_start] + [t.not_before for t in project.tasks if t.not_before]
+    if any(t.remaining_minutes is not None for t in project.tasks):
+        all_starts.append(as_of.replace(second=0, microsecond=0) + MINUTE)
     all_finishes = [project.deadline] + [t.actual_finish for t in project.tasks if t.actual_finish]
-    total_dur_days = max(30, sum(t.duration_minutes for t in project.tasks) // 480 + 90)
+    total_dur_days = max(30, sum(max(t.duration_minutes, t.remaining_minutes or 0) for t in project.tasks) // 480 + 90)
     try:
         min_start = min(all_starts).astimezone(timezone.utc)
         max_target = max([*all_finishes, *all_starts]).astimezone(timezone.utc)
@@ -78,6 +94,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
     calendar = {t.id: calendars[t.assignee_id] for t in project.tasks}
     early, indices, flags = {}, {}, defaultdict(set)
     explanations = {}
+    durations = {t.id: t.remaining_minutes if t.remaining_minutes is not None else t.duration_minutes for t in project.tasks}
 
     def shifted(dep, predecessor):
         anchor = predecessor[0 if dep.kind[0] == "S" else 1]
@@ -117,8 +134,17 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
             pair = (task.actual_start, task.actual_finish)
             index = cal.index(task.actual_start)
         elif task.actual_start:
-            index = cal.index(task.actual_start)
-            pair = (task.actual_start, cal.finish(index, task.duration_minutes))
+            # Remaining work is an explicit estimate at this calculation's as_of.
+            # Never infer progress merely from elapsed wall-clock time.
+            work_from = task.actual_start
+            if task.remaining_minutes is not None:
+                work_from = max(task.actual_start, as_of, task.not_before or task.actual_start)
+                if work_from.second or work_from.microsecond:
+                    work_from = work_from.replace(second=0, microsecond=0) + MINUTE
+                index = earliest_index(cal, durations[task_id], work_from, finish_bound)
+            else:
+                index = cal.index(work_from)
+            pair = (task.actual_start, cal.finish(index, durations[task_id]))
         else:
             index = earliest_index(cal, task.duration_minutes, start_bound, finish_bound)
             pair = (cal.start(index), cal.finish(index, task.duration_minutes))
@@ -146,6 +172,8 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
             mode="actual" if task.actual_start else "calculated",
             actual_finish=task.actual_finish,
             duration_minutes=task.duration_minutes,
+            remaining_minutes=task.remaining_minutes,
+            work_start=cal.start(index) if task.status != "done" else None,
             assignee_id=task.assignee_id,
             constraints=reasons,
         )
@@ -161,12 +189,15 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
     for task_id in reversed(order):
         budget.check()
         task, cal = tasks[task_id], calendar[task_id]
-        if task.actual_start:
+        if task.status == "done" or (task.actual_start and task.remaining_minutes is None and early[task_id][1] < as_of):
             latest[task_id], slack[task_id] = early[task_id], None
             continue
 
+        def proposed_pair(index):
+            return (task.actual_start or cal.start(index), cal.finish(index, durations[task_id]))
+
         def feasible(index):
-            pair = (cal.start(index), cal.finish(index, task.duration_minutes))
+            pair = proposed_pair(index)
             if pair[1] > finish:
                 return False
             for dep in outgoing[task_id]:
@@ -179,7 +210,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
             return True
 
         lo = indices[task_id]
-        hi = min(cal.index(finish), len(cal.slots) - max(1, task.duration_minutes))
+        hi = min(cal.index(finish), len(cal.slots) - max(1, durations[task_id]))
         if not feasible(lo):
             flags[task_id].add("dependency_conflict")
         while lo < hi:
@@ -188,7 +219,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
                 lo = mid
             else:
                 hi = mid - 1
-        latest[task_id] = (cal.start(lo), cal.finish(lo, task.duration_minutes))
+        latest[task_id] = proposed_pair(lo)
         slack[task_id] = lo - indices[task_id]
 
     events = defaultdict(lambda: defaultdict(list))
@@ -198,7 +229,7 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
         if task.assignee_id is None or task.status == "done":
             continue
         start, end = early[task_id]
-        begin_index, end_index = cal.index(start), cal.index(end)
+        begin_index, end_index = indices[task_id], cal.index(end)
         budget.consume_work(end_index - begin_index)
         slots = cal.slots[begin_index:end_index]
         if not slots:
@@ -245,7 +276,8 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
         if end > project.deadline:
             flags[task_id].add("past_deadline")
         rows.append(dict(id=task_id, start=start, finish=end,
-                         latest_start=latest[task_id][0], slack_minutes=slack[task_id],
+                         latest_start=latest[task_id][0], latest_finish=latest[task_id][1], slack_minutes=slack[task_id],
+                         criticality_known=tasks[task_id].status == "done" or slack[task_id] is not None,
                          critical=slack[task_id] == 0, risk_flags=sorted(flags[task_id]),
                          explanation=explanations[task_id]))
     critical = {r["id"] for r in rows if r["critical"]}
@@ -256,16 +288,19 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
         predecessor = tasks[dep.predecessor_id]
         cal = calendar[predecessor.id]
         index = indices[predecessor.id] + 1
-        moved = (cal.start(index), cal.finish(index, predecessor.duration_minutes))
+        moved = (predecessor.actual_start or cal.start(index), cal.finish(index, durations[predecessor.id]))
         if shifted(dep, moved) > early[dep.successor_id][0 if dep.kind[1] == "S" else 1]:
             critical_dependencies.append(dep.model_dump())
-    return dict(tasks=rows, finish=finish, deadline=project.deadline,
+    result = dict(tasks=rows, finish=finish, deadline=project.deadline,
                 forecast_stale=bool(stale_task_ids),
                 stale_task_ids=stale_task_ids,
-                as_of=as_of, baseline_delta_minutes=baseline_delta(finish),
+                as_of=as_of, snapshot_id=snapshot_id, baseline_delta_minutes=baseline_delta(finish),
                 deadline_exceeded=finish > project.deadline,
                 delay_minutes=max(0, int((finish-project.deadline).total_seconds()/60)),
                 overloads=overloads, critical_dependencies=critical_dependencies)
+    enrich_delivery_analysis(source_project, result, delivery_reports)
+    result.update(summarize_attention(project, result))
+    return result
 
 
 def compare(before, after, old_project=None, new_project=None):
@@ -273,10 +308,27 @@ def compare(before, after, old_project=None, new_project=None):
     changed = [t["id"] for t in after["tasks"] if t["id"] not in previous or
                any(t[key] != previous[t["id"]][key] for key in ("start", "finish"))]
     downstream = set()
+    roots = set()
+    edited = set()
     if old_project is not None and new_project is not None:
         old_tasks = {t.id: t.model_dump() for t in old_project.tasks}
         roots = {t.id for t in new_project.tasks if old_tasks.get(t.id) != t.model_dump()}
         roots.update(set(old_tasks) - {t.id for t in new_project.tasks})
+        edited = set(roots)
+        old_deliveries = {d.id: d for d in old_project.deliveries}
+        new_deliveries = {d.id: d for d in new_project.deliveries}
+        for key in old_deliveries.keys() | new_deliveries.keys():
+            old, new = old_deliveries.get(key), new_deliveries.get(key)
+            if old != new:
+                roots.update(old.dependent_task_ids if old else [])
+                roots.update(new.dependent_task_ids if new else [])
+        roots.update(set(old_project.deferred_task_ids) ^ set(new_project.deferred_task_ids))
+        old_people = {a.id: a.model_dump() for a in old_project.assignees}
+        changed_people = {a.id for a in new_project.assignees if old_people.get(a.id) != a.model_dump()}
+        changed_people.update(set(old_people) - {a.id for a in new_project.assignees})
+        roots.update(t.id for t in new_project.tasks if t.assignee_id in changed_people)
+        if any(getattr(old_project, key) != getattr(new_project, key) for key in ("start", "deadline", "timezone", "calendar")):
+            roots.update(t.id for t in new_project.tasks)
         outgoing = defaultdict(set)
         for dep in [*old_project.dependencies, *new_project.dependencies]:
             outgoing[dep.predecessor_id].add(dep.successor_id)
@@ -293,5 +345,20 @@ def compare(before, after, old_project=None, new_project=None):
                 if child not in visited:
                     visited.add(child)
                     queue.append(child)
-    return dict(changed_task_ids=changed, downstream_task_ids=sorted(downstream), removed_task_ids=sorted(set(previous)-{t["id"] for t in after["tasks"]}),
-                finish_delta_minutes=int((after["finish"]-before["finish"]).total_seconds()/60))
+    current = {t["id"]: t for t in after["tasks"]}
+    risk_changed = sorted(k for k, row in current.items() if k not in previous or
+                          any(row.get(key) != previous[k].get(key) for key in ("risk_flags", "critical", "slack_minutes")))
+    old_critical = {k for k, r in previous.items() if r["critical"]}
+    new_critical = {k for k, r in current.items() if r["critical"]}
+    old_alerts = {r["id"]: r for r in before.get("attention", [])}
+    new_alerts = {r["id"]: r for r in after.get("attention", [])}
+    return dict(changed_task_ids=changed, date_changed_task_ids=changed,
+                edited_task_ids=sorted(edited), calculation_root_task_ids=sorted(roots), risk_changed_task_ids=risk_changed,
+                critical_added_task_ids=sorted(new_critical - old_critical),
+                critical_removed_task_ids=sorted(old_critical - new_critical),
+                downstream_task_ids=sorted(downstream), removed_task_ids=sorted(set(previous) - set(current)),
+                new_alerts=[new_alerts[k] for k in sorted(new_alerts.keys() - old_alerts.keys())],
+                resolved_alert_ids=sorted(old_alerts.keys() - new_alerts.keys()),
+                finish_delta_minutes=int((after["finish"]-before["finish"]).total_seconds()/60),
+                delay_before_minutes=before["delay_minutes"], delay_after_minutes=after["delay_minutes"],
+                forecast_stale=after.get("forecast_stale", False))

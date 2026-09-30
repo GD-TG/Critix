@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Button,
@@ -46,8 +46,10 @@ import { Toast } from "./feature/Toast/Toast";
 import { ExecutiveReportModal } from "./ExecutiveReportModal";
 import { api } from "./api";
 import type { Result } from "./types";
+import { DecisionLab } from "./feature/DecisionLab/DecisionLab";
 
 export function App() {
+  const [decisionLabOpened, setDecisionLabOpened] = useState(false);
   const {
     logged,
     colorScheme,
@@ -116,6 +118,10 @@ export function App() {
           <TopBar />
 
           <div className="content-wrap" id="overview">
+            <Group mb="md" justify="space-between">
+              <Text size="sm">Подрядчик опаздывает или изменился дедлайн? Выберите готовую ситуацию.</Text>
+              <Button onClick={() => setDecisionLabOpened(true)}>Разобрать ситуацию</Button>
+            </Group>
             {!draft && (
               <Card withBorder>
                 <Stack>
@@ -181,6 +187,7 @@ export function App() {
       </div>
 
       <Toast />
+      <DecisionLab opened={decisionLabOpened} onClose={() => setDecisionLabOpened(false)} />
 
       <DependencyModal />
 

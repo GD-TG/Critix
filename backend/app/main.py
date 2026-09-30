@@ -18,14 +18,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 
 from app import models, service
-from app.ai import chat, explain
+from app.ai import chat, explain, fallback, configuration_error
 from app.db import session, SessionLocal
-from app.demo import demo
+from app.demo import demo, delivery_demo
 from app.engine.analysis import analyze
 from app.engine.calendar import PlanningError
-from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse
+from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse, RecommendationRequest, StrictModel
 
 from contextlib import asynccontextmanager
+from app.schemas import DeliveryEvent, ApplyDeliveryEvent
+from app.engine.decision_lab import DecisionCase, evaluate as evaluate_decision_case
 
 logger = logging.getLogger(__name__)
 
@@ -350,6 +352,13 @@ auth = [Depends(authenticated)]
 calculated = [*auth, Depends(calculation_slot)]
 
 
+@app.get("/api/ai/status", dependencies=auth)
+def ai_status():
+    reason = configuration_error()
+    return {"configured": reason is None, "reason": reason, "provider_verified": False,
+            "fallback_available": True}
+
+
 @app.get("/api/projects", dependencies=auth)
 def projects(db=Depends(project_session), user=Depends(current_user)):
     return service.list_projects_for_user(db, user.id)
@@ -360,9 +369,36 @@ def create(body: ProjectInput, db=Depends(project_session), user=Depends(current
     return service.create(db, body, owner_id=user.id)
 
 
+@app.post("/api/decision-lab/evaluate", dependencies=calculated)
+def decision_lab(body: DecisionCase, user=Depends(current_user)):
+    return evaluate_decision_case(body)
+
+
 @app.post("/api/demo", dependencies=calculated, status_code=201)
 def create_demo(db=Depends(project_session), user=Depends(current_user)):
     return service.create(db, demo(), owner_id=user.id)
+
+
+@app.post("/api/demo/deliveries", dependencies=calculated, status_code=201)
+def create_delivery_demo(db=Depends(project_session), user=Depends(current_user)):
+    return service.create(db, delivery_demo(), owner_id=user.id)
+
+
+@app.get("/api/projects/{project_id}/delivery-cases", dependencies=calculated)
+def delivery_cases(project_id: UUID, db=Depends(project_session)):
+    from app.engine.delivery_events import event_catalog
+    version, project = service.read(db, project_id)
+    return dict(id=project_id, version=version, deliveries=event_catalog(project))
+
+
+@app.post("/api/projects/{project_id}/delivery-events/preview", dependencies=calculated)
+def preview_delivery_event(project_id: UUID, body: DeliveryEvent, db=Depends(project_session)):
+    return service.delivery_event(db, project_id, body)
+
+
+@app.post("/api/projects/{project_id}/delivery-events", dependencies=calculated)
+def apply_delivery_event(project_id: UUID, body: ApplyDeliveryEvent, db=Depends(project_session), user=Depends(current_user)):
+    return service.delivery_event(db, project_id, body, apply=True, actor_id=user.id)
 
 
 @app.get("/api/projects/{project_id}", dependencies=calculated)
@@ -425,7 +461,7 @@ def check_ai_quota(user_id: UUID | None, client_ip: str):
         ai_user_daily_counts[key] = user_daily + 1
 
 
-def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None, owner_id=None):
+def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None, owner_id=None, expected_version=None):
     # A worker owns the session and the slot; neither survives into the LLM wait.
     if not calculation_slots.acquire(timeout=3):
         raise HTTPException(503, "Сейчас выполняются другие расчёты. Повторите запрос через несколько секунд")
@@ -433,11 +469,42 @@ def prepare_ai_context(project_id: UUID, project: Optional[ProjectInput] = None,
         with SessionLocal() as db:
             if owner_id is not None:
                 db.info["owner_id"] = owner_id
-            _, saved_data = service.read(db, project_id)
+            version, saved_data = service.read(db, project_id)
+            if expected_version is not None and version != expected_version:
+                raise HTTPException(409, "Проект изменён. Обновите контекст консультации")
         data = project if project is not None else saved_data
-        return data, analyze(data)
+        analysis = analyze(data)
+        analysis.update(version=version, scope="draft" if project is not None else "saved")
+        return data, analysis
     finally:
         calculation_slots.release()
+
+
+AI_QUEUE_SECONDS = 1
+AI_RESPONSE_SECONDS = 16
+
+
+async def ai_response(data, analysis, messages=None):
+    """Bound the queue separately; degraded service still returns local facts."""
+    reason = configuration_error()
+    acquired = False
+    if reason is None:
+        try:
+            await asyncio.wait_for(ai_concurrency.acquire(), timeout=AI_QUEUE_SECONDS)
+            acquired = True
+            async with asyncio.timeout(AI_RESPONSE_SECONDS):
+                response = await (explain(data, analysis) if messages is None else chat(data, analysis, messages))
+        except TimeoutError:
+            reason = "provider_timeout" if acquired else "queue_timeout"
+        finally:
+            if acquired:
+                ai_concurrency.release()
+    if reason:
+        response = fallback(data, analysis, reason, messages=messages)
+    # Metadata returns to our client only; it is not added to the LLM prompt.
+    response["context"] = {"version": analysis.get("version"), "scope": analysis.get("scope"),
+                           "snapshot_id": analysis.get("snapshot_id"), "as_of": analysis.get("as_of")}
+    return response
 
 
 @app.post("/api/projects/{project_id}/ai", dependencies=auth)
@@ -448,22 +515,18 @@ async def ai(project_id: UUID, request: Request = None, user=Depends(detached_cu
         request = None
     check_ai_quota(getattr(user, "id", None), client_address(request) if request is not None else "127.0.0.1")
     data, analysis = await run_in_threadpool(prepare_ai_context, project_id, None, getattr(user, "id", None))
-    try:
-        async with asyncio.timeout(20):
-            async with ai_concurrency:
-                return await explain(data, analysis)
-    except (TimeoutError, asyncio.TimeoutError):
-        raise HTTPException(503, "Сервис ИИ временно перегружен запросами. Повторите попытку через минуту")
+    return await ai_response(data, analysis)
 
 
-class ChatMessage(BaseModel):
+class ChatMessage(StrictModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=8000)
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(StrictModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=10)
     project: Optional[ProjectInput] = None
+    version: int | None = Field(default=None, ge=1)
 
 
 @app.post("/api/projects/{project_id}/chat", dependencies=auth)
@@ -473,13 +536,13 @@ async def chat_copilot(project_id: UUID, body: ChatRequest, request: Request = N
             user = request
         request = None
     check_ai_quota(getattr(user, "id", None), client_address(request) if request is not None else "127.0.0.1")
-    data, analysis = await run_in_threadpool(prepare_ai_context, project_id, body.project, getattr(user, "id", None))
-    try:
-        async with asyncio.timeout(20):
-            async with ai_concurrency:
-                return await chat(data, analysis, [m.model_dump() for m in body.messages])
-    except (TimeoutError, asyncio.TimeoutError):
-        raise HTTPException(503, "Сервис ИИ временно перегружен запросами. Повторите попытку через минуту")
+    data, analysis = await run_in_threadpool(prepare_ai_context, project_id, body.project, getattr(user, "id", None), body.version)
+    return await ai_response(data, analysis, [m.model_dump() for m in body.messages])
+
+
+@app.post("/api/projects/{project_id}/recommendations", dependencies=calculated)
+def recommendations(project_id: UUID, body: RecommendationRequest, db=Depends(project_session)):
+    return service.recommendations(db, project_id, body)
 
 
 @app.get("/api/projects/{project_id}/history", dependencies=auth)
@@ -487,7 +550,14 @@ def project_history(project_id: UUID, db=Depends(project_session)):
     return service.get_history(db, project_id)
 
 
-@app.get("/api/projects/{project_id}/scenarios", dependencies=auth)
+def scenario_calculation_slot(include_analysis: bool = False):
+    if include_analysis:
+        yield from calculation_slot()
+    else:
+        yield
+
+
+@app.get("/api/projects/{project_id}/scenarios", dependencies=[*auth, Depends(scenario_calculation_slot)])
 def list_scenarios(project_id: UUID, limit: int = 20, offset: int = 0, include_analysis: bool = False, db=Depends(project_session)):
     return service.list_scenarios(db, project_id, limit=limit, offset=offset, include_analysis=include_analysis)
 

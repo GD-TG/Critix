@@ -9,6 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    @field_validator("name", mode="before", check_fields=False)
+    @classmethod
+    def trim_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
 
 class Shift(StrictModel):
     start: time
@@ -60,6 +65,7 @@ class Task(StrictModel):
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=200)
     duration_minutes: int = Field(ge=0, le=525600)
+    remaining_minutes: int | None = Field(default=None, ge=0, le=525600)
     priority: Literal["low", "medium", "high", "urgent"] = "medium"
     required_skills: list[str] = Field(default_factory=list)
     not_before: datetime | None = None
@@ -71,6 +77,8 @@ class Task(StrictModel):
 
     @model_validator(mode="after")
     def actual_dates(self):
+        if self.remaining_minutes is not None and (not self.actual_start or self.status not in ("in_progress", "blocked")):
+            raise ValueError("Остаток работы задаётся только для начатой незавершённой задачи")
         for value in [self.not_before, self.actual_start, self.actual_finish]:
             if value and (value.tzinfo is None or value.second or value.microsecond):
                 raise ValueError("Дата должна содержать часовой пояс и иметь точность до минуты")
@@ -95,6 +103,41 @@ class Dependency(StrictModel):
     lag_mode: Literal["working", "elapsed"] = "working"
 
 
+class Delivery(StrictModel):
+    id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    contractor: str = Field(min_length=1, max_length=200)
+    promised_at: datetime
+    expected_at: datetime | None = None
+    review_days: int = Field(default=1, ge=0, le=30)
+    status: Literal["waiting", "delivered", "rework", "accepted"] = "waiting"
+    delivered_at: datetime | None = None
+    accepted_at: datetime | None = None
+    dependent_task_ids: list[str] = Field(min_length=1, max_length=200)
+
+    @field_validator("contractor", mode="before")
+    @classmethod
+    def trim_contractor(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def valid_delivery(self):
+        for value in (self.promised_at, self.expected_at, self.delivered_at, self.accepted_at):
+            if value and (value.tzinfo is None or value.second or value.microsecond):
+                raise ValueError("Дата поставки должна содержать часовой пояс и точность до минуты")
+        if len(set(self.dependent_task_ids)) != len(self.dependent_task_ids):
+            raise ValueError("Задачи поставки не должны повторяться")
+        if self.status in ("delivered", "rework", "accepted") and not self.delivered_at:
+            raise ValueError("Укажите дату передачи результата")
+        if self.status == "accepted" and not self.accepted_at:
+            raise ValueError("Укажите дату приёмки результата")
+        if self.accepted_at and (self.status != "accepted" or self.accepted_at < self.delivered_at):
+            raise ValueError("Дата приёмки должна соответствовать принятому результату и быть не раньше передачи")
+        if self.status == "waiting" and self.delivered_at:
+            raise ValueError("Переданный результат должен иметь статус приёмки или доработки")
+        return self
+
+
 class ProjectInput(StrictModel):
     name: str = Field(min_length=1, max_length=200)
     timezone: str = "Asia/Yekaterinburg"
@@ -105,6 +148,9 @@ class ProjectInput(StrictModel):
     assignees: list[Assignee] = Field(default_factory=list, max_length=100)
     tasks: list[Task] = Field(default_factory=list, max_length=200)
     dependencies: list[Dependency] = Field(default_factory=list, max_length=2000)
+    deliveries: list[Delivery] = Field(default_factory=list, max_length=100)
+    optional_task_ids: list[str] = Field(default_factory=list, max_length=200)
+    deferred_task_ids: list[str] = Field(default_factory=list, max_length=200)
 
     @field_validator("baseline")
     @classmethod
@@ -161,13 +207,83 @@ class ProjectInput(StrictModel):
             if pair in seen:
                 raise ValueError("Повторная зависимость между задачами")
             seen.add(pair)
+        for values in (self.optional_task_ids, self.deferred_task_ids):
+            if len(values) != len(set(values)) or not set(values) <= ids:
+                raise ValueError("Состав выпуска содержит повторные или неизвестные задачи")
+        deferred = set(self.deferred_task_ids)
+        if not deferred <= set(self.optional_task_ids):
+            raise ValueError("Переносить из выпуска можно только явно необязательные задачи")
+        by_id = {t.id: t for t in self.tasks}
+        if any(by_id[k].actual_start or by_id[k].status == "done" for k in deferred):
+            raise ValueError("Начатую или выполненную работу нельзя исключать из выпуска")
+        for dep in self.dependencies:
+            if dep.predecessor_id in deferred and dep.successor_id not in deferred and by_id[dep.successor_id].duration_minutes != 0:
+                raise ValueError("От отложенной задачи зависит работа текущего выпуска")
+        if len({d.id for d in self.deliveries}) != len(self.deliveries):
+            raise ValueError("Идентификаторы поставок должны быть уникальными")
+        outgoing = {key: [] for key in ids}
+        for dep in self.dependencies:
+            outgoing[dep.predecessor_id].append(dep.successor_id)
+        for delivery in self.deliveries:
+            if not set(delivery.dependent_task_ids) <= ids:
+                raise ValueError("Поставка ссылается на неизвестную задачу")
+            pending = list(delivery.dependent_task_ids)
+            visited = set()
+            while pending:
+                key = pending.pop()
+                if key in visited or key in deferred:
+                    continue
+                visited.add(key)
+                task = by_id[key]
+                if task.actual_start and (delivery.status != "accepted" or task.actual_start < delivery.accepted_at):
+                    raise ValueError("Работу, требующую поставку, нельзя начать до фактической приёмки результата")
+                pending.extend(outgoing[key])
         return self
+
+
+class DeliveryEvent(StrictModel):
+    version: int = Field(ge=1)
+    delivery_id: str = Field(min_length=1, max_length=64)
+    kind: Literal["delay", "submit", "reject", "accept"]
+    expected_at: datetime | None = None
+    occurred_at: datetime | None = None
+    reason: str = Field(min_length=1, max_length=512)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def trim_reason(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def valid_dates(self):
+        for value in (self.expected_at, self.occurred_at):
+            if value and (value.tzinfo is None or value.second or value.microsecond):
+                raise ValueError("Укажите часовой пояс и точность до минуты")
+        if self.kind in ("submit", "accept") and self.expected_at is not None:
+            raise ValueError("Фактическая передача или приёмка не меняет ожидаемую дату")
+        return self
+
+
+class ApplyDeliveryEvent(DeliveryEvent):
+    decision: Literal["accept_change", "defer_optional"] = "accept_change"
+    decision_owner: str = Field(min_length=1, max_length=200)
+
+    @field_validator("decision_owner", mode="before")
+    @classmethod
+    def trim_owner(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class SaveProject(StrictModel):
     version: int = Field(ge=1)
     project: ProjectInput
     comment: str | None = Field(default=None, max_length=512)
+
+
+class RecommendationRequest(SaveProject):
+    """Evaluate explicitly supplied alternatives; never invent durations or staff."""
+    alternatives: list[ProjectInput] = Field(default_factory=list, max_length=3)
+    include_leveling: bool = True
 
 
 class LevelProject(SaveProject):
