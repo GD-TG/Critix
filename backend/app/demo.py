@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.schemas import Assignee, Dependency, ProjectInput, Skill, Task
+from app.schemas import Assignee, Dependency, ProjectInput, Skill, Task, Delivery
 
 
 def demo():
@@ -125,4 +125,33 @@ def demo():
         assignees=assignees,
         dependencies=[Dependency(predecessor_id=str(a), successor_id=str(b)) for a, b in pairs]
     )
+
+
+def delivery_demo(as_of=None):
+    """A supplier commitment and eight internal tasks; no supplier working schedule."""
+    now = (as_of or datetime.now(ZoneInfo("Asia/Yekaterinburg"))).astimezone(ZoneInfo("Asia/Yekaterinburg"))
+    monday = (now - timedelta(days=now.weekday())).replace(hour=9, minute=0, second=0, microsecond=0)
+    start, upcoming = monday - timedelta(days=7), monday + timedelta(days=7)
+    tasks = [
+        Task(id="requirements", name="Требования согласованы", duration_minutes=480, status="done", actual_start=start, actual_finish=start.replace(hour=18)),
+        Task(id="architecture", name="Схема интеграции согласована", duration_minutes=480, status="done", actual_start=start + timedelta(days=1), actual_finish=start + timedelta(days=1, hours=9)),
+        Task(id="docs", name="Подготовка инструкции", duration_minutes=480, not_before=upcoming, assignee_id="pm"),
+        Task(id="training", name="Подготовка поддержки", duration_minutes=480, assignee_id="pm"),
+        Task(id="integration", name="Интеграция оплаты", duration_minutes=480, assignee_id="dev"),
+        Task(id="qa", name="Проверка оплаты", duration_minutes=480, assignee_id="qa"),
+        Task(id="report", name="Дополнительный отчёт по платежам", duration_minutes=1440),
+        Task(id="launch", name="Запуск пилота", duration_minutes=0),
+    ]
+    links = [("requirements", "architecture"), ("requirements", "docs"), ("docs", "training"),
+             ("architecture", "integration"), ("integration", "qa"), ("qa", "launch"),
+             ("report", "launch"), ("training", "launch")]
+    return ProjectInput(name="Пилот: оплата от внешнего подрядчика", start=start,
+                        deadline=upcoming + timedelta(days=4, hours=9), tasks=tasks,
+                        assignees=[Assignee(id="pm", name="Руководитель проекта"), Assignee(id="dev", name="Команда интеграции"),
+                                   Assignee(id="qa", name="Команда проверки")],
+                        dependencies=[Dependency(predecessor_id=a, successor_id=b) for a, b in links],
+                        optional_task_ids=["report"],
+                        deliveries=[Delivery(id="payment-api", name="API оплаты", contractor="Внешний подрядчик",
+                                             promised_at=upcoming, expected_at=upcoming, review_days=1,
+                                             dependent_task_ids=["integration", "report"])])
 

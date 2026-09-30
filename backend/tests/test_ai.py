@@ -1,5 +1,6 @@
 import asyncio
 import json
+import pytest
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -11,6 +12,12 @@ class FakeClient(SimpleNamespace):
 from app import ai
 from app.demo import demo
 from app.engine.analysis import analyze
+
+
+@pytest.fixture(autouse=True)
+def explicit_test_provider(monkeypatch):
+    # All successful provider calls below are replaced with in-process fakes.
+    monkeypatch.setenv("LLM_BASE_URL", "https://provider.invalid/v1")
 
 
 def test_audit_and_payload_use_project_zone_for_all_instants():

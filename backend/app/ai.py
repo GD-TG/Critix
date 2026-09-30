@@ -21,6 +21,48 @@ def provider_failure(exc):
 _NOT_CONFIGURED = {"available": False, "text": "AI не настроен. Расчёты и предупреждения доступны без AI."}
 _UNAVAILABLE = {"available": False, "text": "AI временно недоступен. Расчёты проекта сохранены."}
 
+
+def configuration_error():
+    # Never silently select another provider/model for a partially configured deployment.
+    for key, reason in (("LLM_API_KEY", "missing_api_key"), ("LLM_MODEL", "missing_model"),
+                        ("LLM_BASE_URL", "missing_base_url")):
+        if not os.getenv(key, "").strip():
+            return reason
+    return None
+
+
+def fallback(project, analysis, reason, *, messages=None):
+    """Local-only answer: no network calls and no additional provider payload."""
+    response = dict(available=False, source="engine", reason=reason)
+    if messages is None:
+        response["text"] = _deterministic_audit(project, analysis)
+    else:
+        question = next((m["content"].casefold() for m in reversed(messages) if m["role"] == "user"), "")
+        lines = ["**Расчётный ответ движка.** Свободная AI-консультация сейчас недоступна."]
+        if analysis.get("forecast_stale"):
+            lines.append("Прогноз устарел: уточните фактическое выполнение и остаток работы.")
+        people = {a.id: a.name for a in project.assignees}
+        if any(word in question for word in ("перегруз", "ресурс", "сотрудник")):
+            for person in sorted({p["assignee_id"] for p in analysis["overloads"]}):
+                peak = max(p["allocation_percent"] for p in analysis["overloads"] if p["assignee_id"] == person)
+                lines.append(f"- {people.get(person, person)}: пиковая загрузка {peak}%.")
+            if not analysis["overloads"]:
+                lines.append("Расчётных перегрузок нет.")
+            lines.append("Действие: проверьте ресурсное выравнивание; оно может отодвинуть финиш.")
+        else:
+            zone = ZoneInfo(project.timezone)
+            lines.append(f"Расчётный финиш: {analysis['finish'].astimezone(zone):%d.%m.%Y %H:%M}. "
+                         f"Дедлайн: {project.deadline.astimezone(zone):%d.%m.%Y %H:%M} ({project.timezone}).")
+            names = {t.id: t.name for t in project.tasks}
+            for item in analysis.get("attention", [])[:3]:
+                tasks = ', '.join(names.get(k, k) for k in item["task_ids"])
+                lines.append(f"- {item['reason']} ({tasks or 'проект'}). {item['action']}.")
+            if not analysis.get("attention"):
+                lines.append("В рассчитанном плане предупреждений нет.")
+            lines.append("Это сводка по плану. Эффект конкретной правки нужно проверить через симуляцию; граф автоматически не изменён.")
+        response["reply"] = "\n\n".join(lines)
+    return response
+
 _SYSTEM = (
     "Ты помощник руководителя проекта (Senior PM & AI Copilot). Отвечай по-русски, лаконично и по делу. "
     "Длительности задач и резервы выражай в рабочих часах. Сдвиг финиша и превышение дедлайна — "
@@ -221,7 +263,7 @@ def _deterministic_audit(project: ProjectInput, analysis: dict) -> str:
 
 ### ⚡ 2. Критический путь (CPM)
 Всего задач на критическом пути: **{len(crit_tasks)}**.
-{chr(10).join(crit_lines) if crit_lines else '- Критические задержки отсутствуют.'}
+{chr(10).join(crit_lines) if crit_lines else '- Критические задачи не определены; проверьте актуальность прогноза.'}
 
 ### 👥 3. Команда и ресурсы
 {chr(10).join(overload_lines) if overload_lines else '- Перегрузок по FTE не обнаружено.'}
@@ -239,12 +281,12 @@ async def explain(project: ProjectInput, analysis: dict) -> dict:
 
     payload = _build_payload(project, analysis)
 
-    if not key or not model:
-        return {"available": False, "source": "engine", "text": _deterministic_audit(project, analysis)}
+    if reason := configuration_error():
+        return fallback(project, analysis, reason)
 
     client = None
     try:
-        client = AsyncOpenAI(api_key=key, base_url=base_url, max_retries=1)
+        client = AsyncOpenAI(api_key=key, base_url=base_url, max_retries=0)
         response = await client.chat.completions.create(
             model=model,
             messages=[
@@ -252,7 +294,7 @@ async def explain(project: ProjectInput, analysis: dict) -> dict:
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
             ],
             max_tokens=1000,
-            timeout=15,
+            timeout=12,
         )
         text = response.choices[0].message.content or ""
         if text.strip():
@@ -262,10 +304,13 @@ async def explain(project: ProjectInput, analysis: dict) -> dict:
         logger.warning("LLM explain failed id=%s type=%s, falling back to deterministic audit", err_id, type(exc).__name__)
     finally:
         if client is not None:
-            await client.close()
+            try:
+                await client.close()
+            except Exception:
+                logger.warning("Could not close LLM client")
 
     # Fallback to deterministic audit with explicit engine source
-    return {"available": False, "source": "engine", "text": _deterministic_audit(project, analysis)}
+    return fallback(project, analysis, "provider_error_or_empty_response")
 
 
 async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> dict:
@@ -275,8 +320,8 @@ async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> d
 
     payload = _build_payload(project, analysis)
 
-    if not key or not model:
-        return {"available": False, "reply": _NOT_CONFIGURED["text"]}
+    if reason := configuration_error():
+        return fallback(project, analysis, reason, messages=messages)
 
     client = None
     try:
@@ -291,12 +336,16 @@ async def chat(project: ProjectInput, analysis: dict, messages: list[dict]) -> d
             model=model,
             messages=formatted_messages,
             max_tokens=1200,
-            timeout=15,
+            timeout=12,
         )
         reply = response.choices[0].message.content or ""
-        return {"available": True, "reply": reply} if reply.strip() else {"available": False, "reply": _UNAVAILABLE["text"]}
+        return {"available": True, "source": "llm", "reply": reply} if reply.strip() else fallback(project, analysis, "empty_response", messages=messages)
     except Exception as exc:
-        return {"available": False, "reply": provider_failure(exc)["text"]}
+        provider_failure(exc)
+        return fallback(project, analysis, "provider_error", messages=messages)
     finally:
         if client is not None:
-            await client.close()
+            try:
+                await client.close()
+            except Exception:
+                logger.warning("Could not close LLM client")

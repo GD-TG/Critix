@@ -41,6 +41,10 @@ def test_account_isolation_demo_and_scenario_validation(monkeypatch):
             ("GET", "/history", None), ("GET", "/scenarios", None),
             ("POST", "/scenarios", scenario), ("DELETE", "/scenarios/" + sc.json()["id"], None),
             ("POST", "/simulate", payload), ("POST", "/level", payload),
+            ("POST", "/recommendations", payload),
+            ("GET", "/delivery-cases", None),
+            ("POST", "/delivery-events/preview", {"version": 1, "delivery_id": "any", "kind": "delay", "reason": "test"}),
+            ("POST", "/delivery-events", {"version": 1, "delivery_id": "any", "kind": "delay", "reason": "test", "decision_owner": "PM"}),
             ("POST", "/ai", None), ("POST", "/chat", {"messages": [{"role": "user", "content": "test"}]}),
         ]:
             response = b.request(method, url + suffix, headers=headers, json=body)
