@@ -6,11 +6,13 @@ import {
   Drawer,
   Group,
   MantineProvider,
+  Paper,
   Stack,
   Text,
+  ThemeIcon,
   Title,
 } from "@mantine/core";
-import { Zap } from "lucide-react";
+import { Coins, Zap } from "lucide-react";
 import "@mantine/core/styles.css";
 import "@xyflow/react/dist/style.css";
 import "./style.css";
@@ -117,10 +119,39 @@ export function App() {
           <TopBar />
 
           <div className="content-wrap" id="overview">
-            <Group mb="md" justify="space-between">
-              <Text size="sm">Подрядчик опаздывает или изменился дедлайн? Выберите готовую ситуацию.</Text>
-              <Button onClick={() => setDecisionLabOpened(true)}>Разобрать ситуацию</Button>
-            </Group>
+            <Paper
+              withBorder
+              p="sm"
+              mb="md"
+              radius="md"
+              style={{
+                background: "linear-gradient(90deg, rgba(210,10,46,0.06) 0%, rgba(255,255,255,0) 100%)",
+                borderColor: "rgba(210,10,46,0.25)",
+              }}
+            >
+              <Group justify="space-between" wrap="wrap" gap="xs">
+                <Group gap="xs">
+                  <ThemeIcon color="red" variant="light" size="md" radius="md">
+                    <Coins size={16} />
+                  </ThemeIcon>
+                  <div>
+                    <Text fw={700} size="sm">
+                      Пульт решений: Срок · Деньги · Состав запуска
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Подрядчик опаздывает или горит дедлайн? Оцените штрафы и спасите запуск за 1 клик.
+                    </Text>
+                  </div>
+                </Group>
+                <Button
+                  color="red"
+                  size="xs"
+                  onClick={() => setDecisionLabOpened(true)}
+                >
+                  Разобрать ситуацию и риски
+                </Button>
+              </Group>
+            </Paper>
             {!draft && (
               <Card withBorder>
                 <Stack>
