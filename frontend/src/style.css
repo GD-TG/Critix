@@ -1810,6 +1810,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   min-height: 220px;
 }
 
+/* HistoryPanel sits directly after .dashboard-grid on the Overview tab,
+   so it needs its own top spacing (uniform 17px, matching .metric-grid). */
+.activity-panel {
+  margin-top: 17px;
+}
+
 .activity-row {
   display: flex;
   align-items: center;

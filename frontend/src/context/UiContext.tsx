@@ -9,7 +9,7 @@ import {
 import { useProjects } from "@/context/ProjectContext";
 import { rescheduleOverdueTasks } from "@/taskEditing";
 
-export type View = "dashboard" | "graph" | "tasks_table" | "team" | "links" | "ai";
+export type View = "dashboard" | "timeline" | "graph" | "tasks_table" | "team" | "links" | "ai";
 
 interface UiContextValue {
   colorScheme: "dark" | "light";

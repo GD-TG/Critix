@@ -143,18 +143,17 @@ export function App() {
                 <MetricsGrid />
 
                 <section className="dashboard-grid">
-                  <TimelinePanel />
+                  <AttentionPanel />
 
-                  <aside className="side-column">
-                    <AttentionPanel />
-                  </aside>
-                </section>
-
-                <section className="bottom-grid">
-                  <HistoryPanel />
                   <EnginePanel />
                 </section>
+
+                <HistoryPanel />
               </>
+            )}
+
+            {activeView === "timeline" && draft && view && (
+              <TimelinePanel />
             )}
 
             <ErrorBoundary fallbackTitle="Ошибка отображения графа проекта">

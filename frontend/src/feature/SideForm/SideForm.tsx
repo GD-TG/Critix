@@ -45,10 +45,10 @@ export function SideForm({ onScrollTo }: Props) {
       <div className="workspace-caption">Нажмите, чтобы переключить</div>
 
       <nav className="main-nav">
-        <button className={`nav-item ${activeView === "dashboard" ? "active" : ""}`} onClick={() => onScrollTo("overview")}>
+        <button className={`nav-item ${activeView === "dashboard" ? "active" : ""}`} onClick={() => setActiveView("dashboard")}>
           <LayoutDashboard size={16} /> Обзор
         </button>
-        <button className="nav-item" onClick={() => onScrollTo("timeline")}>
+        <button className={`nav-item ${activeView === "timeline" ? "active" : ""}`} onClick={() => setActiveView("timeline")}>
           <GitBranch size={16} /> План проекта
         </button>
         <button className={`nav-item ${activeView === "tasks_table" ? "active" : ""}`} onClick={() => setActiveView("tasks_table")}>
