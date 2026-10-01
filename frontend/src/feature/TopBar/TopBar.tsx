@@ -18,6 +18,7 @@ import {
   FileText,
   LogOut,
   Menu as MenuIcon,
+  PlayCircle,
   Sparkles,
   User as UserIcon,
 } from "lucide-react";
@@ -188,6 +189,17 @@ export function TopBar() {
             </Stack>
           </Popover.Dropdown>
         </Popover>
+
+        <Button
+          size="xs"
+          variant="light"
+          color="red"
+          style={{ height: 28, fontSize: 12, fontWeight: 600 }}
+          leftSection={<PlayCircle size={14} />}
+          onClick={() => setHelpModal(true)}
+        >
+          Сценарий демо (2 мин)
+        </Button>
 
         <button className="help-button" aria-label="Помощь" onClick={() => setHelpModal(true)}>
           <CircleHelp size={14} />
