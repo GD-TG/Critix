@@ -11,7 +11,7 @@ import {
   getZone,
   skillLevelLabels,
 } from "@/shared";
-import { defaultCalendar, type Person, type Skill } from "@/types";
+import { defaultCalendar, safeRandomUuid, type Person, type Skill } from "@/types";
 
 export function useTeamView() {
   const { draft, saved, rows, overloadedAssigneeIds, change } = useProjects();
@@ -32,7 +32,7 @@ export function useTeamView() {
 
   const addPerson = () => {
     if (!draft) return;
-    const newId = crypto.randomUUID();
+    const newId = safeRandomUuid();
     const newPerson: Person = {
       id: newId,
       name: `Сотрудник ${draft.assignees.length + 1}`,
@@ -50,7 +50,7 @@ export function useTeamView() {
 
   const createFirstPerson = () => {
     if (!draft) return;
-    const newId = crypto.randomUUID();
+    const newId = safeRandomUuid();
     change({
       ...draft,
       assignees: [
