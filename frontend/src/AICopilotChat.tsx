@@ -70,7 +70,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
       {
         id: "welcome",
         role: "assistant",
-        content: `Здравствуйте! Я ваш AI Copilot и консультант по проекту **«${project.name}»**.\n\nЯ отвечаю по сохранённому плану. Изменения сроков проверяются отдельной симуляцией. Чем я могу помочь? Можете выбрать быстрый вопрос ниже или задать свой.`,
+        content: `Здравствуйте! Я ваш AI советник и консультант по проекту **«${project.name}»**.\n\nЯ отвечаю по сохранённому плану. Изменения сроков проверяются отдельной симуляцией. Чем я могу помочь? Можете выбрать быстрый вопрос ниже или задать свой.`,
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
       },
     ];
@@ -107,7 +107,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
       {
         id: "welcome",
         role: "assistant",
-        content: `Здравствуйте! Я ваш AI Copilot и консультант по проекту **«${project.name}»**.\n\nЯ отвечаю по сохранённому плану. Изменения сроков проверяются отдельной симуляцией. Чем я могу помочь? Можете выбрать быстрый вопрос ниже или задать свой.`,
+        content: `Здравствуйте! Я ваш AI советник и консультант по проекту **«${project.name}»**.\n\nЯ отвечаю по сохранённому плану. Изменения сроков проверяются отдельной симуляцией. Чем я могу помочь? Можете выбрать быстрый вопрос ниже или задать свой.`,
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
       },
     ]);
@@ -213,7 +213,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
           </div>
           <div>
             <Title order={4} style={{ fontSize: 16 }}>
-              AI Copilot & Аналитик проекта
+              AI советник & Аналитик проекта
             </Title>
             <Text size="xs" c="dimmed">
               Консультации по сохранённому плану; расчёт изменений — в симуляции

@@ -24,6 +24,7 @@ import { AuthForm } from "./feature/AuthForm/AuthForm";
 import { SideForm } from "./feature/SideForm/SideForm";
 import { TopBar } from "./feature/TopBar/TopBar";
 import { DashboardHeader } from "./feature/DashboardHeader/DashboardHeader";
+import { DashboardOverview } from "./feature/DashboardOverview/DashboardOverview";
 import { StatusStrip } from "./feature/StatusStrip/StatusStrip";
 import { DraftBar } from "./feature/DraftBar/DraftBar";
 import { DeliveriesModal } from "./feature/DeliveriesModal/DeliveriesModal";
@@ -50,6 +51,9 @@ import { ExecutiveReportModal } from "./ExecutiveReportModal";
 import { api } from "./api";
 import type { Result } from "./types";
 import { DecisionLab } from "./feature/DecisionLab/DecisionLab";
+import { EventDialog } from "./feature/EventDialog/EventDialog";
+import { BriefDialog } from "./feature/BriefDialog/BriefDialog";
+import { CompareVariantsDialog } from "./feature/CompareVariantsDialog/CompareVariantsDialog";
 
 export function App() {
   const {
@@ -75,10 +79,15 @@ export function App() {
     decisionLabOpened,
     setDecisionLabOpened,
     openDecisionLabForTask,
+    eventDialogOpened,
+    setEventDialogOpened,
+    compareVariantsOpened,
+    setCompareVariantsOpened,
+    briefDialogOpened,
+    setBriefDialogOpened,
   } = useApp();
 
   const view = preview || saved;
-  const [dashboardTab, setDashboardTab] = useState<"timeline" | "analysis">("timeline");
 
   const scrollToSection = (id: string) => {
     setActiveView("dashboard");
@@ -156,55 +165,12 @@ export function App() {
               </div>
             )}
 
-            {draft && view && (activeView === "dashboard" || activeView === "timeline") && (
-              <>
-                <StatusStrip />
+            {draft && view && activeView === "dashboard" && (
+              <DashboardOverview />
+            )}
 
-                <Group justify="center" align="center" mb="sm">
-                  <SegmentedControl
-                    size="xs"
-                    value={activeView === "timeline" ? "timeline" : dashboardTab}
-                    onChange={(val) => {
-                      setDashboardTab(val as "timeline" | "analysis");
-                      if (activeView !== "dashboard") {
-                        setActiveView("dashboard");
-                      }
-                    }}
-                    data={[
-                      {
-                        label: (
-                          <Group gap="xs" justify="center">
-                            <Calendar size={14} />
-                            <span>Расписание и Гант</span>
-                          </Group>
-                        ),
-                        value: "timeline",
-                      },
-                      {
-                        label: (
-                          <Group gap="xs" justify="center">
-                            <Activity size={14} />
-                            <span>Анализ рисков и Сценарии</span>
-                          </Group>
-                        ),
-                        value: "analysis",
-                      },
-                    ]}
-                  />
-                </Group>
-
-                {(activeView === "timeline" || dashboardTab === "timeline") ? (
-                  <TimelinePanel />
-                ) : (
-                  <>
-                    <section className="dashboard-grid">
-                      <AttentionPanel />
-                      <EnginePanel />
-                    </section>
-                    <HistoryPanel />
-                  </>
-                )}
-              </>
+            {draft && view && activeView === "timeline" && (
+              <TimelinePanel />
             )}
 
             <ErrorBoundary fallbackTitle="Ошибка отображения графа проекта">
@@ -263,6 +229,10 @@ export function App() {
           aiSource={aiReport?.source || "llm"}
         />
       )}
+
+      <EventDialog opened={eventDialogOpened} onClose={() => setEventDialogOpened(false)} />
+      <BriefDialog opened={briefDialogOpened} onClose={() => setBriefDialogOpened(false)} />
+      <CompareVariantsDialog opened={compareVariantsOpened} onClose={() => setCompareVariantsOpened(false)} />
 
       <DraftBar />
       <DeliveriesModal />

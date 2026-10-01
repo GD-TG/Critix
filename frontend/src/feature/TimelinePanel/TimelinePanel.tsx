@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge, Box, Button, Group, Popover, ScrollArea, Stack, Text } from "@mantine/core";
 import { ArrowLeft, ArrowRight, ChevronRight, List, Plus, ShieldAlert } from "lucide-react";
 import { useTimelinePanel } from "./useTimelinePanel";
@@ -13,6 +13,7 @@ export function TimelinePanel() {
     setTimelineMode,
     rows,
     savedRows,
+    view,
     dirty,
     timelineStartMs,
     timelineTotalMs,
@@ -27,7 +28,9 @@ export function TimelinePanel() {
     activeDepTaskId,
     setActiveDepTaskId,
     draggingTaskId,
+    dragDeltaDays,
     handleBarMouseDown,
+    handleTaskClick,
     chartContainerRef,
     getAvatarClass,
     getInitials,
@@ -37,22 +40,37 @@ export function TimelinePanel() {
     copy,
   } = useTimelinePanel();
 
+  const rootCauseTaskId = useMemo(() => {
+    if (!draft || !view?.analysis.deadline_exceeded) return null;
+    const dlMs = new Date(draft.deadline).getTime();
+    const criticalTasks = draft.tasks.filter((t) => rows.get(t.id)?.critical);
+    const breachTask = criticalTasks.find((t) => {
+      const r = rows.get(t.id);
+      return r && new Date(r.finish).getTime() > dlMs;
+    });
+    return breachTask?.id || criticalTasks[criticalTasks.length - 1]?.id || null;
+  }, [draft, view?.analysis.deadline_exceeded, rows]);
+
   return (
     <article className="panel timeline-panel" id="timeline" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div className="panel-header" style={{ paddingBottom: 8 }}>
-        <div>
-          <h2>План проекта и расписание</h2>
-          <p>Интерактивная диаграмма Ганта с расчётом резервов времени (Float), критического пути и сдвигов</p>
-        </div>
+      <div className="panel-header" style={{ padding: "8px 16px", alignItems: "center" }}>
+        <Group gap="xs" align="center">
+          <h2 style={{ fontSize: 16, margin: 0 }}>График задач</h2>
+          {draft && (
+            <Badge variant="subtle" color="gray" size="sm">
+              {draft.tasks.length} задач
+            </Badge>
+          )}
+        </Group>
         <Group gap="xs">
           <Button
             size="xs"
             variant="filled"
-            color="red"
+            style={{ backgroundColor: "#1e293b", color: "#fff" }}
             leftSection={<Plus size={14} />}
             onClick={addTask}
           >
-            + Добавить задачу
+            Добавить задачу
           </Button>
           <div className="view-tabs">
             <button
@@ -104,9 +122,10 @@ export function TimelinePanel() {
                         position: "absolute",
                         left: `${m.pctStart}%`,
                         width: `${m.pctWidth}%`,
-                        fontSize: 9,
+                        fontSize: 11,
                         fontWeight: 700,
-                        color: "var(--muted)",
+                        color: "var(--ink)",
+                        opacity: 0.85,
                         paddingLeft: 6,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -128,7 +147,7 @@ export function TimelinePanel() {
                         left: `${d.pctStart}%`,
                         width: `${d.pctWidth}%`,
                         textAlign: "center",
-                        fontSize: 8,
+                        fontSize: 10,
                         color: d.isWeekend ? "var(--red)" : "var(--muted)",
                         background: d.isWeekend ? "rgba(0,0,0,0.02)" : "transparent",
                         borderRight: "1px solid var(--line)",
@@ -138,8 +157,8 @@ export function TimelinePanel() {
                         justifyContent: "center",
                       }}
                     >
-                      <span style={{ fontWeight: 700, fontSize: 8 }}>{d.dayNum}</span>
-                      <span style={{ fontSize: 7, opacity: 0.8 }}>{d.weekday}</span>
+                      <span style={{ fontWeight: 700, fontSize: 11 }}>{d.dayNum}</span>
+                      <span style={{ fontSize: 9, opacity: 0.9 }}>{d.weekday}</span>
                     </div>
                   ))}
                 </div>
@@ -152,7 +171,7 @@ export function TimelinePanel() {
                 position: "absolute",
                 top: 48,
                 bottom: 0,
-                left: 260, // ширина колонки названий задач
+                left: 280, // ширина колонки названий задач
                 right: 0,
                 pointerEvents: "none",
                 zIndex: 0,
@@ -181,7 +200,11 @@ export function TimelinePanel() {
                   className="deadline-marker"
                   style={{ left: `${deadlineMarkerPercent}%` }}
                   title={draft?.deadline ? `Дедлайн проекта: ${shortDate(draft.deadline)}` : "Дедлайн проекта"}
-                />
+                >
+                  <div className="deadline-flag">
+                    🚩 Дедлайн {draft?.deadline ? shortDate(draft.deadline) : ""}
+                  </div>
+                </div>
               )}
 
               {/* Маркер "Сегодня" */}
@@ -248,6 +271,12 @@ export function TimelinePanel() {
               const isDragging = draggingTaskId === t.id;
               const depDetails = dependenciesDetailed.get(t.id);
 
+              let dynamicWidthPct = widthPct;
+              if (isDragging && dragDeltaDays !== 0) {
+                const dayPct = (86400000 / timelineTotalMs) * 100;
+                dynamicWidthPct = Math.max(0.5, widthPct + dragDeltaDays * dayPct);
+              }
+
               return (
                 <div
                   className="task-row"
@@ -258,7 +287,7 @@ export function TimelinePanel() {
                   }}
                 >
                   {/* КОЛОНКА ОПИСАНИЯ ЗАДАЧИ */}
-                  <div className="task-info" onClick={() => setTask(copy(t))} style={{ cursor: "pointer" }}>
+                  <div className="task-info" onClick={() => handleTaskClick(t)} style={{ cursor: "pointer" }}>
                     <span className={`avatar mini-avatar ${person ? getAvatarClass(person.id) : "avatar-ink"}`}>
                       {person ? getInitials(person.name) : "—"}
                     </span>
@@ -367,6 +396,11 @@ export function TimelinePanel() {
                             CPM (0 ч)
                           </span>
                         )}
+                        {t.id === rootCauseTaskId && (
+                          <span className="root-cause-tag" title="Задача на критическом пути, вызвавшая срыв контрактного дедлайна проекта">
+                            🔥 Причина срыва
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -397,21 +431,70 @@ export function TimelinePanel() {
                     {isMilestone ? (
                       <span
                         className={`task-milestone-marker ${statusClass} ${r.critical ? "critical" : ""} ${isHighlighted ? "is-highlighted" : ""}`}
-                        style={{ left: `${leftPct}%` }}
-                        onClick={() => setTask(copy(t))}
+                        style={{
+                          left: `${leftPct}%`,
+                          top: 14,
+                          position: "absolute",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          cursor: "pointer",
+                          zIndex: 3,
+                        }}
+                        onClick={() => handleTaskClick(t)}
                         title={`Веха: «${t.name}» (${date(r.start)})`}
                       >
-                        ◆
+                        <span
+                          style={{
+                            width: 14,
+                            height: 14,
+                            transform: "rotate(45deg)",
+                            background: r.critical ? "var(--red)" : "#55b287",
+                            border: "2px solid #fff",
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                            display: "inline-block",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: r.critical ? "var(--red)" : "var(--ink)",
+                            background: "rgba(255,255,255,0.92)",
+                            padding: "1px 5px",
+                            borderRadius: 3,
+                            whiteSpace: "nowrap",
+                            border: "1px solid var(--line)",
+                          }}
+                        >
+                          {t.name}
+                        </span>
                       </span>
                     ) : (
                       <span
                         className={`task-bar ${statusClass} ${r.critical ? "critical" : ""} is-draggable ${isDragging ? "is-dragging" : ""} ${isHighlighted ? "is-highlighted" : ""}`}
-                        style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                        style={{
+                          left: `${leftPct}%`,
+                          width: `${dynamicWidthPct}%`,
+                          ...(t.id === rootCauseTaskId ? { boxShadow: "0 0 0 2px #d20a2e, 0 4px 14px rgba(210, 10, 46, 0.45)" } : {}),
+                        }}
                         onMouseDown={(e) => handleBarMouseDown(e, t)}
-                        onClick={() => setTask(copy(t))}
-                        title={`«${t.name}»: ${date(r.start)} → ${date(r.finish)} · ${formatWorkDuration(t.duration_minutes, false)}${r.critical ? " (Критический путь)" : ""}. Потяните вправо для мгновенного What-If расчёта.`}
+                        onClick={() => handleTaskClick(t)}
+                        title={`«${t.name}»: ${date(r.start)} → ${date(r.finish)} · ${formatWorkDuration(t.duration_minutes, false)}${r.critical ? " (Критический путь)" : ""}. Потяните за правый край для What-If симуляции.`}
                       >
-                        {formatWorkDuration(t.duration_minutes, false)}
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                          {formatWorkDuration(t.duration_minutes, false)}
+                          {isDragging && dragDeltaDays !== 0 && (
+                            <span style={{ marginLeft: 5, fontWeight: 700, color: dragDeltaDays > 0 ? "#fff3bf" : "#b2f2bb" }}>
+                              ({dragDeltaDays > 0 ? `+${dragDeltaDays}` : dragDeltaDays} дн.)
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className="task-resize-handle"
+                          title="Потяните для изменения длительности задачи"
+                          onMouseDown={(e) => handleBarMouseDown(e, t)}
+                        />
                       </span>
                     )}
 
@@ -456,7 +539,7 @@ export function TimelinePanel() {
                 <div
                   className={`list-view-row ${isCritical ? "is-critical" : ""} ${isOverdue ? "is-overdue" : ""}`}
                   key={t.id}
-                  onClick={() => setTask(copy(t))}
+                  onClick={() => handleTaskClick(t)}
                   title="Нажмите для редактирования задачи"
                 >
                   <div className="col-task">

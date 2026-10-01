@@ -39,8 +39,8 @@ export function useHistoryPanel() {
         api<import("@/types").Result>(`/projects/${saved.id}/history/${changeId}/revert`, "POST")
       );
       if (res) {
-        accept(res, true);
-        showNotification(`Проект успешно откатан к версии v${version}`);
+        accept(res);
+        showNotification("Проект откачен");
       }
     } catch {
       showNotification("Ошибка отката к выбранной версии");

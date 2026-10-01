@@ -63,10 +63,18 @@ export function DraftBar() {
                   variant="light"
                   color="gray"
                   size="xs"
-                  onClick={openScenario}
+                  onClick={data.openCompareVariants}
                   leftSection={<GitBranch size={14} />}
                 >
-                  В варианты (Сценарии)
+                  Сравнить варианты
+                </Button>
+                <Button
+                  variant="light"
+                  color="blue"
+                  size="xs"
+                  onClick={data.openBriefDialog}
+                >
+                  Сообщить
                 </Button>
                 <Button
                   color="teal"

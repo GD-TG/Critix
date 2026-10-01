@@ -54,7 +54,7 @@ export function HistoryPanel() {
                       leftSection={<RotateCcw size={12} />}
                       onClick={() => handleRevert(item.id!, item.version)}
                     >
-                      Вернуть
+                      Вернуть как было
                     </Button>
                   )}
                 </Group>

@@ -224,6 +224,8 @@ export function useTimelinePanel() {
   // Drag-What-If интерактивный сдвиг длительности задачи на Gantt
   // -------------------------------------------------------------
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragDeltaDays, setDragDeltaDays] = useState<number>(0);
+  const hasDraggedRef = useRef(false);
   const dragRef = useRef<{
     active: boolean;
     taskId: string;
@@ -241,6 +243,7 @@ export function useTimelinePanel() {
       if (e.button !== 0 || task.duration_minutes === 0 || !draft) return;
       e.stopPropagation();
 
+      hasDraggedRef.current = false;
       dragRef.current = {
         active: false,
         taskId: task.id,
@@ -256,13 +259,17 @@ export function useTimelinePanel() {
 
         if (!dragRef.current.active && Math.abs(dx) > 5) {
           dragRef.current.active = true;
+          hasDraggedRef.current = true;
           setDraggingTaskId(dragRef.current.taskId);
         }
 
         if (dragRef.current.active) {
-          const containerWidth = chartContainerRef.current.clientWidth || 800;
+          const chartEl = chartContainerRef.current.querySelector(".task-chart") as HTMLElement | null;
+          const containerWidth = chartEl?.clientWidth || (chartContainerRef.current.clientWidth ? Math.max(300, chartContainerRef.current.clientWidth - 260) : 800);
           const dayWidthPx = containerWidth / Math.max(1, timelineDays.length);
           const deltaDays = Math.round(dx / Math.max(10, dayWidthPx));
+
+          setDragDeltaDays(deltaDays);
 
           if (deltaDays !== dragRef.current.lastDeltaDays) {
             dragRef.current.lastDeltaDays = deltaDays;
@@ -270,7 +277,13 @@ export function useTimelinePanel() {
 
             if (draft) {
               const updatedTasks = draft.tasks.map((t) =>
-                t.id === dragRef.current?.taskId ? { ...t, duration_minutes: newDuration } : t
+                t.id === dragRef.current?.taskId
+                  ? {
+                      ...t,
+                      duration_minutes: newDuration,
+                      ...(t.status === "done" ? { status: "in_progress" as const, actual_finish: null } : {}),
+                    }
+                  : t
               );
               change({ ...draft, tasks: updatedTasks });
             }
@@ -284,6 +297,10 @@ export function useTimelinePanel() {
         window.removeEventListener("keydown", onKeyDown);
         dragRef.current = null;
         setDraggingTaskId(null);
+        setDragDeltaDays(0);
+        setTimeout(() => {
+          hasDraggedRef.current = false;
+        }, 80);
       };
 
       const onKeyDown = (keyEvt: KeyboardEvent) => {
@@ -302,6 +319,14 @@ export function useTimelinePanel() {
     [draft, change, timelineDays.length]
   );
 
+  const handleTaskClick = useCallback(
+    (task: Task) => {
+      if (hasDraggedRef.current) return;
+      setTask(copy(task));
+    },
+    [setTask]
+  );
+
   return {
     draft,
     zone,
@@ -315,6 +340,7 @@ export function useTimelinePanel() {
     setDependencyVisible,
     rows,
     savedRows,
+    view,
     dirty,
     timelineStartMs,
     timelineTotalMs,
@@ -329,7 +355,9 @@ export function useTimelinePanel() {
     activeDepTaskId,
     setActiveDepTaskId,
     draggingTaskId,
+    dragDeltaDays,
     handleBarMouseDown,
+    handleTaskClick,
     chartContainerRef,
     getAvatarClass,
     getInitials,

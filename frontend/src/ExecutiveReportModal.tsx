@@ -133,7 +133,7 @@ export function ExecutiveReportModal({
     if (aiSummary) {
       const title = aiSource === "engine"
         ? "## 4. Расчетная сводка аналитического движка (AI недоступен)"
-        : "## 4. Стратегические рекомендации AI Copilot";
+        : "## 4. Стратегические рекомендации AI советника";
       lines.push("", "---", title, aiSummary);
     }
 

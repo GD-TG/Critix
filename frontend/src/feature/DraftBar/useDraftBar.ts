@@ -54,6 +54,16 @@ export function useDraftBar() {
     setShowScenarioModal(true);
   }, [setShowScenarioModal]);
 
+  const { setCompareVariantsOpened, setBriefDialogOpened } = useApp();
+
+  const openCompareVariants = useCallback(() => {
+    setCompareVariantsOpened(true);
+  }, [setCompareVariantsOpened]);
+
+  const openBriefDialog = useCallback(() => {
+    setBriefDialogOpened(true);
+  }, [setBriefDialogOpened]);
+
   return useMemo(() => {
     if (!dirty || !draft || !saved || !view) {
       return { isActive: false };
@@ -99,6 +109,8 @@ export function useDraftBar() {
       handleCancel,
       handleApply,
       openScenario,
+      openCompareVariants,
+      openBriefDialog,
     };
-  }, [dirty, draft, saved, view, preview, isApplying, handleCancel, handleApply, openScenario]);
+  }, [dirty, draft, saved, view, preview, isApplying, handleCancel, handleApply, openScenario, openCompareVariants, openBriefDialog]);
 }

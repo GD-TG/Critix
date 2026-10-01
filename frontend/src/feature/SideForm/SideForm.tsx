@@ -42,7 +42,6 @@ export function SideForm({ onScrollTo }: Props) {
         </span>
         <ChevronDown size={15} />
       </button>
-      <div className="workspace-caption">Нажмите, чтобы переключить</div>
 
       <nav className="main-nav">
         <button className={`nav-item ${activeView === "dashboard" ? "active" : ""}`} onClick={() => setActiveView("dashboard")}>

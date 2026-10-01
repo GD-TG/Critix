@@ -156,6 +156,34 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     saved && draft && JSON.stringify(saved.project) !== JSON.stringify(draft),
   );
 
+  // Auto-simulate draft changes to compute What-If cascade and preview in real-time
+  useEffect(() => {
+    if (!dirty || !saved?.id || !draft) {
+      setPreview(null);
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api<Result>(`/projects/${saved.id}/simulate`, "POST", {
+          version: saved.version,
+          project: draft,
+        });
+        if (isMounted && res) {
+          setPreview(res);
+        }
+      } catch {
+        // If simulation fails (e.g. cycle during edit), preview stays null
+      }
+    }, 120);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [dirty, saved?.id, saved?.version, draft]);
+
   // Auto-backup draft to localStorage when modified
   useEffect(() => {
     if (dirty && saved?.id && draft) {

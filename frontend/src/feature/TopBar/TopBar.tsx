@@ -182,7 +182,7 @@ export function TopBar() {
                   <FileText size={13} style={{ marginRight: 4 }} /> Отчет
                 </Button>
                 <Button size="xs" variant="light" onClick={() => setActiveView("ai")}>
-                  <Sparkles size={13} style={{ marginRight: 4 }} /> AI Copilot
+                  <Sparkles size={13} style={{ marginRight: 4 }} /> AI советник
                 </Button>
               </Group>
             </Stack>

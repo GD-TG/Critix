@@ -1,10 +1,16 @@
-import { Menu, Text } from "@mantine/core";
+import { Badge, Button, Group, Menu, Text } from "@mantine/core";
 import {
+  AlertCircle,
+  AlertTriangle,
   BookmarkCheck,
+  CheckCircle2,
   ChevronDown,
   Download,
   FileJson,
   FileText,
+  FlaskConical,
+  Package,
+  ShieldAlert,
   SlidersHorizontal,
   Sparkles,
   Upload,
@@ -19,6 +25,17 @@ export function DashboardHeader() {
     zone,
     dirty,
     preview,
+    health,
+    healthText,
+    finishText,
+    bufferText,
+    isExceeded,
+    deadlineText,
+    criticalCount,
+    hasDeliveries,
+    deliveriesCount,
+    openDeliveriesModal,
+    openDecisionLab,
     handleSaveAsBaseline,
     exportProjectToJson,
     exportTasksToCsv,
@@ -27,32 +44,117 @@ export function DashboardHeader() {
     setExecutiveReportModal,
     setJsonImportModal,
     setImportModal,
+    setEventDialogOpened,
   } = useDashboardHeader();
 
+  const healthColor = health === "red" ? "red" : health === "orange" ? "orange" : "teal";
+  const HealthIcon = health === "red" ? AlertCircle : health === "orange" ? AlertTriangle : CheckCircle2;
+
   return (
-    <section className="page-heading">
-      <div>
-        <div className="eyebrow">
-          <span className="status-dot" />
-          {view?.analysis.deadline_exceeded ? "Есть превышение" : "В работе"}
-          <span className="heading-separator">·</span>
-          обновлено в {lastUpdated.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-        </div>
-        <h1>{draft?.name || "Создайте или выберите проект"}</h1>
-        <p>План, команда и последствия изменений — на одном экране. Часовой пояс: {zone}.</p>
-        {dirty && !preview && <Text c="orange" size="sm">Черновик изменён. Даты, риски, отчёт и AI относятся к сохранённому плану до проверки последствий.</Text>}
+    <section className="page-heading" style={{ flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+      <div style={{ minWidth: 280, flex: "1 1 auto" }}>
+        <Group gap="xs" align="center" wrap="nowrap">
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}>
+            {draft?.name || "Создайте или выберите проект"}
+          </h1>
+          {draft && (
+            <Badge
+              variant="light"
+              color={healthColor}
+              size="sm"
+              leftSection={<HealthIcon size={13} />}
+            >
+              {healthText}
+            </Badge>
+          )}
+        </Group>
+
+        {draft && view && (
+          <Group gap="xs" mt={4} wrap="wrap" style={{ fontSize: 12, color: "var(--muted)" }}>
+            <span>
+              <strong>Финиш:</strong> {finishText}
+            </span>
+            <span>·</span>
+            <span>
+              <strong>Дедлайн:</strong> {deadlineText}
+            </span>
+            <span>·</span>
+            <span style={{ fontWeight: 600, color: isExceeded ? "var(--mantine-color-red-6)" : "var(--mantine-color-teal-6)" }}>
+              {bufferText}
+            </span>
+            {criticalCount > 0 && (
+              <>
+                <span>·</span>
+                <span style={{ color: "var(--mantine-color-red-6)", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <ShieldAlert size={12} /> {criticalCount} на крит. пути
+                </span>
+              </>
+            )}
+            <span>·</span>
+            <span>{zone}</span>
+          </Group>
+        )}
+
+        {dirty && !preview && (
+          <Text c="orange" size="xs" mt={2} fw={500}>
+            Черновик изменён. Проверьте последствия изменений в симуляторе.
+          </Text>
+        )}
       </div>
 
-      <div className="heading-actions">
-        <button className="secondary-button" disabled={!draft?.tasks.length} onClick={() => {setSimResult(null); setShowScenarioModal(true);}}>
-          <Sparkles size={14} /> Симуляция (What-If)
-        </button>
+      <div className="heading-actions" style={{ flexWrap: "nowrap", gap: 8 }}>
+        <Button
+          size="xs"
+          variant="light"
+          color="orange"
+          disabled={!draft?.tasks.length}
+          onClick={() => setEventDialogOpened(true)}
+          leftSection={<Sparkles size={14} />}
+        >
+          Что случилось?
+        </Button>
+
+        <Button
+          size="xs"
+          variant="default"
+          disabled={!draft?.tasks.length}
+          onClick={() => {
+            setSimResult(null);
+            setShowScenarioModal(true);
+          }}
+          leftSection={<Sparkles size={14} />}
+        >
+          Симуляция (What-If)
+        </Button>
+
+        <Button
+          size="xs"
+          variant="subtle"
+          color="gray"
+          onClick={openDecisionLab}
+          leftSection={<FlaskConical size={14} />}
+        >
+          Лаборатория
+        </Button>
+
+        {hasDeliveries && (
+          <Button
+            size="xs"
+            variant="light"
+            color="indigo"
+            onClick={openDeliveriesModal}
+            leftSection={<Package size={14} />}
+          >
+            Поставки ({deliveriesCount})
+          </Button>
+        )}
+
         {draft && (
           <Menu shadow="md" width={240} position="bottom-end">
             <Menu.Target>
-              <button className="secondary-button">
-                <SlidersHorizontal size={14} /> Действия и экспорт <ChevronDown size={12} />
-              </button>
+              <Button size="xs" variant="default" rightSection={<ChevronDown size={12} />} leftSection={<SlidersHorizontal size={14} />}>
+                Действия
+              </Button>
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Label>Отчеты и управление</Menu.Label>

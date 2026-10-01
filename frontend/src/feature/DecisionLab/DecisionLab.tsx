@@ -74,12 +74,12 @@ export function DecisionLab({
     if (opened && draft && draft.tasks.length > 0) {
       const initialTask =
         decisionLabTaskId ||
-        draft.tasks.find((t) => t.status !== "done" && view?.analysis.tasks.find((r) => r.id === t.id)?.critical)?.id ||
+        draft.tasks.find((t) => t.status !== "done" && (saved || view)?.analysis.tasks.find((r) => r.id === t.id)?.critical)?.id ||
         draft.tasks.find((t) => t.status !== "done")?.id ||
         draft.tasks[0].id;
       setSelectedTaskId(initialTask);
     }
-  }, [opened, decisionLabTaskId, draft]);
+  }, [opened, decisionLabTaskId, draft, saved, view]);
 
   // Запуск симуляции на реальном CPM-графе
   useEffect(() => {
@@ -96,7 +96,8 @@ export function DecisionLab({
             t.id === selectedTaskId
               ? {
                   ...t,
-                  duration_minutes: t.duration_minutes + Math.round((delayDays + stressOffset) * 480),
+                  duration_minutes: Math.max(480, t.duration_minutes + Math.round((delayDays + stressOffset) * 480)),
+                  ...(t.status === "done" ? { status: "in_progress" as const, actual_finish: null } : {}),
                 }
               : t
           ),
@@ -161,7 +162,7 @@ export function DecisionLab({
 
   // Данные выбранной задачи
   const activeTask = draft.tasks.find((t) => t.id === selectedTaskId);
-  const activeTaskRow = view?.analysis.tasks.find((r) => r.id === selectedTaskId);
+  const activeTaskRow = saved?.analysis.tasks.find((r) => r.id === selectedTaskId) || view?.analysis.tasks.find((r) => r.id === selectedTaskId);
   const isCritical = Boolean(activeTaskRow?.critical);
   const originalSlackMinutes = activeTaskRow?.slack_minutes ?? 0;
   const originalSlackDays = Math.round(originalSlackMinutes / 480);
@@ -204,13 +205,26 @@ export function DecisionLab({
     const newFinishStr = shortDate(newFinishIso);
 
     if (finishDeltaDays <= 0) {
+      if (originalSlackDays >= delayDays && originalSlackDays > 0) {
+        return `Уважаемый партнер!
+
+Информируем о статусе выполнения проекта «${draft.name}».
+По задаче «${taskName}» зафиксировано смещение на ${delayDays} дн.
+
+Благодаря наличию технологического резерва времени (${originalSlackDays} дн.), данная задержка полностью укладывается в график.
+Плановая дата сдачи проекта (${deadlineStr}) остается неизменной. Дополнительных финансовых расходов и срыва дедлайна нет.
+
+С уважением,
+Руководитель проекта Critix`;
+      }
+
       return `Уважаемый партнер!
 
 Информируем о статусе выполнения проекта «${draft.name}».
 По задаче «${taskName}» зафиксировано смещение на ${delayDays} дн.
 
-Благодаря наличию технологического резерва времени (${originalSlackDays} дн.), данная задержка полностью поглощена графиком.
-Плановая дата сдачи проекта (${deadlineStr}) остается неизменной. Дополнительных финансовых расходов и срыва дедлайна нет.
+Собственный резерв времени задачи исчерпан, однако текущая дата сдачи проекта (${deadlineStr}) удерживается за счет параллельных веток графика.
+Задача взята под усиленный контроль руководителя для предотвращения выхода на критический путь.
 
 С уважением,
 Руководитель проекта Critix`;
@@ -283,12 +297,13 @@ export function DecisionLab({
                 value={selectedTaskId}
                 onChange={(val) => val && setSelectedTaskId(val)}
                 data={draft.tasks.map((t) => {
-                  const r = view?.analysis.tasks.find((x) => x.id === t.id);
+                  const r = saved?.analysis.tasks.find((x) => x.id === t.id) || view?.analysis.tasks.find((x) => x.id === t.id);
                   const crit = r?.critical;
                   const slack = Math.round((r?.slack_minutes ?? 0) / 480);
+                  const statusStr = t.status === "done" ? " [Завершена]" : t.status === "in_progress" ? " [В работе]" : " [План]";
                   return {
                     value: t.id,
-                    label: `${t.name} (${crit ? "Критическая" : `Резерв: ${slack} дн.`})`,
+                    label: `${t.name}${statusStr} (${crit ? "Критическая" : `Резерв: ${slack} дн.`})`,
                   };
                 })}
               />
@@ -366,28 +381,51 @@ export function DecisionLab({
         {simResult && (
           <Stack gap="md">
             {finishDeltaDays <= 0 ? (
-              /* СЛУЧАЙ А: Задержка безопасна, поглощена резервом */
-              <Paper withBorder p="md" radius="md" bg="var(--mantine-color-teal-0)" style={{ borderColor: "var(--mantine-color-teal-4)" }}>
-                <Group align="flex-start" wrap="nowrap">
-                  <ThemeIcon color="teal" size="lg" radius="md">
-                    <CheckCircle2 size={24} />
-                  </ThemeIcon>
-                  <Stack gap={4}>
-                    <Text fw={700} size="md" c="teal.9">
-                      Задержка безопасна: дата сдачи проекта НЕ изменится!
-                    </Text>
-                    <Text size="sm">
-                      У задачи «{activeTask?.name}» был свободный резерв времени ({originalSlackDays} дн.). Задержка на {delayDays} дн. полностью поглощена запасом.
-                      Проект финиширует в срок: <b>{shortDate(newFinishIso)}</b>.
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Финансовые штрафы: <b>0 ₽</b> · Оставшийся резерв задачи: {Math.max(0, originalSlackDays - delayDays)} дн.
-                    </Text>
-                  </Stack>
-                </Group>
-              </Paper>
+              originalSlackDays >= delayDays && originalSlackDays > 0 ? (
+                /* СЛУЧАЙ А: Задержка безопасна, полностью укладывается в технологический резерв задачи */
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-teal-0)" style={{ borderColor: "var(--mantine-color-teal-4)" }}>
+                  <Group align="flex-start" wrap="nowrap">
+                    <ThemeIcon color="teal" size="lg" radius="md">
+                      <CheckCircle2 size={24} />
+                    </ThemeIcon>
+                    <Stack gap={4}>
+                      <Text fw={700} size="md" c="teal.9">
+                        Задержка безопасна: дата сдачи проекта НЕ изменится!
+                      </Text>
+                      <Text size="sm">
+                        У задачи «{activeTask?.name}» есть свободный резерв времени ({originalSlackDays} дн.). Задержка на {delayDays} дн. полностью укладывается в запас.
+                        Проект финиширует в срок: <b>{shortDate(newFinishIso)}</b>.
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Финансовые штрафы: <b>0 ₽</b> · Оставшийся резерв задачи: {Math.max(0, originalSlackDays - delayDays)} дн.
+                      </Text>
+                    </Stack>
+                  </Group>
+                </Paper>
+              ) : (
+                /* СЛУЧАЙ Б: Резерв задачи исчерпан, финиш пока удерживается параллельной цепочкой */
+                <Paper withBorder p="md" radius="md" bg="var(--mantine-color-yellow-0)" style={{ borderColor: "var(--mantine-color-yellow-5)" }}>
+                  <Group align="flex-start" wrap="nowrap">
+                    <ThemeIcon color="yellow" size="lg" radius="md">
+                      <AlertTriangle size={24} />
+                    </ThemeIcon>
+                    <Stack gap={4}>
+                      <Text fw={700} size="md" c="yellow.9">
+                        Внимание: технологический резерв задачи исчерпан!
+                      </Text>
+                      <Text size="sm">
+                        Собственный запас времени задачи «{activeTask?.name}» ({originalSlackDays} дн.) исчерпан задержкой на {delayDays} дн.
+                        Общая дата сдачи проекта (<b>{shortDate(newFinishIso)}</b>) пока удерживается за счет параллельной критической цепочки работ. Задача «{activeTask?.name}» перешла в критическую зону без права на дальнейшие задержки.
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Штрафы на текущий момент: <b>0 ₽</b> (находится на грани срыва дедлайна).
+                      </Text>
+                    </Stack>
+                  </Group>
+                </Paper>
+              )
             ) : (
-              /* СЛУЧАЙ Б: Задержка ломает критический путь */
+              /* СЛУЧАЙ В: Задержка ломает критический путь */
               <Paper withBorder p="md" radius="md" bg="var(--mantine-color-red-0)" style={{ borderColor: "var(--mantine-color-red-4)" }}>
                 <Group align="flex-start" wrap="nowrap">
                   <ThemeIcon color="red" size="lg" radius="md">

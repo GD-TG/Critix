@@ -48,6 +48,13 @@ interface UiContextValue {
   setDecisionLabTaskId: (id: string | null) => void;
   openDecisionLabForTask: (taskId?: string) => void;
 
+  eventDialogOpened: boolean;
+  setEventDialogOpened: (v: boolean) => void;
+  compareVariantsOpened: boolean;
+  setCompareVariantsOpened: (v: boolean) => void;
+  briefDialogOpened: boolean;
+  setBriefDialogOpened: (v: boolean) => void;
+
   deliveriesModalOpened: boolean;
   setDeliveriesModalOpened: (v: boolean) => void;
 
@@ -80,6 +87,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const [showScenarioModal, setShowScenarioModal] = useState(false);
   const [decisionLabOpened, setDecisionLabOpened] = useState(false);
   const [decisionLabTaskId, setDecisionLabTaskId] = useState<string | null>(null);
+  const [eventDialogOpened, setEventDialogOpened] = useState(false);
+  const [compareVariantsOpened, setCompareVariantsOpened] = useState(false);
+  const [briefDialogOpened, setBriefDialogOpened] = useState(false);
   const [deliveriesModalOpened, setDeliveriesModalOpened] = useState(false);
   const [mobileNavOpened, setMobileNavOpened] = useState(false);
 
@@ -130,6 +140,9 @@ export function UiProvider({ children }: { children: ReactNode }) {
     decisionLabOpened, setDecisionLabOpened,
     decisionLabTaskId, setDecisionLabTaskId,
     openDecisionLabForTask,
+    eventDialogOpened, setEventDialogOpened,
+    compareVariantsOpened, setCompareVariantsOpened,
+    briefDialogOpened, setBriefDialogOpened,
     deliveriesModalOpened, setDeliveriesModalOpened,
     mobileNavOpened, setMobileNavOpened,
     rescheduleOverdue,
