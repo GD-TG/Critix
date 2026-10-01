@@ -9,7 +9,7 @@ export interface BriefDialogProps {
 }
 
 export function BriefDialog({ opened, onClose }: BriefDialogProps) {
-  const { saved, preview, draft } = useApp();
+  const { saved, preview, draft, costPerDay } = useApp();
 
   let text = "";
 
@@ -29,7 +29,7 @@ export function BriefDialog({ opened, onClose }: BriefDialogProps) {
     };
 
     const previewLateDays = getLateDays(previewFinishDate);
-    const previewPenalty = previewLateDays * 35000;
+    const previewPenalty = previewLateDays * costPerDay;
 
     const newDateText = formatShortDate(preview.analysis.finish, zone);
 

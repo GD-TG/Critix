@@ -4,6 +4,7 @@ import {
   Divider,
   Drawer,
   Group,
+  NumberInput,
   Select,
   Stack,
   Tabs,
@@ -14,6 +15,7 @@ import { CalendarEditor } from "@/CalendarEditor";
 import { ProjectDateInput } from "@/ProjectDateInput";
 import { TIMEZONE_OPTIONS } from "@/shared";
 import { useSettingsDrawer } from "@/feature/SettingsDrawer/useSettingsDrawer";
+import { useUi } from "@/context/UiContext";
 
 export function SettingsDrawer() {
   const {
@@ -27,6 +29,8 @@ export function SettingsDrawer() {
     handleSaveBaseline,
     goToTeam,
   } = useSettingsDrawer();
+
+  const { costPerDay, setCostPerDay } = useUi();
 
   return (
     <Drawer
@@ -73,6 +77,17 @@ export function SettingsDrawer() {
                   onChange={(value) => change({ ...draft, deadline: value })}
                 />
               </Group>
+
+              <NumberInput
+                label="Ставка неустойки / простоя (₽ в сутки)"
+                description="Используется для оценки финансового ущерба при срыве дедлайна и в деловых письмах заказчику"
+                value={costPerDay}
+                onChange={(v) => setCostPerDay(Number(v) || 0)}
+                step={5000}
+                min={0}
+                thousandSeparator=" "
+                suffix=" ₽/сутки"
+              />
 
               <Divider my="sm" />
 

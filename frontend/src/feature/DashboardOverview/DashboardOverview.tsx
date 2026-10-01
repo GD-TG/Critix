@@ -5,7 +5,9 @@ import {
   Button,
   Card,
   Group,
+  NumberInput,
   Paper,
+  Popover,
   Progress,
   SimpleGrid,
   Stack,
@@ -47,6 +49,8 @@ export function DashboardOverview() {
     setActiveView,
     openDecisionLabForTask,
     setEventDialogOpened,
+    costPerDay,
+    setCostPerDay,
   } = useApp();
 
   const view = preview || saved;
@@ -101,7 +105,6 @@ export function DashboardOverview() {
   }, [hasExceeded, draft, deadlineDate, criticalTasks, rows, view?.changes?.downstream_task_ids]);
 
   // Финансовый риск (штрафы за простой)
-  const costPerDay = 35000;
   const financialRisk = lateDays > 0 ? lateDays * costPerDay : 0;
 
   // Анализ загрузки команды
@@ -304,16 +307,78 @@ export function DashboardOverview() {
             <Text size="xs" fw={700} c="dimmed">
               ФИНАНСОВЫЙ РИСК (ШТРАФЫ)
             </Text>
-            <ThemeIcon color={hasExceeded ? "red" : "blue"} size="sm" variant="light">
-              <Coins size={14} />
-            </ThemeIcon>
+            <Popover width={280} position="bottom-end" shadow="md">
+              <Popover.Target>
+                <button
+                  type="button"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                  title="Изменить ставку простоя"
+                >
+                  <ThemeIcon color={hasExceeded ? "red" : "blue"} size="sm" variant="light">
+                    <Coins size={14} />
+                  </ThemeIcon>
+                </button>
+              </Popover.Target>
+              <Popover.Dropdown p="xs">
+                <Text size="xs" fw={700} mb={4}>
+                  Ставка штрафа / простоя
+                </Text>
+                <Text size="11px" c="dimmed" mb={8}>
+                  Стоимость 1 дня задержки по вашему контракту:
+                </Text>
+                <NumberInput
+                  size="xs"
+                  value={costPerDay}
+                  onChange={(v) => setCostPerDay(Number(v) || 0)}
+                  step={5000}
+                  min={0}
+                  thousandSeparator=" "
+                  suffix=" ₽/сутки"
+                />
+              </Popover.Dropdown>
+            </Popover>
           </Group>
           <Text size="xl" fw={700} c={hasExceeded ? "red.7" : "gray.7"}>
             {financialRisk.toLocaleString("ru-RU")} ₽
           </Text>
-          <Text size="xs" c="dimmed">
-            Расчет при ставке 35 000 ₽ / сутки простоя
-          </Text>
+          <Group gap={6} justify="space-between">
+            <Text size="xs" c="dimmed">
+              Ставка: {costPerDay.toLocaleString("ru-RU")} ₽ / сутки
+            </Text>
+            <Popover width={280} position="bottom-end" shadow="md">
+              <Popover.Target>
+                <Text
+                  size="xs"
+                  c="blue"
+                  style={{ cursor: "pointer", textDecoration: "underline" }}
+                >
+                  изменить
+                </Text>
+              </Popover.Target>
+              <Popover.Dropdown p="xs">
+                <Text size="xs" fw={700} mb={4}>
+                  Ставка штрафа / простоя
+                </Text>
+                <Text size="11px" c="dimmed" mb={8}>
+                  Стоимость 1 дня задержки по вашему контракту:
+                </Text>
+                <NumberInput
+                  size="xs"
+                  value={costPerDay}
+                  onChange={(v) => setCostPerDay(Number(v) || 0)}
+                  step={5000}
+                  min={0}
+                  thousandSeparator=" "
+                  suffix=" ₽/сутки"
+                />
+              </Popover.Dropdown>
+            </Popover>
+          </Group>
         </Card>
 
         <Card withBorder p="sm" radius="md">

@@ -52,7 +52,7 @@ export function DecisionLab({
   onClose: () => void;
   onLoadDemo?: () => Promise<void>;
 }) {
-  const { draft, saved, preview, decisionLabTaskId, change, showNotification } = useApp();
+  const { draft, saved, preview, decisionLabTaskId, change, showNotification, costPerDay, setCostPerDay } = useApp();
   const view = preview || saved;
   const zone = getZone(draft, saved);
   const shortDate = (iso?: string) => (iso ? formatShortDate(iso, zone) : "—");
@@ -60,7 +60,6 @@ export function DecisionLab({
   // Состояние симуляции
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [delayDays, setDelayDays] = useState<number>(3);
-  const [costPerDay, setCostPerDay] = useState<number>(35000);
   const [stressOffset, setStressOffset] = useState<number>(0);
   const [letterOpened, setLetterOpened] = useState<boolean>(false);
   const [selectedStrategy, setSelectedStrategy] = useState<string>("descope");

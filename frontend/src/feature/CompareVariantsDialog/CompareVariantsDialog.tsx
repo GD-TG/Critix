@@ -8,7 +8,7 @@ export interface CompareVariantsDialogProps {
 }
 
 export function CompareVariantsDialog({ opened, onClose }: CompareVariantsDialogProps) {
-  const { saved, preview, draft } = useApp();
+  const { saved, preview, draft, costPerDay } = useApp();
 
   if (!saved || !preview || !draft) {
     return (
@@ -44,8 +44,8 @@ export function CompareVariantsDialog({ opened, onClose }: CompareVariantsDialog
   const savedLateDays = getLateDays(savedFinishDate);
   const previewLateDays = getLateDays(previewFinishDate);
 
-  const savedPenalty = savedLateDays * 35000;
-  const previewPenalty = previewLateDays * 35000;
+  const savedPenalty = savedLateDays * costPerDay;
+  const previewPenalty = previewLateDays * costPerDay;
 
   const savedCriticalTasksCount = saved.analysis.tasks.filter((t) => t.critical).length;
   const previewCriticalTasksCount = preview.analysis.tasks.filter((t) => t.critical).length;

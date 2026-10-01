@@ -18,6 +18,8 @@ interface UiContextValue {
 
   toast: string;
   showNotification: (msg: string) => void;
+  costPerDay: number;
+  setCostPerDay: (v: number) => void;
 
   activeView: View;
   setActiveView: (view: View) => void;
@@ -94,6 +96,24 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const [deliveriesModalOpened, setDeliveriesModalOpened] = useState(false);
   const [mobileNavOpened, setMobileNavOpened] = useState(false);
 
+  const [costPerDay, setCostPerDayState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("critix_cost_per_day");
+      return saved ? Number(saved) : 35000;
+    } catch {
+      return 35000;
+    }
+  });
+
+  const setCostPerDay = useCallback((val: number) => {
+    setCostPerDayState(val);
+    try {
+      localStorage.setItem("critix_cost_per_day", String(val));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const openDecisionLabForTask = useCallback((taskId?: string) => {
     setDecisionLabTaskId(taskId || null);
     setDecisionLabOpened(true);
@@ -144,6 +164,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const value: UiContextValue = {
     colorScheme, toggleTheme,
     toast, showNotification,
+    costPerDay, setCostPerDay,
     activeView, setActiveView,
     newProjectModal, setNewProjectModal,
     projectManageModal, setProjectManageModal,
