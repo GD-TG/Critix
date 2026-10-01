@@ -30,7 +30,7 @@ interface ProjectContextValue {
   aiReport: { available: boolean; source: "llm" | "engine"; text: string } | null;
   setAiReport: (v: { available: boolean; source: "llm" | "engine"; text: string } | null) => void;
   list: () => Promise<Array<{ id: string; name: string }>>;
-  accept: (result: Result) => void;
+  accept: (result: Result, forceReset?: boolean) => void;
   change: (p: Project) => void;
   run: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
   clearProject: () => void;
@@ -76,23 +76,27 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     return data;
   }, [logged]);
 
-  const accept = useCallback((result: Result) => {
+  const accept = useCallback((result: Result, forceReset?: boolean) => {
     setSaved(result);
     let initialDraft = copy(result.project);
-    try {
-      const backup = readBackup(localStorage, result.id);
-      if (
-        backup &&
-        JSON.stringify(backup.draft) !== JSON.stringify(result.project)
-      ) {
-        // User has unsaved edits in backup; preserve them so work is never lost.
-        // Even if server baseVersion changed, user can review diff or cancel.
-        initialDraft = backup.draft;
-      } else {
+    if (forceReset) {
+      clearBackup(localStorage, result.id);
+    } else {
+      try {
+        const backup = readBackup(localStorage, result.id);
+        if (
+          backup &&
+          JSON.stringify(backup.draft) !== JSON.stringify(result.project)
+        ) {
+          // User has unsaved edits in backup; preserve them so work is never lost.
+          // Even if server baseVersion changed, user can review diff or cancel.
+          initialDraft = backup.draft;
+        } else {
+          clearBackup(localStorage, result.id);
+        }
+      } catch {
         clearBackup(localStorage, result.id);
       }
-    } catch {
-      clearBackup(localStorage, result.id);
     }
     setDraft(initialDraft);
     setPreview(null);

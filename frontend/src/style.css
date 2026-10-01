@@ -1564,6 +1564,96 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   border-top: 1px dashed #c6ccd6;
 }
 
+/* Резервы времени: Float Tails */
+.float-tail {
+  position: absolute;
+  top: 22px;
+  height: 2px;
+  z-index: 1;
+  border-top: 2px dashed;
+  pointer-events: auto;
+}
+.float-tail.generous {
+  border-color: #3eac7d;
+  opacity: 0.85;
+}
+.float-tail.tight {
+  border-color: #e5ad5b;
+  opacity: 0.9;
+}
+.float-tail-cap {
+  position: absolute;
+  right: 0;
+  top: -4px;
+  width: 2px;
+  height: 10px;
+  border-right: 2px solid;
+}
+.float-tail.generous .float-tail-cap { border-color: #3eac7d; }
+.float-tail.tight .float-tail-cap { border-color: #e5ad5b; }
+
+/* Призрачные полосы: Ghost Bars ("Было") */
+.ghost-bar {
+  position: absolute;
+  top: 14px;
+  height: 17px;
+  border-radius: 5px;
+  border: 1.5px dashed var(--muted);
+  background: rgba(140, 150, 175, 0.18);
+  z-index: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
+  font-size: 8px;
+  color: var(--muted);
+  font-weight: 600;
+  overflow: hidden;
+}
+
+/* Интерактивный Drag & Highlight */
+.task-bar.is-draggable {
+  cursor: grab;
+  user-select: none;
+}
+.task-bar.is-dragging {
+  cursor: grabbing !important;
+  opacity: 0.88;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  z-index: 10 !important;
+}
+.task-bar.is-highlighted {
+  filter: brightness(1.2);
+  box-shadow: 0 0 0 2px var(--brand), 0 0 14px rgba(210, 10, 46, 0.5) !important;
+  z-index: 5 !important;
+}
+
+/* Бейдж зависимостей 🔗 N */
+.dep-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+[data-mantine-color-scheme="dark"] .dep-badge-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: #444;
+}
+.dep-badge-btn:hover {
+  background: rgba(210, 10, 46, 0.12);
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+
 .today-marker {
   position: absolute;
   top: 0;

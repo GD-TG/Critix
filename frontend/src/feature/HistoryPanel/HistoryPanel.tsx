@@ -1,9 +1,10 @@
-import { Badge, Box, Group, ScrollArea, Stack, Text } from "@mantine/core";
+import { Badge, Box, Button, Group, ScrollArea, Stack, Text } from "@mantine/core";
+import { RotateCcw } from "lucide-react";
 import { formatCalendarShift } from "@/shared";
 import { useHistoryPanel } from "./useHistoryPanel";
 
 export function HistoryPanel() {
-  const { history, historyError, date } = useHistoryPanel();
+  const { history, historyError, date, handleRevert, revertingId, currentVersion } = useHistoryPanel();
 
   return (
     <article className="panel activity-panel" id="tasks">
@@ -44,6 +45,18 @@ export function HistoryPanel() {
                   <Text size="xs" c="dimmed">
                     {date(item.created_at)}
                   </Text>
+                  {item.id && currentVersion !== undefined && item.version !== currentVersion && (
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      color="gray"
+                      loading={revertingId === item.id}
+                      leftSection={<RotateCcw size={12} />}
+                      onClick={() => handleRevert(item.id!, item.version)}
+                    >
+                      Вернуть
+                    </Button>
+                  )}
                 </Group>
                 {typeof item.finish_delta_minutes === "number" && item.finish_delta_minutes !== 0 && (
                   <Badge

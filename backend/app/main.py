@@ -23,7 +23,7 @@ from app.db import session, SessionLocal
 from app.demo import demo, delivery_demo
 from app.engine.analysis import analyze
 from app.engine.calendar import PlanningError
-from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse, RecommendationRequest, StrictModel
+from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse, RecommendationRequest, StrictModel, EventCompile
 
 from contextlib import asynccontextmanager
 from app.schemas import DeliveryEvent, ApplyDeliveryEvent
@@ -422,6 +422,11 @@ def simulate(project_id: UUID, body: SaveProject, db=Depends(project_session)):
     return service.update(db, project_id, body, simulate=True)
 
 
+@app.post("/api/projects/{project_id}/compile-event", dependencies=calculated)
+def compile_project_event(project_id: UUID, body: EventCompile, db=Depends(project_session)):
+    return service.compile_event(db, project_id, body)
+
+
 ai_concurrency = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENT_AI", "2")))
 ai_user_quotas = {}
 ai_quota_lock = Lock()
@@ -548,6 +553,11 @@ def recommendations(project_id: UUID, body: RecommendationRequest, db=Depends(pr
 @app.get("/api/projects/{project_id}/history", dependencies=auth)
 def project_history(project_id: UUID, db=Depends(project_session)):
     return service.get_history(db, project_id)
+
+
+@app.post("/api/projects/{project_id}/history/{change_id}/revert", dependencies=calculated)
+def revert_project_history(project_id: UUID, change_id: UUID, db=Depends(project_session)):
+    return service.revert_history(db, project_id, change_id)
 
 
 def scenario_calculation_slot(include_analysis: bool = False):

@@ -5,13 +5,14 @@ import { formatDateTime, getZone } from "@/shared";
 import type { HistoryEntry } from "@/types";
 
 export function useHistoryPanel() {
-  const { draft, saved } = useApp();
+  const { draft, saved, accept, showNotification, run } = useApp();
 
   const zone = getZone(draft, saved);
   const date = (iso?: string) => (iso ? formatDateTime(iso, zone) : "—");
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyError, setHistoryError] = useState("");
+  const [revertingId, setRevertingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,5 +31,23 @@ export function useHistoryPanel() {
     };
   }, [saved?.id, saved?.version]);
 
-  return { history, historyError, date };
+  const handleRevert = async (changeId: string, version: number) => {
+    if (!saved) return;
+    setRevertingId(changeId);
+    try {
+      const res = await run(() =>
+        api<import("@/types").Result>(`/projects/${saved.id}/history/${changeId}/revert`, "POST")
+      );
+      if (res) {
+        accept(res, true);
+        showNotification(`Проект успешно откатан к версии v${version}`);
+      }
+    } catch {
+      showNotification("Ошибка отката к выбранной версии");
+    } finally {
+      setRevertingId(null);
+    }
+  };
+
+  return { history, historyError, date, handleRevert, revertingId, currentVersion: saved?.version };
 }

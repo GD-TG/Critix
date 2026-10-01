@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   copy,
@@ -12,6 +12,7 @@ import {
   priorityLabels,
   statusLabels,
 } from "@/shared";
+import type { Task } from "@/types";
 
 export interface TimelineDay {
   key: string;
@@ -28,7 +29,7 @@ export interface TimelineDay {
 const WEEKDAYS = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 
 export function useTimelinePanel() {
-  const { draft, saved, preview, setTask, setActiveView } = useApp();
+  const { draft, saved, preview, setTask, setActiveView, dirty, change } = useApp();
 
   const view = preview || saved;
   const zone = getZone(draft, saved);
@@ -38,7 +39,19 @@ export function useTimelinePanel() {
   const [timelineMode, setTimelineMode] = useState<"timeline" | "list">("timeline");
   const [dependencyVisible, setDependencyVisible] = useState(true);
 
-  const rows = new Map((view?.analysis.tasks || []).map((r) => [r.id, r]));
+  // Ховер и поповер связей
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
+  const [activeDepTaskId, setActiveDepTaskId] = useState<string | null>(null);
+
+  const rows = useMemo(
+    () => new Map((view?.analysis.tasks || []).map((r) => [r.id, r])),
+    [view?.analysis.tasks]
+  );
+
+  const savedRows = useMemo(
+    () => new Map((saved?.analysis.tasks || []).map((r) => [r.id, r])),
+    [saved?.analysis.tasks]
+  );
 
   // Вычисляем строгие календарные границы таймлайна (по полуночам)
   const { timelineStartMs, timelineEndMs, timelineTotalMs, timelineDays, timelineMonths } = useMemo(() => {
@@ -150,6 +163,145 @@ export function useTimelinePanel() {
     return map;
   }, [draft?.dependencies]);
 
+  // Детальная карта связей для поповера
+  const dependenciesDetailed = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        predecessors: Array<{ id: string; name: string; kind: string; lag: number; isCritical: boolean }>;
+        successors: Array<{ id: string; name: string; kind: string; lag: number; isCritical: boolean }>;
+      }
+    >();
+
+    if (!draft) return map;
+
+    const taskMap = new Map(draft.tasks.map((t) => [t.id, t]));
+    const analysisMap = rows;
+
+    for (const t of draft.tasks) {
+      map.set(t.id, { predecessors: [], successors: [] });
+    }
+
+    for (const d of draft.dependencies || []) {
+      const predTask = taskMap.get(d.predecessor_id);
+      const succTask = taskMap.get(d.successor_id);
+      const predAnalysis = analysisMap.get(d.predecessor_id);
+      const succAnalysis = analysisMap.get(d.successor_id);
+
+      const isCriticalLink = Boolean(predAnalysis?.critical && succAnalysis?.critical);
+
+      if (succTask) {
+        const entry = map.get(d.successor_id);
+        if (entry) {
+          entry.predecessors.push({
+            id: d.predecessor_id,
+            name: predTask?.name || d.predecessor_id,
+            kind: d.kind,
+            lag: d.lag_minutes,
+            isCritical: isCriticalLink,
+          });
+        }
+      }
+
+      if (predTask) {
+        const entry = map.get(d.predecessor_id);
+        if (entry) {
+          entry.successors.push({
+            id: d.successor_id,
+            name: succTask?.name || d.successor_id,
+            kind: d.kind,
+            lag: d.lag_minutes,
+            isCritical: isCriticalLink,
+          });
+        }
+      }
+    }
+
+    return map;
+  }, [draft, rows]);
+
+  // -------------------------------------------------------------
+  // Drag-What-If интерактивный сдвиг длительности задачи на Gantt
+  // -------------------------------------------------------------
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const dragRef = useRef<{
+    active: boolean;
+    taskId: string;
+    startX: number;
+    origDuration: number;
+    origDraft: typeof draft;
+    lastDeltaDays: number;
+  } | null>(null);
+
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleBarMouseDown = useCallback(
+    (e: React.MouseEvent, task: Task) => {
+      // Игнорируем клики правой кнопкой мыши или вехи
+      if (e.button !== 0 || task.duration_minutes === 0 || !draft) return;
+      e.stopPropagation();
+
+      dragRef.current = {
+        active: false,
+        taskId: task.id,
+        startX: e.clientX,
+        origDuration: task.duration_minutes,
+        origDraft: copy(draft),
+        lastDeltaDays: 0,
+      };
+
+      const onMouseMove = (moveEvt: MouseEvent) => {
+        if (!dragRef.current || !chartContainerRef.current) return;
+        const dx = moveEvt.clientX - dragRef.current.startX;
+
+        if (!dragRef.current.active && Math.abs(dx) > 5) {
+          dragRef.current.active = true;
+          setDraggingTaskId(dragRef.current.taskId);
+        }
+
+        if (dragRef.current.active) {
+          const containerWidth = chartContainerRef.current.clientWidth || 800;
+          const dayWidthPx = containerWidth / Math.max(1, timelineDays.length);
+          const deltaDays = Math.round(dx / Math.max(10, dayWidthPx));
+
+          if (deltaDays !== dragRef.current.lastDeltaDays) {
+            dragRef.current.lastDeltaDays = deltaDays;
+            const newDuration = Math.max(480, dragRef.current.origDuration + deltaDays * 8 * 60);
+
+            if (draft) {
+              const updatedTasks = draft.tasks.map((t) =>
+                t.id === dragRef.current?.taskId ? { ...t, duration_minutes: newDuration } : t
+              );
+              change({ ...draft, tasks: updatedTasks });
+            }
+          }
+        }
+      };
+
+      const onMouseUp = () => {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        window.removeEventListener("keydown", onKeyDown);
+        dragRef.current = null;
+        setDraggingTaskId(null);
+      };
+
+      const onKeyDown = (keyEvt: KeyboardEvent) => {
+        if (keyEvt.key === "Escape" && dragRef.current) {
+          if (dragRef.current.origDraft) {
+            change(dragRef.current.origDraft);
+          }
+          onMouseUp();
+        }
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+      window.addEventListener("keydown", onKeyDown);
+    },
+    [draft, change, timelineDays.length]
+  );
+
   return {
     draft,
     zone,
@@ -162,6 +314,8 @@ export function useTimelinePanel() {
     dependencyVisible,
     setDependencyVisible,
     rows,
+    savedRows,
+    dirty,
     timelineStartMs,
     timelineTotalMs,
     timelineDays,
@@ -169,6 +323,14 @@ export function useTimelinePanel() {
     todayMarkerPercent,
     deadlineMarkerPercent,
     taskDependencyCounts,
+    dependenciesDetailed,
+    hoveredTaskId,
+    setHoveredTaskId,
+    activeDepTaskId,
+    setActiveDepTaskId,
+    draggingTaskId,
+    handleBarMouseDown,
+    chartContainerRef,
     getAvatarClass,
     getInitials,
     statusLabels,

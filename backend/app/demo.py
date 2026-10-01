@@ -4,10 +4,28 @@ from zoneinfo import ZoneInfo
 from app.schemas import Assignee, Dependency, ProjectInput, Skill, Task, Delivery
 
 
+def _add_business_days(dt: datetime, add_days: int) -> datetime:
+    res = dt
+    while add_days > 0:
+        res += timedelta(days=1)
+        if res.weekday() < 5:
+            add_days -= 1
+    return res
+
+
+def _sub_business_days(dt: datetime, sub_days: int) -> datetime:
+    res = dt
+    while sub_days > 0:
+        res -= timedelta(days=1)
+        if res.weekday() < 5:
+            sub_days -= 1
+    return res
+
+
 def demo():
     zone = ZoneInfo("Asia/Yekaterinburg")
     now = datetime.now(zone)
-    start = (now - timedelta(days=now.weekday())).replace(hour=9, minute=0, second=0, microsecond=0)
+    start = _sub_business_days(now, 15).replace(hour=9, minute=0, second=0, microsecond=0)
     
     names = [
         "Анализ требований и скоупа",
@@ -53,11 +71,22 @@ def demo():
         for i, (name, hours, person, prio, skills) in enumerate(zip(names, durations, people, priorities, req_skills))
     ]
     
-    # Первая задача уже выполнена
+    # Первая задача уже выполнена (в прошлом)
+    task1_finish = _add_business_days(start, 1).replace(hour=18)
     tasks[0] = tasks[0].model_copy(update=dict(
         status="done",
         actual_start=start,
-        actual_finish=start.replace(hour=18)
+        actual_finish=task1_finish
+    ))
+
+    # Вторая и третья задачи in_progress (начались недавно)
+    tasks[1] = tasks[1].model_copy(update=dict(
+        status="in_progress",
+        actual_start=_sub_business_days(now, 2).replace(hour=10)
+    ))
+    tasks[2] = tasks[2].model_copy(update=dict(
+        status="in_progress",
+        actual_start=_sub_business_days(now, 1).replace(hour=11)
     ))
     
     # Цепочка технологических зависимостей
@@ -117,10 +146,13 @@ def demo():
         )
     ]
 
+    calc_finish = _add_business_days(start, 11)
+    deadline = _add_business_days(calc_finish, 3).replace(hour=18, minute=0, second=0, microsecond=0)
+
     return ProjectInput(
         name="Запуск клиентского портала",
         start=start,
-        deadline=start + timedelta(days=16, hours=9),
+        deadline=deadline,
         tasks=tasks,
         assignees=assignees,
         dependencies=[Dependency(predecessor_id=str(a), successor_id=str(b)) for a, b in pairs]

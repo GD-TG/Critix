@@ -169,6 +169,7 @@ export type Scenario = {
 };
 
 export type HistoryEntry = {
+  id?: string;
   version: number;
   created_at: string;
   finish?: string;

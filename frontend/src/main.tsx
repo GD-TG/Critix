@@ -7,6 +7,7 @@ import {
   Group,
   MantineProvider,
   Paper,
+  SegmentedControl,
   Stack,
   Text,
   ThemeIcon,
@@ -23,8 +24,10 @@ import { AuthForm } from "./feature/AuthForm/AuthForm";
 import { SideForm } from "./feature/SideForm/SideForm";
 import { TopBar } from "./feature/TopBar/TopBar";
 import { DashboardHeader } from "./feature/DashboardHeader/DashboardHeader";
-import { DraftBanner } from "./feature/DraftBanner/DraftBanner";
-import { MetricsGrid } from "./feature/MetricsGrid/MetricsGrid";
+import { StatusStrip } from "./feature/StatusStrip/StatusStrip";
+import { DraftBar } from "./feature/DraftBar/DraftBar";
+import { BriefDialog } from "./feature/BriefDialog/BriefDialog";
+import { EventDialog } from "./feature/EventDialog/EventDialog";
 import { TimelinePanel } from "./feature/TimelinePanel/TimelinePanel";
 import { AttentionPanel } from "./feature/AttentionPanel/AttentionPanel";
 import { HistoryPanel } from "./feature/HistoryPanel/HistoryPanel";
@@ -76,6 +79,7 @@ export function App() {
   } = useApp();
 
   const view = preview || saved;
+  const [dashboardTab, setDashboardTab] = useState<"timeline" | "analysis">("timeline");
 
   const scrollToSection = (id: string) => {
     setActiveView("dashboard");
@@ -121,41 +125,8 @@ export function App() {
           <TopBar />
 
           <div className="content-wrap" id="overview">
-            <Paper
-              withBorder
-              p="sm"
-              mb="md"
-              radius="md"
-              style={{
-                background: "linear-gradient(90deg, rgba(210,10,46,0.06) 0%, rgba(255,255,255,0) 100%)",
-                borderColor: "rgba(210,10,46,0.25)",
-              }}
-            >
-              <Group justify="space-between" wrap="wrap" gap="xs">
-                <Group gap="xs">
-                  <ThemeIcon color="red" variant="light" size="md" radius="md">
-                    <Coins size={16} />
-                  </ThemeIcon>
-                  <div>
-                    <Text fw={700} size="sm">
-                      Пульт решений: Срок · Деньги · Состав запуска
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Подрядчик опаздывает или горит дедлайн? Оцените штрафы и спасите запуск за 1 клик.
-                    </Text>
-                  </div>
-                </Group>
-                <Button
-                  color="red"
-                  size="xs"
-                  onClick={() => openDecisionLabForTask()}
-                >
-                  Разобрать ситуацию и риски
-                </Button>
-              </Group>
-            </Paper>
             {!draft && (
-              <Card withBorder>
+              <Card withBorder mb="md">
                 <Stack>
                   <Title order={3}>Нет выбранного проекта</Title>
                   <Text>Создайте проект, откройте существующий или загрузите демо.</Text>
@@ -175,24 +146,49 @@ export function App() {
               </div>
             )}
 
-            <DraftBanner />
-
-            {activeView === "dashboard" && draft && view && (
+            {draft && view && (activeView === "dashboard" || activeView === "timeline") && (
               <>
-                <MetricsGrid />
+                <StatusStrip />
 
-                <section className="dashboard-grid">
-                  <AttentionPanel />
+                <Group justify="space-between" align="center" mb="sm" wrap="wrap">
+                  <SegmentedControl
+                    size="xs"
+                    value={activeView === "timeline" ? "timeline" : dashboardTab}
+                    onChange={(val) => {
+                      setDashboardTab(val as "timeline" | "analysis");
+                      if (activeView !== "dashboard") {
+                        setActiveView("dashboard");
+                      }
+                    }}
+                    data={[
+                      { label: "📅 Расписание и Гант", value: "timeline" },
+                      { label: "🔬 Анализ рисков и Сценарии", value: "analysis" },
+                    ]}
+                  />
 
-                  <EnginePanel />
-                </section>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="red"
+                    leftSection={<Coins size={14} />}
+                    onClick={() => openDecisionLabForTask()}
+                  >
+                    Пульт решений (What-If)
+                  </Button>
+                </Group>
 
-                <HistoryPanel />
+                {(activeView === "timeline" || dashboardTab === "timeline") ? (
+                  <TimelinePanel />
+                ) : (
+                  <>
+                    <section className="dashboard-grid">
+                      <AttentionPanel />
+                      <EnginePanel />
+                    </section>
+                    <HistoryPanel />
+                  </>
+                )}
               </>
-            )}
-
-            {activeView === "timeline" && draft && view && (
-              <TimelinePanel />
             )}
 
             <ErrorBoundary fallbackTitle="Ошибка отображения графа проекта">
@@ -251,6 +247,10 @@ export function App() {
           aiSource={aiReport?.source || "llm"}
         />
       )}
+
+      <DraftBar />
+      <EventDialog />
+      <BriefDialog />
     </MantineProvider>
   );
 }
