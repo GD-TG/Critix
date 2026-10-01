@@ -319,7 +319,13 @@ class UserRegister(StrictModel):
     @classmethod
     def validate_email(cls, v: str) -> str:
         v = v.strip().lower()
-        if "@" not in v or "." not in v.split("@")[-1]:
+        if " " in v or "@" not in v or v.count("@") != 1:
+            raise ValueError("Некорректный формат email")
+        local, domain = v.split("@")
+        if not local or not domain or "." not in domain:
+            raise ValueError("Некорректный формат email")
+        domain_parts = domain.split(".")
+        if any(not part for part in domain_parts) or len(domain_parts[-1]) < 2:
             raise ValueError("Некорректный формат email")
         return v
 
@@ -327,6 +333,11 @@ class UserRegister(StrictModel):
 class UserLogin(StrictModel):
     email: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
 
 
 class UserResponse(StrictModel):

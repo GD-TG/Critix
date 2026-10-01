@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   Button,
@@ -29,9 +29,6 @@ import { StatusStrip } from "./feature/StatusStrip/StatusStrip";
 import { DraftBar } from "./feature/DraftBar/DraftBar";
 import { DeliveriesModal } from "./feature/DeliveriesModal/DeliveriesModal";
 import { TimelinePanel } from "./feature/TimelinePanel/TimelinePanel";
-import { AttentionPanel } from "./feature/AttentionPanel/AttentionPanel";
-import { HistoryPanel } from "./feature/HistoryPanel/HistoryPanel";
-import { EnginePanel } from "./feature/EnginePanel/EnginePanel";
 import { GraphView } from "./feature/GraphView/GraphView";
 import { TasksTableView } from "./feature/TasksTableView/TasksTableView";
 import { TeamView } from "./feature/TeamView/TeamView";
@@ -91,10 +88,12 @@ export function App() {
 
   const scrollToSection = (id: string) => {
     setActiveView("dashboard");
-    setTimeout(() => {
-      const el = document.getElementById(id);
-      if (el) el.scrollIntoView({ behavior: "smooth" });
-    }, 50);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }, 120);
+    });
   };
 
   const handleLoadDemoProject = async () => {
@@ -166,11 +165,15 @@ export function App() {
             )}
 
             {draft && view && activeView === "dashboard" && (
-              <DashboardOverview />
+              <ErrorBoundary fallbackTitle="Ошибка отображения обзора проекта">
+                <DashboardOverview />
+              </ErrorBoundary>
             )}
 
             {draft && view && activeView === "timeline" && (
-              <TimelinePanel />
+              <ErrorBoundary fallbackTitle="Ошибка отображения плана проекта">
+                <TimelinePanel />
+              </ErrorBoundary>
             )}
 
             <ErrorBoundary fallbackTitle="Ошибка отображения графа проекта">
@@ -189,17 +192,21 @@ export function App() {
               <LinksView />
             </ErrorBoundary>
 
-            <AiView />
+            <ErrorBoundary fallbackTitle="Ошибка отображения AI советника">
+              <AiView />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
 
       <Toast />
-      <DecisionLab
-        opened={decisionLabOpened}
-        onClose={() => setDecisionLabOpened(false)}
-        onLoadDemo={handleLoadDemoProject}
-      />
+      <ErrorBoundary fallbackTitle="Ошибка лаборатории решений">
+        <DecisionLab
+          opened={decisionLabOpened}
+          onClose={() => setDecisionLabOpened(false)}
+          onLoadDemo={handleLoadDemoProject}
+        />
+      </ErrorBoundary>
 
       <DependencyModal />
 
@@ -220,14 +227,16 @@ export function App() {
       <HelpModal />
 
       {draft && (
-        <ExecutiveReportModal
-          opened={executiveReportModal}
-          onClose={() => setExecutiveReportModal(false)}
-          project={view?.project || draft}
-          result={view}
-          aiSummary={aiText}
-          aiSource={aiReport?.source || "llm"}
-        />
+        <ErrorBoundary fallbackTitle="Ошибка формирования исполнительного отчета">
+          <ExecutiveReportModal
+            opened={executiveReportModal}
+            onClose={() => setExecutiveReportModal(false)}
+            project={view?.project || draft}
+            result={view}
+            aiSummary={aiText}
+            aiSource={aiReport?.source || "llm"}
+          />
+        </ErrorBoundary>
       )}
 
       <EventDialog opened={eventDialogOpened} onClose={() => setEventDialogOpened(false)} />

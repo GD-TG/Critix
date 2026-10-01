@@ -80,8 +80,11 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
   const [busy, setBusy] = useState(false);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
 
-  // Sync to localStorage
+  const loadedKeyRef = useRef(storageKey);
+
+  // Sync to localStorage (only after messages for the current project are loaded)
   useEffect(() => {
+    if (loadedKeyRef.current !== storageKey) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(messages));
     } catch {
@@ -97,6 +100,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
+          loadedKeyRef.current = storageKey;
           return;
         }
       }
@@ -111,6 +115,7 @@ export function AICopilotChat({ project, projectId, result }: AICopilotChatProps
         timestamp: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
       },
     ]);
+    loadedKeyRef.current = storageKey;
   }, [projectId, project.name, storageKey]);
 
   const scrollToBottom = () => {

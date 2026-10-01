@@ -123,7 +123,11 @@ def analyze(project: ProjectInput, as_of=None, calendar_cache=None, budget=None)
         if task.not_before is not None:
             constraints.append(dict(source="not_before", target="start", bound=task.not_before))
         for dep in incoming[task_id]:
-            bound = shifted(dep, early[dep.predecessor_id])
+            try:
+                bound = shifted(dep, early[dep.predecessor_id])
+            except PlanningError:
+                bound = project.start
+                flags[task_id].add("dependency_conflict")
             constraints.append(dict(source="dependency", target="start" if dep.kind[1] == "S" else "finish",
                                     bound=bound, dependency=dep.model_dump()))
             if dep.kind[1] == "S":

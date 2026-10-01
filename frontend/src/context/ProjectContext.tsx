@@ -66,6 +66,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [setBusy, setError]);
 
   const sessionGen = useRef(0);
+  const currentProjectIdRef = useRef<string | null>(null);
 
   const list = useCallback(async () => {
     const currentSession = sessionGen.current;
@@ -77,6 +78,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   }, [logged]);
 
   const accept = useCallback((result: Result, forceReset?: boolean) => {
+    currentProjectIdRef.current = result.id;
     setSaved(result);
     let initialDraft = copy(result.project);
     if (forceReset) {
@@ -108,12 +110,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const change = useCallback((p: Project) => {
     setDraft(p);
     setPreview(null);
-    setAiText("");
-    setAiReport(null);
     setLastUpdated(new Date());
   }, []);
 
   const clearProject = useCallback(() => {
+    currentProjectIdRef.current = null;
     setSaved(null);
     setDraft(null);
     setPreview(null);
@@ -127,6 +128,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const currentGen = sessionGen.current;
 
     if (!logged) {
+      currentProjectIdRef.current = null;
       setProjects([]);
       setSaved(null);
       setDraft(null);
@@ -141,8 +143,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const data = await list();
         if (sessionGen.current !== currentGen) return;
         if (data.length > 0) {
+          if (currentProjectIdRef.current) return;
           const res = await api<Result>(`/projects/${data[0].id}`);
-          if (sessionGen.current === currentGen) {
+          if (sessionGen.current === currentGen && !currentProjectIdRef.current) {
             accept(res);
           }
         }
@@ -174,7 +177,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           setPreview(res);
         }
       } catch {
-        // If simulation fails (e.g. cycle during edit), preview stays null
+        // If simulation fails (e.g. cycle during edit), reset preview to null
+        if (isMounted) {
+          setPreview(null);
+        }
       }
     }, 120);
 

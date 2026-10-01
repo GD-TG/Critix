@@ -33,7 +33,17 @@ export function BriefDialog({ opened, onClose }: BriefDialogProps) {
 
     const newDateText = formatShortDate(preview.analysis.finish, zone);
 
-    text = `Уважаемый заказчик, из-за недавних изменений финиш проекта сдвигается на ${finishDeltaDays} дней. Новый срок: ${newDateText}. Финансовые риски: штраф составит ${previewPenalty.toLocaleString("ru-RU")} руб. Предлагаем согласовать перенос дедлайна или урезать скоуп.`;
+    if (finishDeltaDays > 0) {
+      const penaltyText = previewPenalty > 0
+        ? ` Финансовые риски: штраф составит ${previewPenalty.toLocaleString("ru-RU")} руб. Предлагаем согласовать перенос дедлайна или оптимизировать состав релиза.`
+        : " Проект остаётся в рамках дедлайна, финансовых рисков нет.";
+      text = `Уважаемый заказчик, из-за недавних изменений расчётный финиш проекта сдвигается на +${finishDeltaDays} дн. Новый планируемый срок: ${newDateText}.${penaltyText}`;
+    } else if (finishDeltaDays < 0) {
+      const earlyDays = Math.abs(finishDeltaDays);
+      text = `Уважаемый заказчик, благодаря оптимизации расписания проект опережает базовый план на ${earlyDays} дн. Новый расчётный срок завершения: ${newDateText}. Рисков срыва дедлайна нет.`;
+    } else {
+      text = `Уважаемый заказчик, дата завершения проекта остаётся без изменений: ${newDateText}. Проект выполняется в строгом соответствии с графиком.`;
+    }
   }
 
   return (

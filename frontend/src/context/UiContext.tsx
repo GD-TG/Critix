@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -102,18 +103,34 @@ export function UiProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute("data-mantine-color-scheme", colorScheme);
   }, [colorScheme]);
 
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(""), 2600);
-    return () => clearTimeout(timer);
-  }, [toast]);
+  const toastTimerRef = useRef<any>(null);
 
-  const showNotification = useCallback((msg: string) => setToast(msg), []);
+  const showNotification = useCallback((msg: string) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast("");
+    requestAnimationFrame(() => {
+      setToast(msg);
+      toastTimerRef.current = setTimeout(() => {
+        setToast("");
+        toastTimerRef.current = null;
+      }, 2600);
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const rescheduleOverdue = useCallback(() => {
-    const view = preview || saved;
-    if (!draft || !view) return;
-    const updatedTasks = rescheduleOverdueTasks(draft.tasks, view.analysis, new Date());
+    const baseResult = saved || preview;
+    if (!draft || !baseResult) return;
+    const updatedTasks = rescheduleOverdueTasks(draft.tasks, baseResult.analysis, new Date());
     change({ ...draft, tasks: updatedTasks });
     showNotification("Ограничения начала обновлены в черновике. Проверьте последствия.");
   }, [draft, saved, preview, change, showNotification]);

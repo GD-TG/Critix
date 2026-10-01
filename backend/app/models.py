@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Integer, JSON, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -13,7 +13,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now())
 
 
 class Project(Base):
@@ -59,7 +59,7 @@ class Task(Base):
     actual_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     actual_finish: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
-        ForeignKeyConstraint(["project_id", "assignee_id"], ["assignees.project_id", "assignees.id"]),
+        ForeignKeyConstraint(["project_id", "assignee_id"], ["assignees.project_id", "assignees.id"], ondelete="SET NULL"),
         CheckConstraint("duration_minutes >= 0"),
         CheckConstraint("remaining_minutes IS NULL OR (remaining_minutes BETWEEN 0 AND 525600 AND actual_start IS NOT NULL AND status IN ('in_progress', 'blocked'))", name="ck_tasks_remaining_work"),
         CheckConstraint("allocation_percent BETWEEN 1 AND 100"),
@@ -89,7 +89,7 @@ class Change(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     project_id: Mapped[UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     version: Mapped[int]
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now())
     snapshot: Mapped[dict] = mapped_column(JSON)
     analysis: Mapped[dict] = mapped_column(JSON)
     comment: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -105,5 +105,5 @@ class Scenario(Base):
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)
     base_version: Mapped[int]
     snapshot: Mapped[dict] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now())
 

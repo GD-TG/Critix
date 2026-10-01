@@ -111,9 +111,11 @@ export function useEventDialog(onClose: () => void) {
       }
       case "delay": {
         if (!taskId || !newStartDate) return;
+        const parsedDate = new Date(newStartDate);
+        if (isNaN(parsedDate.getTime())) return;
         const task = newDraft.tasks.find((t) => t.id === taskId);
         if (task) {
-          task.not_before = new Date(newStartDate).toISOString();
+          task.not_before = parsedDate.toISOString();
           if (task.status === "done") {
             task.status = "in_progress";
             task.actual_finish = null;
@@ -140,7 +142,9 @@ export function useEventDialog(onClose: () => void) {
       }
       case "deadline": {
         if (!newDeadline) return;
-        newDraft.deadline = new Date(newDeadline).toISOString();
+        const parsedDeadline = new Date(newDeadline);
+        if (isNaN(parsedDeadline.getTime())) return;
+        newDraft.deadline = parsedDeadline.toISOString();
         showNotification(`Событие применено: новый дедлайн проекта сохранен.`);
         break;
       }

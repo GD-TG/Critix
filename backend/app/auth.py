@@ -1,5 +1,8 @@
 import hashlib
+import logging
 import secrets
+
+logger = logging.getLogger("critix.auth")
 
 
 def hash_password(password: str) -> str:
@@ -19,4 +22,5 @@ def verify_password(password: str, hashed: str) -> bool:
     except Exception:
         pass
     # Fallback to constant-time string comparison for legacy or plain test strings
+    logger.warning("Legacy non-PBKDF2 password format detected during authentication")
     return secrets.compare_digest(password.encode("utf-8"), hashed.encode("utf-8"))

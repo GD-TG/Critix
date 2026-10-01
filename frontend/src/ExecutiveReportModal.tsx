@@ -46,26 +46,45 @@ export function ExecutiveReportModal({
   aiSummary,
   aiSource = "llm",
 }: ExecutiveReportModalProps) {
-  const formatDate = (iso?: string | null) =>
-    iso
-      ? new Date(iso).toLocaleDateString("ru-RU", {
-          timeZone: project.timezone,
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        })
-      : "—";
-  const formatTime = (iso?: string | null) =>
-    iso
-      ? new Date(iso).toLocaleString("ru-RU", {
-          timeZone: project.timezone,
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "—";
+  const formatDate = (iso?: string | null) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleDateString("ru-RU", {
+        timeZone: project.timezone || undefined,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return new Date(iso).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    }
+  };
+
+  const formatTime = (iso?: string | null) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("ru-RU", {
+        timeZone: project.timezone || undefined,
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return new Date(iso).toLocaleString("ru-RU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  };
   const [copyStatus, setCopyStatus] = useState("");
   const printRef = useRef<HTMLDivElement>(null);
 
