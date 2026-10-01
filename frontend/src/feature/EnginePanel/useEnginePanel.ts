@@ -1,8 +1,6 @@
 import { useApp } from "@/context/AppContext";
 import { formatShortDate, getZone } from "@/shared";
 
-const DAILY_LOSS_RATE = 35000;
-
 export function useEnginePanel() {
   const { draft, saved, preview, openDecisionLabForTask, setSettingsTab, setSettings } = useApp();
 
@@ -26,7 +24,6 @@ export function useEnginePanel() {
     }
   }
 
-  const financialLoss = lateDays * DAILY_LOSS_RATE;
   const criticalCount = view?.analysis.tasks.filter((t) => t.critical).length ?? 0;
   const nonCriticalCount = (draft?.tasks.length ?? 0) - criticalCount;
 
@@ -44,7 +41,6 @@ export function useEnginePanel() {
     shortDate,
     lateDays,
     bufferDays,
-    financialLoss,
     criticalCount,
     nonCriticalCount,
     maxSlackHours,

@@ -1,8 +1,6 @@
-import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon } from "@mantine/core";
-import { AlertCircle, CheckCircle2, Clock, Coins, Flame, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Badge, Button, Card, Group, SimpleGrid, Text, ThemeIcon } from "@mantine/core";
+import { AlertCircle, CheckCircle2, Clock, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useEnginePanel } from "./useEnginePanel";
-
-const formatMoney = (val: number) => `${val.toLocaleString("ru-RU")} ₽`;
 
 export function EnginePanel() {
   const {
@@ -12,7 +10,6 @@ export function EnginePanel() {
     shortDate,
     lateDays,
     bufferDays,
-    financialLoss,
     criticalCount,
     nonCriticalCount,
     maxSlackHours,
@@ -28,7 +25,7 @@ export function EnginePanel() {
       <div className="panel-header">
         <div>
           <Group gap="xs" align="center">
-            <h2>Финансовый пульс и устойчивость</h2>
+            <h2>Метрики расписания</h2>
             {hasExceeded ? (
               <Badge color="red" variant="light" size="sm">
                 Риск срыва дедлайна
@@ -44,38 +41,29 @@ export function EnginePanel() {
               </Badge>
             )}
           </Group>
-          <p>Оценка финансовых потерь от задержек, запас времени и статус критического пути</p>
+          <p>Сводная информация о состоянии расписания, резервах времени и критическом пути</p>
         </div>
-        <Button
-          size="xs"
-          color="red"
-          variant="light"
-          leftSection={<Coins size={14} />}
-          onClick={() => openDecisionLabForTask()}
-        >
-          Пульт решений
-        </Button>
       </div>
 
       <div style={{ padding: "0 20px 20px 20px" }}>
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          {/* КАРТОЧКА 1: Финансовые риски */}
+          {/* КАРТОЧКА 1: Статус дедлайна */}
           <Card withBorder p="sm" radius="md">
             <Group justify="space-between" mb={4}>
               <Text size="xs" fw={700} c="dimmed">
-                ФИНАНСОВЫЙ РИСК СРЫВА
+                СТАТУС ДЕДЛАЙНА
               </Text>
               <ThemeIcon color={hasExceeded ? "red" : "teal"} size="sm" variant="light">
-                {hasExceeded ? <Flame size={14} /> : <CheckCircle2 size={14} />}
+                {hasExceeded ? <AlertCircle size={14} /> : <CheckCircle2 size={14} />}
               </ThemeIcon>
             </Group>
             <Text size="lg" fw={700} c={hasExceeded ? "red.7" : "green.7"}>
-              {hasExceeded ? formatMoney(financialLoss) : "0 ₽ (в графике)"}
+              {hasExceeded ? `Срыв на ${lateDays} дн.` : "В графике"}
             </Text>
             <Text size="xs" c="dimmed">
               {hasExceeded
-                ? `Штраф за ${lateDays} дн. опоздания (~35 000 ₽ / сутки)`
-                : "Проект укладывается в срок, штрафные санкции отсутствуют"}
+                ? "Прогнозируемая дата завершения позже целевого дедлайна"
+                : "Прогнозируемая дата завершения укладывается в целевой дедлайн"}
             </Text>
           </Card>
 
@@ -95,7 +83,7 @@ export function EnginePanel() {
             <Text size="xs" c="dimmed">
               Дедлайн: {shortDate(draft.deadline)} ·{" "}
               <span style={{ fontWeight: 600, color: hasExceeded ? "var(--mantine-color-red-7)" : "var(--mantine-color-teal-7)" }}>
-                {hasExceeded ? `Срыв на ${lateDays} дн.` : `Запас: ${bufferDays} дн.`}
+                {hasExceeded ? `Опоздание: ${lateDays} дн.` : `Запас: ${bufferDays} дн.`}
               </span>
             </Text>
           </Card>

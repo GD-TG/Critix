@@ -13,7 +13,7 @@ import {
   ThemeIcon,
   Title,
 } from "@mantine/core";
-import { FlaskConical, Zap } from "lucide-react";
+import { Calendar, Activity, FlaskConical, Zap } from "lucide-react";
 import "@mantine/core/styles.css";
 import "@xyflow/react/dist/style.css";
 import "./style.css";
@@ -160,7 +160,7 @@ export function App() {
               <>
                 <StatusStrip />
 
-                <Group justify="space-between" align="center" mb="sm" wrap="wrap">
+                <Group justify="center" align="center" mb="sm">
                   <SegmentedControl
                     size="xs"
                     value={activeView === "timeline" ? "timeline" : dashboardTab}
@@ -171,20 +171,26 @@ export function App() {
                       }
                     }}
                     data={[
-                      { label: "📅 Расписание и Гант", value: "timeline" },
-                      { label: "🔬 Анализ рисков и Сценарии", value: "analysis" },
+                      {
+                        label: (
+                          <Group gap="xs" justify="center">
+                            <Calendar size={14} />
+                            <span>Расписание и Гант</span>
+                          </Group>
+                        ),
+                        value: "timeline",
+                      },
+                      {
+                        label: (
+                          <Group gap="xs" justify="center">
+                            <Activity size={14} />
+                            <span>Анализ рисков и Сценарии</span>
+                          </Group>
+                        ),
+                        value: "analysis",
+                      },
                     ]}
                   />
-
-                  <Button
-                    size="xs"
-                    variant="subtle"
-                    color="gray"
-                    leftSection={<FlaskConical size={14} />}
-                    onClick={() => openDecisionLabForTask()}
-                  >
-                    Лаборатория решений
-                  </Button>
                 </Group>
 
                 {(activeView === "timeline" || dashboardTab === "timeline") ? (

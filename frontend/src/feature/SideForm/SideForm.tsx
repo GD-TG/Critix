@@ -67,7 +67,7 @@ export function SideForm({ onScrollTo }: Props) {
           <span className="nav-count">{draft?.dependencies.length || 0}</span>
         </button>
         <button className={`nav-item ${activeView === "ai" ? "active" : ""}`} onClick={() => setActiveView("ai")}>
-          <AlertTriangle size={16} /> Риски & AI
+          <AlertTriangle size={16} /> Анализ рисков
           {overdueTasks.length > 0 && <span className="nav-count warning">{overdueTasks.length}</span>}
         </button>
       </nav>

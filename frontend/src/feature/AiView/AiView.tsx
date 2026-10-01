@@ -13,9 +13,9 @@ export function AiView() {
     <Stack gap="md">
       <Group justify="space-between">
         <div>
-          <Title order={3}>AI Copilot и Центр анализа рисков</Title>
+          <Title order={3}>Центр анализа рисков</Title>
           <Text size="sm" c="dimmed">
-            Интерактивный диалог с AI по проекту, экспресс-аудит критического пути и стратегические рекомендации.
+            Экспресс-аудит критического пути и стратегические рекомендации по расписанию.
           </Text>
         </div>
         <Button size="xs" variant="light" onClick={() => setActiveView("dashboard")}>

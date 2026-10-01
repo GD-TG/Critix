@@ -12,7 +12,7 @@ import {
   priorityLabels,
   statusLabels,
 } from "@/shared";
-import type { Task } from "@/types";
+import { defaultTask, type Task } from "@/types";
 
 export interface TimelineDay {
   key: string;
@@ -335,6 +335,7 @@ export function useTimelinePanel() {
     getInitials,
     statusLabels,
     priorityLabels,
+    addTask: () => setTask(defaultTask()),
     setTask,
     copy,
     setActiveView,

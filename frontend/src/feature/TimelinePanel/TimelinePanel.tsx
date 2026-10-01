@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Badge, Box, Button, Group, Popover, ScrollArea, Stack, Text } from "@mantine/core";
-import { ArrowLeft, ArrowRight, ChevronRight, List, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, List, Plus, ShieldAlert } from "lucide-react";
 import { useTimelinePanel } from "./useTimelinePanel";
 
 export function TimelinePanel() {
@@ -32,6 +32,7 @@ export function TimelinePanel() {
     getAvatarClass,
     getInitials,
     statusLabels,
+    addTask,
     setTask,
     copy,
   } = useTimelinePanel();
@@ -43,20 +44,31 @@ export function TimelinePanel() {
           <h2>План проекта и расписание</h2>
           <p>Интерактивная диаграмма Ганта с расчётом резервов времени (Float), критического пути и сдвигов</p>
         </div>
-        <div className="view-tabs">
-          <button
-            className={`view-tab ${timelineMode === "timeline" ? "active" : ""}`}
-            onClick={() => setTimelineMode("timeline")}
+        <Group gap="xs">
+          <Button
+            size="xs"
+            variant="filled"
+            color="red"
+            leftSection={<Plus size={14} />}
+            onClick={addTask}
           >
-            Гант
-          </button>
-          <button
-            className={`view-tab ${timelineMode === "list" ? "active" : ""}`}
-            onClick={() => setTimelineMode("list")}
-          >
-            <List size={12} /> Список
-          </button>
-        </div>
+            + Добавить задачу
+          </Button>
+          <div className="view-tabs">
+            <button
+              className={`view-tab ${timelineMode === "timeline" ? "active" : ""}`}
+              onClick={() => setTimelineMode("timeline")}
+            >
+              Гант
+            </button>
+            <button
+              className={`view-tab ${timelineMode === "list" ? "active" : ""}`}
+              onClick={() => setTimelineMode("list")}
+            >
+              <List size={12} /> Список
+            </button>
+          </div>
+        </Group>
       </div>
 
       <div className="timeline-toolbar" style={{ padding: "4px 12px", borderBottom: "1px solid var(--line)" }}>
