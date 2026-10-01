@@ -26,6 +26,7 @@ export type Task = {
   status: "todo" | "in_progress" | "done" | "blocked";
   actual_start: string | null;
   actual_finish: string | null;
+  remaining_minutes?: number | null;
 };
 export type Dependency = {
   predecessor_id: string;
@@ -33,6 +34,18 @@ export type Dependency = {
   kind: "FS" | "SS" | "FF" | "SF";
   lag_minutes: number;
   lag_mode: "working" | "elapsed";
+};
+export type Delivery = {
+  id: string;
+  name: string;
+  contractor: string;
+  promised_at: string;
+  expected_at: string | null;
+  review_days: number;
+  status: "waiting" | "delivered" | "rework" | "accepted";
+  delivered_at: string | null;
+  accepted_at: string | null;
+  dependent_task_ids: string[];
 };
 export type Project = {
   name: string;
@@ -48,6 +61,9 @@ export type Project = {
   assignees: Person[];
   tasks: Task[];
   dependencies: Dependency[];
+  deliveries?: Delivery[];
+  optional_task_ids?: string[];
+  deferred_task_ids?: string[];
 };
 export type Analysis = {
   critical_dependencies: Dependency[];
@@ -178,6 +194,13 @@ export type HistoryEntry = {
   changed_tasks?: string[];
   change_details?: string[];
   finish_delta_minutes?: number;
+  decision?: {
+    delivery_id: string;
+    kind: string;
+    decision: string;
+    decision_owner: string;
+    reason: string;
+  };
 };
 
 export type User = {
@@ -185,6 +208,72 @@ export type User = {
   email: string;
   name: string;
   created_at: string;
+};
+
+export type DeliveryEventKind = "delay" | "submit" | "reject" | "accept";
+
+export type DeliveryCaseAction = {
+  kind: DeliveryEventKind;
+  name: string;
+  requires_date: boolean;
+};
+
+export type DeliveryCase = {
+  delivery_id: string;
+  name: string;
+  contractor: string;
+  status: "waiting" | "delivered" | "rework" | "accepted";
+  promised_at: string;
+  expected_at: string | null;
+  delivered_at: string | null;
+  accepted_at: string | null;
+  review_days: number;
+  dependent_tasks: { id: string; name: string }[];
+  actions: DeliveryCaseAction[];
+};
+
+export type DeliveryCasesResponse = {
+  version: number;
+  deliveries: DeliveryCase[];
+};
+
+export type DeliveryEventPreviewVariant = {
+  decision: "accept_change" | "defer_optional";
+  name: string;
+  description: string;
+  project: Project;
+  analysis: Analysis;
+  impact: {
+    finish_before: string;
+    finish_after: string | null;
+    finish_delta_minutes: number;
+    deadline_exceeded: boolean;
+    moved_tasks: {
+      id: string;
+      name: string;
+      before_start: string;
+      before_finish: string;
+      after_start: string;
+      after_finish: string;
+    }[];
+    headline?: string;
+    deferred_tasks?: string[];
+  };
+};
+
+export type DeliveryEventPreviewResponse = {
+  before: {
+    forecast_finish: string | null;
+    deadline: string;
+  };
+  event: {
+    delivery_id: string;
+    kind: DeliveryEventKind;
+    expected_at: string | null;
+    reason: string;
+  };
+  variants: DeliveryEventPreviewVariant[];
+  requires_confirmation: boolean;
 };
 
 

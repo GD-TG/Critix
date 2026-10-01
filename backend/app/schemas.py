@@ -335,23 +335,3 @@ class UserResponse(StrictModel):
     name: str
     created_at: datetime
 
-
-class EventCompile(StrictModel):
-    kind: Literal["harder", "absence", "delay", "scope", "deadline"]
-    # For 'harder': task_id + extra_days
-    task_id: str | None = None
-    extra_days: int | None = None
-    # For 'absence': assignee_id + from_date + to_date + handover_to (optional)
-    assignee_id: str | None = None
-    from_date: str | None = None  # ISO date
-    to_date: str | None = None
-    handover_to: str | None = None  # assignee_id to transfer tasks to
-    # For 'delay': task_id + until_date
-    until_date: str | None = None
-    # For 'scope': new task name, duration_days, after_task_id, before_task_id
-    new_task_name: str | None = None
-    duration_days: int | None = None
-    after_task_id: str | None = None
-    before_task_id: str | None = None
-    # For 'deadline': new_deadline (ISO date)
-    new_deadline: str | None = None

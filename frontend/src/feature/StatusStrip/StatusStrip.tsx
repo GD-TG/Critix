@@ -1,5 +1,5 @@
 import { Badge, Button, Group, Paper, Text } from "@mantine/core";
-import { AlertCircle, AlertTriangle, CheckCircle2, ShieldAlert, Zap } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, FlaskConical, Package, ShieldAlert } from "lucide-react";
 import { useStatusStrip } from "./useStatusStrip";
 
 export function StatusStrip() {
@@ -16,7 +16,10 @@ export function StatusStrip() {
     criticalCount,
     dirty,
     deltaDays,
-    openEventDialog,
+    hasDeliveries,
+    deliveriesCount,
+    openDeliveriesModal,
+    openDecisionLab,
   } = data;
 
   const healthColor = health === "red" ? "red" : health === "orange" ? "orange" : "teal";
@@ -77,14 +80,25 @@ export function StatusStrip() {
         </Group>
 
         <Group gap="xs" wrap="nowrap">
+          {hasDeliveries && (
+            <Button
+              size="xs"
+              variant="light"
+              color="indigo"
+              leftSection={<Package size={14} />}
+              onClick={openDeliveriesModal}
+            >
+              Поставки ({deliveriesCount})
+            </Button>
+          )}
           <Button
             size="xs"
-            variant="light"
-            color="red"
-            leftSection={<Zap size={14} />}
-            onClick={openEventDialog}
+            variant="subtle"
+            color="gray"
+            leftSection={<FlaskConical size={14} />}
+            onClick={openDecisionLab}
           >
-            Что случилось?
+            Лаборатория решений
           </Button>
         </Group>
       </Group>

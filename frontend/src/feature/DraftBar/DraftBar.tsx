@@ -1,5 +1,5 @@
 import { Affix, Badge, Button, Group, Paper, Text, Transition } from "@mantine/core";
-import { AlertTriangle, Check, GitBranch, MessageSquare, X } from "lucide-react";
+import { Check, GitBranch, X } from "lucide-react";
 import { useDraftBar } from "./useDraftBar";
 
 export function DraftBar() {
@@ -12,12 +12,10 @@ export function DraftBar() {
     verdict,
     color,
     finishText,
-    financialImpact,
     isApplying,
     handleCancel,
     handleApply,
     openScenario,
-    openBrief,
   } = data;
 
   return (
@@ -37,27 +35,19 @@ export function DraftBar() {
             }}
           >
             <Group justify="space-between" align="center" wrap="wrap" gap="sm">
-              <Group gap="sm">
-                <div>
-                  <Text size="sm" fw={700}>
-                    {desc}
-                  </Text>
-                  <Group gap="xs" mt={2}>
-                    <Badge color={color} size="sm" variant="light">
-                      {verdict}
-                    </Badge>
-                    <Text size="xs" c="dimmed">
-                      {finishText}
-                    </Text>
-                  </Group>
-                </div>
-
-                {financialImpact && (
-                  <Badge color="red" variant="outline" size="sm" leftSection={<AlertTriangle size={12} />}>
-                    {financialImpact}
+              <div>
+                <Text size="sm" fw={700}>
+                  {desc}
+                </Text>
+                <Group gap="xs" mt={2}>
+                  <Badge color={color} size="sm" variant="light">
+                    {verdict}
                   </Badge>
-                )}
-              </Group>
+                  <Text size="xs" c="dimmed">
+                    {finishText}
+                  </Text>
+                </Group>
+              </div>
 
               <Group gap="xs" wrap="nowrap">
                 <Button
@@ -76,25 +66,16 @@ export function DraftBar() {
                   onClick={openScenario}
                   leftSection={<GitBranch size={14} />}
                 >
-                  В варианты
+                  В варианты (Сценарии)
                 </Button>
                 <Button
-                  variant="light"
-                  color="blue"
-                  size="xs"
-                  onClick={openBrief}
-                  leftSection={<MessageSquare size={14} />}
-                >
-                  Сообщить
-                </Button>
-                <Button
-                  color="red"
+                  color="teal"
                   size="xs"
                   loading={isApplying}
                   onClick={handleApply}
                   leftSection={<Check size={14} />}
                 >
-                  Применить
+                  Применить в проект
                 </Button>
               </Group>
             </Group>

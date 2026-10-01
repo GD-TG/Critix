@@ -158,63 +158,6 @@ def update(db, project_id, request, simulate=False):
     return {**write(db, row, request.project, after, comment=getattr(request, "comment", None)), "changes": delta}
 
 
-def compile_event(db, project_id, request):
-    import uuid
-    from app.schemas import Task, Dependency
-    version, old_project = read(db, project_id)
-    
-    draft = old_project.model_copy(deep=True)
-    
-    if request.kind == "harder" and request.task_id:
-        for t in draft.tasks:
-            if t.id == request.task_id:
-                t.duration_minutes += (request.extra_days or 0) * 8 * 60
-                break
-                
-    elif request.kind == "absence" and request.assignee_id:
-        to_dt = datetime.fromisoformat(request.to_date) if request.to_date else None
-        for t in draft.tasks:
-            if t.assignee_id == request.assignee_id:
-                if request.handover_to:
-                    t.assignee_id = request.handover_to
-                elif to_dt:
-                    t.not_before = to_dt
-                    
-    elif request.kind == "delay" and request.task_id and request.until_date:
-        to_dt = datetime.fromisoformat(request.until_date)
-        for t in draft.tasks:
-            if t.id == request.task_id:
-                t.not_before = to_dt
-                break
-                
-    elif request.kind == "scope" and request.new_task_name:
-        new_id = f"task-{uuid.uuid4().hex[:8]}"
-        duration = (request.duration_days or 1) * 8 * 60
-        draft.tasks.append(Task(
-            id=new_id,
-            name=request.new_task_name,
-            duration_minutes=duration,
-        ))
-        if request.after_task_id:
-            draft.dependencies.append(Dependency(predecessor_id=request.after_task_id, successor_id=new_id))
-        if request.before_task_id:
-            draft.dependencies.append(Dependency(predecessor_id=new_id, successor_id=request.before_task_id))
-            
-    elif request.kind == "deadline" and request.new_deadline:
-        draft.deadline = datetime.fromisoformat(request.new_deadline)
-        
-    as_of = datetime.now(timezone.utc)
-    current_analysis = analyze(old_project, as_of=as_of)
-    new_analysis = analyze(draft, as_of=as_of)
-    diff = compare(current_analysis, new_analysis, old_project, draft)
-    
-    db.rollback()
-    return {
-        "draft": draft,
-        "analysis": new_analysis,
-        "comparison": diff,
-    }
-
 
 def level(db, project_id, request):
     from app.engine.leveling import level_resources

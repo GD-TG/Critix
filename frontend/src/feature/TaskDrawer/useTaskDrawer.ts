@@ -141,6 +141,24 @@ export function useTaskDrawer() {
     showNotification(`Задача «${task.name}» сохранена`);
   };
 
+  const isOptional = Boolean(task && draft?.optional_task_ids?.includes(task.id));
+
+  const toggleOptional = (checked: boolean) => {
+    if (!draft || !task) return;
+    const current = new Set(draft.optional_task_ids || []);
+    if (checked) {
+      current.add(task.id);
+    } else {
+      current.delete(task.id);
+    }
+    change({
+      ...draft,
+      optional_task_ids: Array.from(current),
+    });
+  };
+
+  const linkedDeliveries = draft?.deliveries?.filter((d) => task && d.dependent_task_ids.includes(task.id)) || [];
+
   return {
     task,
     draft,
@@ -164,5 +182,8 @@ export function useTaskDrawer() {
     deleteTask,
     saveTask,
     calculateSkillMatch,
+    isOptional,
+    toggleOptional,
+    linkedDeliveries,
   };
 }

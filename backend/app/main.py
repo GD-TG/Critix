@@ -23,7 +23,7 @@ from app.db import session, SessionLocal
 from app.demo import demo, delivery_demo
 from app.engine.analysis import analyze
 from app.engine.calendar import PlanningError
-from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse, RecommendationRequest, StrictModel, EventCompile
+from app.schemas import ProjectInput, SaveProject, LevelProject, CreateScenario, ScenarioResponse, UserRegister, UserLogin, UserResponse, RecommendationRequest, StrictModel
 
 from contextlib import asynccontextmanager
 from app.schemas import DeliveryEvent, ApplyDeliveryEvent
@@ -421,10 +421,6 @@ def delete_project(project_id: UUID, db=Depends(project_session)):
 def simulate(project_id: UUID, body: SaveProject, db=Depends(project_session)):
     return service.update(db, project_id, body, simulate=True)
 
-
-@app.post("/api/projects/{project_id}/compile-event", dependencies=calculated)
-def compile_project_event(project_id: UUID, body: EventCompile, db=Depends(project_session)):
-    return service.compile_event(db, project_id, body)
 
 
 ai_concurrency = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENT_AI", "2")))

@@ -13,7 +13,7 @@ import {
   ThemeIcon,
   Title,
 } from "@mantine/core";
-import { Coins, Zap } from "lucide-react";
+import { FlaskConical, Zap } from "lucide-react";
 import "@mantine/core/styles.css";
 import "@xyflow/react/dist/style.css";
 import "./style.css";
@@ -26,8 +26,7 @@ import { TopBar } from "./feature/TopBar/TopBar";
 import { DashboardHeader } from "./feature/DashboardHeader/DashboardHeader";
 import { StatusStrip } from "./feature/StatusStrip/StatusStrip";
 import { DraftBar } from "./feature/DraftBar/DraftBar";
-import { BriefDialog } from "./feature/BriefDialog/BriefDialog";
-import { EventDialog } from "./feature/EventDialog/EventDialog";
+import { DeliveriesModal } from "./feature/DeliveriesModal/DeliveriesModal";
 import { TimelinePanel } from "./feature/TimelinePanel/TimelinePanel";
 import { AttentionPanel } from "./feature/AttentionPanel/AttentionPanel";
 import { HistoryPanel } from "./feature/HistoryPanel/HistoryPanel";
@@ -99,6 +98,16 @@ export function App() {
     });
   };
 
+  const handleLoadDeliveriesDemo = async () => {
+    await run(async () => {
+      const created = await api<Result>("/demo/deliveries", "POST");
+      await list();
+      accept(created);
+      setProjectManageModal(false);
+      showNotification("Демо-проект «Пилот: оплата от внешнего подрядчика» успешно загружен!");
+    });
+  };
+
   if (!logged) {
     return <AuthForm />;
   }
@@ -130,9 +139,10 @@ export function App() {
                 <Stack>
                   <Title order={3}>Нет выбранного проекта</Title>
                   <Text>Создайте проект, откройте существующий или загрузите демо.</Text>
-                  <Group>
+                  <Group wrap="wrap" gap="xs">
                     <Button onClick={() => setProjectManageModal(true)}>Управление проектами</Button>
-                    <Button variant="light" onClick={handleLoadDemoProject}>Загрузить Демо-проект</Button>
+                    <Button variant="light" onClick={handleLoadDemoProject}>Демо: Классический CPM</Button>
+                    <Button variant="light" color="indigo" onClick={handleLoadDeliveriesDemo}>Демо: Поставки подрядчика</Button>
                   </Group>
                 </Stack>
               </Card>
@@ -169,11 +179,11 @@ export function App() {
                   <Button
                     size="xs"
                     variant="subtle"
-                    color="red"
-                    leftSection={<Coins size={14} />}
+                    color="gray"
+                    leftSection={<FlaskConical size={14} />}
                     onClick={() => openDecisionLabForTask()}
                   >
-                    Пульт решений (What-If)
+                    Лаборатория решений
                   </Button>
                 </Group>
 
@@ -249,8 +259,7 @@ export function App() {
       )}
 
       <DraftBar />
-      <EventDialog />
-      <BriefDialog />
+      <DeliveriesModal />
     </MantineProvider>
   );
 }

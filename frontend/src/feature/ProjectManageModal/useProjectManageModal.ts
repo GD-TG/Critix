@@ -26,6 +26,16 @@ export function useProjectManageModal() {
     });
   };
 
+  const handleLoadDeliveriesDemo = async () => {
+    await run(async () => {
+      const created = await api<Result>("/demo/deliveries", "POST");
+      await list();
+      accept(created);
+      setProjectManageModal(false);
+      showNotification("Демо «Пилот: оплата от внешнего подрядчика» успешно загружен!");
+    });
+  };
+
   const handleDeleteProject = async (id: string) => {
     await run(async () => {
       await api(`/projects/${id}`, "DELETE");
@@ -79,6 +89,7 @@ export function useProjectManageModal() {
     setNewProjectModal, setJsonImportModal,
     deleteConfirmProject, setDeleteConfirmProject,
     handleLoadDemoProject,
+    handleLoadDeliveriesDemo,
     handleDeleteProject,
     switchProject,
     exportCurrent,

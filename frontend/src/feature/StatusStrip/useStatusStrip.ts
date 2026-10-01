@@ -3,7 +3,7 @@ import { useApp } from "@/context/AppContext";
 import { formatShortDate, getZone } from "@/shared";
 
 export function useStatusStrip() {
-  const { draft, saved, preview, view, dirty, setEventDialogOpened } = useApp();
+  const { draft, saved, preview, view, dirty, setDeliveriesModalOpened, openDecisionLabForTask } = useApp();
 
   const zone = getZone(draft, saved);
   const shortDate = (iso?: string) => (iso ? formatShortDate(iso, zone) : "—");
@@ -48,7 +48,8 @@ export function useStatusStrip() {
       ? `Запас: ${bufferDays} дн.` 
       : `Опоздание: ${lateDays} дн.`;
 
-    const openEventDialog = () => setEventDialogOpened(true);
+    const deliveriesCount = draft.deliveries?.length || 0;
+    const hasDeliveries = deliveriesCount > 0;
 
     return {
       health,
@@ -61,7 +62,10 @@ export function useStatusStrip() {
       overdueCount,
       dirty,
       deltaDays,
-      openEventDialog,
+      hasDeliveries,
+      deliveriesCount,
+      openDeliveriesModal: () => setDeliveriesModalOpened(true),
+      openDecisionLab: () => openDecisionLabForTask(),
     };
-  }, [draft, saved, preview, view, dirty, setEventDialogOpened]);
+  }, [draft, saved, preview, view, dirty, setDeliveriesModalOpened, openDecisionLabForTask]);
 }

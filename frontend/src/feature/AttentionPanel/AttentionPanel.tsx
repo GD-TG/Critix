@@ -12,6 +12,7 @@ export function AttentionPanel() {
     setActiveView,
     setShowScenarioModal,
     openDecisionLabForTask,
+    handleLevelResources,
   } = useAttentionPanel();
 
   return (
@@ -46,7 +47,7 @@ export function AttentionPanel() {
                     style={{ color: "var(--brand)", fontWeight: 600 }}
                     onClick={() => openDecisionLabForTask(t.id)}
                   >
-                    Пульт решений <ArrowRight size={10} />
+                    Лаборатория решений <ArrowRight size={10} />
                   </button>
                 </div>
               </div>
@@ -58,14 +59,23 @@ export function AttentionPanel() {
         {overloadedAssigneeIds.size > 0 && (
           <div className="attention-item medium">
             <span className="attention-icon">
-              <ArrowRight size={13} />
+              <AlertTriangle size={13} />
             </span>
             <div>
-              <strong>Перегрузка исполнителей</strong>
-              <p>Перегрузка {overloadedAssigneeIds.size} сотрудников.</p>
-              <button className="text-action" onClick={() => setActiveView("team")}>
-                Посмотреть <ArrowRight size={10} />
-              </button>
+              <strong>Ресурсный конфликт (&gt;100% FTE)</strong>
+              <p>Обнаружена перегрузка {overloadedAssigneeIds.size} сотрудников.</p>
+              <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                <button
+                  className="text-action"
+                  style={{ color: "var(--mantine-color-teal-6)", fontWeight: 600 }}
+                  onClick={handleLevelResources}
+                >
+                  Выровнять ресурсы в движке <ArrowRight size={10} />
+                </button>
+                <button className="text-action" onClick={() => setActiveView("team")}>
+                  В команду <ArrowRight size={10} />
+                </button>
+              </div>
             </div>
           </div>
         )}

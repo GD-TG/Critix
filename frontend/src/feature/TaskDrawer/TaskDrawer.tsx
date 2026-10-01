@@ -9,6 +9,7 @@ import {
   NumberInput,
   Select,
   Stack,
+  Switch,
   Text,
   TextInput,
 } from "@mantine/core";
@@ -41,6 +42,9 @@ export function TaskDrawer() {
     deleteTask,
     saveTask,
     calculateSkillMatch,
+    isOptional,
+    toggleOptional,
+    linkedDeliveries,
   } = useTaskDrawer();
 
   return (
@@ -222,12 +226,48 @@ export function TaskDrawer() {
           )}
 
           {(task.status === "in_progress" || task.status === "blocked") && (
-            <ProjectDateInput
-              label="Фактическое начало"
-              zone={draft.timezone}
-              value={task.actual_start}
-              onChange={(val) => updateTask({ actual_start: val })}
-            />
+            <Stack gap="xs">
+              <ProjectDateInput
+                label="Фактическое начало"
+                zone={draft.timezone}
+                value={task.actual_start}
+                onChange={(val) => updateTask({ actual_start: val })}
+              />
+              <NumberInput
+                label="Оценка остатка работы (часы)"
+                description="Оценка остатка на момент расчёта (as_of). Оставьте пустым для расчета по исходной длительности."
+                value={task.remaining_minutes != null ? task.remaining_minutes / 60 : undefined}
+                min={0}
+                step={0.5}
+                onChange={(val) =>
+                  updateTask({
+                    remaining_minutes: val != null && val !== "" ? Math.round(Number(val) * 60) : null,
+                  })
+                }
+              />
+            </Stack>
+          )}
+
+          <Divider my="xs" label="Управление составом выпуска (Scope)" labelPosition="center" />
+
+          <Switch
+            label="Необязательная работа (Optional Scope)"
+            description="Эту задачу можно перенести или исключить из текущего релиза при задержке дедлайна или поставки."
+            checked={isOptional}
+            onChange={(e) => toggleOptional(e.currentTarget.checked)}
+          />
+
+          {linkedDeliveries.length > 0 && (
+            <Card withBorder p="xs" radius="sm" style={{ backgroundColor: "rgba(59, 130, 246, 0.05)", borderColor: "rgba(59, 130, 246, 0.3)" }}>
+              <Text size="xs" fw={700} c="blue">
+                Зависит от поставки подрядчика:
+              </Text>
+              {linkedDeliveries.map((ld) => (
+                <Text key={ld.id} size="xs" c="dimmed">
+                  «{ld.name}» ({ld.contractor}) — статус: {ld.status}
+                </Text>
+              ))}
+            </Card>
           )}
 
           <Divider my="xs" label="Связи и зависимости (Предшественники)" labelPosition="center" />

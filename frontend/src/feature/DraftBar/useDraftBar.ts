@@ -16,7 +16,6 @@ export function useDraftBar() {
     run,
     showNotification,
     setShowScenarioModal,
-    setBriefDialogOpened,
   } = useApp();
 
   const [isApplying, setIsApplying] = useState(false);
@@ -55,10 +54,6 @@ export function useDraftBar() {
     setShowScenarioModal(true);
   }, [setShowScenarioModal]);
 
-  const openBrief = useCallback(() => {
-    setBriefDialogOpened(true);
-  }, [setBriefDialogOpened]);
-
   return useMemo(() => {
     if (!dirty || !draft || !saved || !view) {
       return { isActive: false };
@@ -94,20 +89,16 @@ export function useDraftBar() {
       ? `Финиш: ${shortDate(baseFinish)} → ${shortDate(currentFinish)} (${sign}${deltaDays} дн.)`
       : `Финиш: ${shortDate(currentFinish)}`;
 
-    const financialImpact = lateDays > 0 ? `Штраф: +${(lateDays * 35000).toLocaleString("ru-RU")} ₽` : null;
-
     return {
       isActive: true,
       desc,
       verdict,
       color,
       finishText,
-      financialImpact,
       isApplying,
       handleCancel,
       handleApply,
       openScenario,
-      openBrief,
     };
-  }, [dirty, draft, saved, view, preview, isApplying, handleCancel, handleApply, openScenario, openBrief]);
+  }, [dirty, draft, saved, view, preview, isApplying, handleCancel, handleApply, openScenario]);
 }

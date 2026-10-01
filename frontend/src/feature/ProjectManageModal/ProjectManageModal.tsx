@@ -19,6 +19,7 @@ export function ProjectManageModal() {
     setNewProjectModal, setJsonImportModal,
     deleteConfirmProject, setDeleteConfirmProject,
     handleLoadDemoProject,
+    handleLoadDeliveriesDemo,
     handleDeleteProject,
     switchProject,
     exportCurrent,
@@ -42,7 +43,10 @@ export function ProjectManageModal() {
               </Text>
               <Group gap="xs" wrap="wrap">
                 <Button size="xs" variant="light" leftSection={<RotateCcw size={13} />} onClick={handleLoadDemoProject}>
-                  Загрузить Демо-проект
+                  Демо: Классический CPM
+                </Button>
+                <Button size="xs" variant="light" color="indigo" leftSection={<RotateCcw size={13} />} onClick={handleLoadDeliveriesDemo}>
+                  Демо: Поставки подрядчика
                 </Button>
                 <Button size="xs" onClick={() => setNewProjectModal(true)}>
                   + Создать проект
